@@ -1,10 +1,7 @@
 use bevy::{
     color::palettes::basic::{GREEN, SILVER},
     input::mouse::MouseMotion,
-    pbr::{
-        wireframe::{WireframeConfig, WireframePlugin},
-        CascadeShadowConfigBuilder,
-    },
+    pbr::wireframe::{WireframeConfig, WireframePlugin},
     prelude::*,
     window::CursorGrabMode,
 };
@@ -29,19 +26,67 @@ fn main() {
             PerfUiPlugin,
             WireframePlugin,
         ))
+        .insert_resource(WorldGenNoise(Perlin::new(WORLD_SEED)))
         .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
         .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
         .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
-        .add_systems(Startup, setup)
+        .add_systems(Startup, (initialize_block_assets, setup).chain())
         .add_systems(Update, (move_camera, toggle_wireframe))
         .run();
 }
 
-fn setup(
+#[derive(Resource)]
+struct WorldGenNoise(Perlin);
+
+#[derive(Resource)]
+struct BlockMaterials {
+    stone: Handle<StandardMaterial>,
+    dirt: Handle<StandardMaterial>,
+    grass: Handle<StandardMaterial>,
+}
+
+#[derive(Resource)]
+struct BlockMeshes {
+    cube: Handle<Mesh>,
+}
+
+fn initialize_block_assets(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let block_meshes = BlockMeshes {
+        cube: meshes.add(Cuboid::from_length(BLOCK_SIZE)),
+    };
+    commands.insert_resource(block_meshes);
+
+    let stone = materials.add(StandardMaterial {
+        base_color: Color::from(SILVER),
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
+        ..Default::default()
+    });
+    let dirt = materials.add(StandardMaterial {
+        base_color: Color::from(Srgba::rgb(0.455, 0.278, 0.0)),
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
+        ..Default::default()
+    });
+    let grass = materials.add(StandardMaterial {
+        base_color: Color::from(GREEN),
+        perceptual_roughness: 1.0,
+        reflectance: 0.0,
+        ..Default::default()
+    });
+    commands.insert_resource(BlockMaterials { stone, dirt, grass });
+}
+
+fn setup(
+    mut commands: Commands,
     mut windows: Query<&mut Window>,
+    block_materials: Res<BlockMaterials>,
+    block_meshes: Res<BlockMeshes>,
+    world_gen_noise: Res<WorldGenNoise>,
 ) {
     let mut window = windows.single_mut();
     window.cursor.visible = false;
@@ -66,40 +111,11 @@ fn setup(
             rotation: Quat::from_rotation_x(-PI / 4.),
             ..default()
         },
-        // The default cascade config is designed to handle large scenes.
-        // As this example has a much smaller world, we can tighten the shadow
-        // bounds for better visual quality.
-        cascade_shadow_config: CascadeShadowConfigBuilder {
-            first_cascade_far_bound: 4.0,
-            maximum_distance: 10_000.0,
-            ..default()
-        }
-        .into(),
         ..default()
     });
 
-    let stone_material = materials.add(StandardMaterial {
-        base_color: Color::from(SILVER),
-        perceptual_roughness: 1.0,
-        reflectance: 0.0,
-        ..Default::default()
-    });
-    let dirt_material = materials.add(StandardMaterial {
-        base_color: Color::from(Srgba::rgb(0.455, 0.278, 0.0)),
-        perceptual_roughness: 1.0,
-        reflectance: 0.0,
-        ..Default::default()
-    });
-    let grass_material = materials.add(StandardMaterial {
-        base_color: Color::from(GREEN),
-        perceptual_roughness: 1.0,
-        reflectance: 0.0,
-        ..Default::default()
-    });
-
-    let perlin_noise = Perlin::new(WORLD_SEED);
     let pos = IVec3::ZERO;
-    let chunk = generate_chunk(&perlin_noise, &pos);
+    let chunk = generate_chunk(&world_gen_noise.0, &pos);
     commands
         .spawn((
             chunk,
@@ -124,15 +140,15 @@ fn setup(
                         }
 
                         let maybe_material = match chunk.blocks[x][y][z] {
-                            Block::Stone => Some(stone_material.clone()),
-                            Block::Dirt => Some(dirt_material.clone()),
-                            Block::Grass => Some(grass_material.clone()),
+                            Block::Stone => Some(block_materials.stone.clone()),
+                            Block::Dirt => Some(block_materials.dirt.clone()),
+                            Block::Grass => Some(block_materials.grass.clone()),
                             _ => None,
                         };
                         let Some(material) = maybe_material else {
                             continue;
                         };
-                        let mesh = meshes.add(Cuboid::from_length(BLOCK_SIZE));
+                        let mesh = block_meshes.cube.clone();
                         let transform = Transform::from_xyz(
                             (x as i32 + pos.x * CHUNK_SIZE as i32) as f32
                                 - (0.5 * CHUNK_SIZE as f32),
@@ -160,15 +176,15 @@ fn setup(
 #[derive(Component)]
 struct TerrainMesh;
 
-fn generate_chunk(noise: &Perlin, pos: &IVec3) -> Chunk {
+fn generate_chunk(noise: &Perlin, chunk_pos: &IVec3) -> Chunk {
     const SAMPLE_SPACING: f64 = 0.05;
     const SCALE: f64 = 15.0;
     let mut blocks = default::<[[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE]>();
     for z in 0..CHUNK_SIZE {
         for x in 0..CHUNK_SIZE {
             let height = ((noise.get([
-                (x as i32 + pos.x * CHUNK_SIZE as i32) as f64 * SAMPLE_SPACING,
-                (z as i32 + pos.z * CHUNK_SIZE as i32) as f64 * SAMPLE_SPACING,
+                (x as i32 + chunk_pos.x * CHUNK_SIZE as i32) as f64 * SAMPLE_SPACING,
+                (z as i32 + chunk_pos.z * CHUNK_SIZE as i32) as f64 * SAMPLE_SPACING,
             ]) * 0.5
                 + 0.5)
                 * SCALE) as usize
