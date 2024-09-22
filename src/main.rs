@@ -7,7 +7,7 @@ use bevy::{
 };
 use iyes_perf_ui::{entries::PerfUiBundle, prelude::*};
 use noise::{NoiseFn, Perlin};
-use std::f32::consts::PI;
+use std::{collections::HashSet, f32::consts::PI};
 
 const WORLD_SEED: u32 = 0xDEADBEEF;
 const CHUNK_SIZE: usize = 32;
@@ -31,7 +31,15 @@ fn main() {
         .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
         .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
         .add_systems(Startup, (initialize_block_assets, setup).chain())
-        .add_systems(Update, (move_camera, toggle_wireframe))
+        .add_systems(
+            Update,
+            (
+                move_camera,
+                toggle_wireframe,
+                update_loaded_chunks,
+                update_camera_chunk_position,
+            ),
+        )
         .run();
 }
 
@@ -81,25 +89,22 @@ fn initialize_block_assets(
     commands.insert_resource(BlockMaterials { stone, dirt, grass });
 }
 
-fn setup(
-    mut commands: Commands,
-    mut windows: Query<&mut Window>,
-    block_materials: Res<BlockMaterials>,
-    block_meshes: Res<BlockMeshes>,
-    world_gen_noise: Res<WorldGenNoise>,
-) {
+fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
     let mut window = windows.single_mut();
     window.cursor.visible = false;
     window.cursor.grab_mode = CursorGrabMode::Locked;
 
     commands.spawn(PerfUiBundle::default());
 
-    let camera_pos = Transform::from_xyz(-25.0, 20.0, -25.0);
+    let camera_pos = Transform::from_xyz(0.0, 60.0, 0.0);
 
-    commands.spawn(Camera3dBundle {
-        transform: camera_pos.looking_at(Vec3::ZERO, Vec3::Y),
-        ..Default::default()
-    });
+    commands.spawn((
+        Camera3dBundle {
+            transform: camera_pos.looking_at(Vec3::ZERO, Vec3::Y),
+            ..Default::default()
+        },
+        ChunkPosition::default(),
+    ));
 
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
@@ -113,72 +118,114 @@ fn setup(
         },
         ..default()
     });
+}
 
-    let pos = IVec3::ZERO;
-    let chunk = generate_chunk(&world_gen_noise.0, &pos);
-    commands
-        .spawn((
-            chunk,
-            SpatialBundle {
-                transform: Transform {
-                    translation: (pos * CHUNK_SIZE as i32).as_vec3(),
-                    scale: Vec3::ONE * BLOCK_SIZE,
-                    ..Default::default()
+fn update_loaded_chunks(
+    mut commands: Commands,
+    q_camera_position: Query<&GlobalTransform, (With<Camera3d>, Changed<ChunkPosition>)>,
+    q_chunk_position: Query<(Entity, &ChunkPosition), With<Chunk>>,
+    block_meshes: Res<BlockMeshes>,
+    block_materials: Res<BlockMaterials>,
+    world_gen_noise: Res<WorldGenNoise>,
+) {
+    let Ok(pos) = q_camera_position.get_single() else {
+        return;
+    };
+    let camera_position = pos.compute_transform().translation;
+    let chunk_pos = ChunkPosition::from_world_position(&camera_position);
+    // Determine position of chunks that should be loaded
+    let mut should_be_loaded_positions: HashSet<IVec3> = HashSet::new();
+    const LOAD_DISTANCE_CHUNKS: i32 = 5;
+    for chunk_x in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
+        for chunk_y in 0..1 {
+            for chunk_z in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
+                let cur_chunk_pos =
+                    ChunkPosition(chunk_pos.0.with_y(0) + IVec3::new(chunk_x, chunk_y, chunk_z));
+                should_be_loaded_positions.insert(cur_chunk_pos.0);
+            }
+        }
+    }
+    // Iterate over loaded chunks, despawning any which shouldn't be loaded right now
+    // By removing loaded chunks from our hash set, we are left only with the chunks
+    // which need to be loaded.
+    for (entity, chunk_pos) in q_chunk_position.iter() {
+        if !should_be_loaded_positions.remove(&chunk_pos.0) {
+            // The chunk shouldn't be loaded since it's not in our set
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+    // Finally, load the new chunks
+    for pos in should_be_loaded_positions {
+        let chunk = generate_chunk(&world_gen_noise.0, &pos);
+        commands
+            .spawn((
+                chunk,
+                ChunkPosition(pos),
+                SpatialBundle {
+                    transform: Transform {
+                        translation: (pos * CHUNK_SIZE as i32).as_vec3(),
+                        scale: Vec3::ONE * BLOCK_SIZE,
+                        ..Default::default()
+                    },
+                    visibility: Visibility::Visible,
+                    ..default()
                 },
-                visibility: Visibility::Visible,
-                ..default()
-            },
-        ))
-        .with_children(|child_builder| {
-            // Naive culling, very inefficient
-            // TODO: Greedy binary meshing: https://www.youtube.com/watch?v=qnGoGq7DWMc&t=176s
-            for x in 0..CHUNK_SIZE {
-                for y in 0..CHUNK_SIZE {
-                    for z in 0..CHUNK_SIZE {
-                        if !chunk.is_block_visible(x, y, z) {
-                            continue;
-                        }
+            ))
+            .with_children(|child_builder| {
+                // Naive culling, very inefficient
+                // TODO: Greedy binary meshing: https://www.youtube.com/watch?v=qnGoGq7DWMc&t=176s
+                for x in 0..CHUNK_SIZE {
+                    for y in 0..CHUNK_SIZE {
+                        for z in 0..CHUNK_SIZE {
+                            if !chunk.is_block_visible(x, y, z) {
+                                continue;
+                            }
 
-                        let maybe_material = match chunk.blocks[x][y][z] {
-                            Block::Stone => Some(block_materials.stone.clone()),
-                            Block::Dirt => Some(block_materials.dirt.clone()),
-                            Block::Grass => Some(block_materials.grass.clone()),
-                            _ => None,
-                        };
-                        let Some(material) = maybe_material else {
-                            continue;
-                        };
-                        let mesh = block_meshes.cube.clone();
-                        let transform = Transform::from_xyz(
-                            (x as i32 + pos.x * CHUNK_SIZE as i32) as f32
-                                - (0.5 * CHUNK_SIZE as f32),
-                            (y as i32 + pos.y * CHUNK_SIZE as i32) as f32
-                                - (0.5 * CHUNK_SIZE as f32),
-                            (z as i32 + pos.z * CHUNK_SIZE as i32) as f32
-                                - (0.5 * CHUNK_SIZE as f32),
-                        )
-                        .with_scale(Vec3::ONE * BLOCK_SIZE);
-                        child_builder.spawn((
-                            PbrBundle {
-                                mesh,
-                                material,
-                                transform,
-                                ..default()
-                            },
-                            TerrainMesh,
-                        ));
+                            let maybe_material = match chunk.blocks[x][y][z] {
+                                Block::Stone => Some(block_materials.stone.clone()),
+                                Block::Dirt => Some(block_materials.dirt.clone()),
+                                Block::Grass => Some(block_materials.grass.clone()),
+                                _ => None,
+                            };
+                            let Some(material) = maybe_material else {
+                                continue;
+                            };
+                            let mesh = block_meshes.cube.clone();
+                            let transform = Transform::from_xyz(x as f32, y as f32, z as f32);
+                            child_builder.spawn((
+                                PbrBundle {
+                                    mesh,
+                                    material,
+                                    transform,
+                                    ..default()
+                                },
+                                TerrainMesh,
+                            ));
+                        }
                     }
                 }
-            }
-        });
+            });
+    }
+}
+
+fn update_camera_chunk_position(
+    mut q_camera: Query<(&mut ChunkPosition, &GlobalTransform), With<Camera3d>>,
+) {
+    let Ok((mut chunk_pos, transform)) = q_camera.get_single_mut() else {
+        return;
+    };
+    let new_chunk_pos = ChunkPosition::from_world_position(&transform.translation());
+    if new_chunk_pos != *chunk_pos {
+        chunk_pos.0 = new_chunk_pos.0;
+    }
 }
 
 #[derive(Component)]
 struct TerrainMesh;
 
 fn generate_chunk(noise: &Perlin, chunk_pos: &IVec3) -> Chunk {
-    const SAMPLE_SPACING: f64 = 0.05;
-    const SCALE: f64 = 15.0;
+    const SAMPLE_SPACING: f64 = 0.025;
+    const SCALE: f64 = 60.0;
     let mut blocks = default::<[[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE]>();
     for z in 0..CHUNK_SIZE {
         for x in 0..CHUNK_SIZE {
@@ -187,13 +234,23 @@ fn generate_chunk(noise: &Perlin, chunk_pos: &IVec3) -> Chunk {
                 (z as i32 + chunk_pos.z * CHUNK_SIZE as i32) as f64 * SAMPLE_SPACING,
             ]) * 0.5
                 + 0.5)
-                * SCALE) as usize
-                + 5;
-            for y in 0..height - 1 {
+                * SCALE) as i32
+                + 1;
+            let Some(chunk_height) = Some(height - (chunk_pos.y * CHUNK_SIZE as i32))
+                .filter(|h| h >= &1)
+                .map(|h| h as usize)
+            else {
+                continue;
+            };
+            for y in (0..chunk_height - 1).filter(|h| h < &CHUNK_SIZE) {
                 blocks[x][y][z] = Block::Stone;
             }
-            blocks[x][height - 1][z] = Block::Dirt;
-            blocks[x][height][z] = Block::Grass;
+            if chunk_height - 1 < CHUNK_SIZE {
+                blocks[x][chunk_height - 1][z] = Block::Dirt;
+            }
+            if chunk_height < CHUNK_SIZE {
+                blocks[x][chunk_height][z] = Block::Grass;
+            }
         }
     }
     Chunk { blocks }
@@ -223,6 +280,15 @@ impl Chunk {
     }
 }
 
+#[derive(Component, PartialEq, Eq, Default)]
+struct ChunkPosition(IVec3);
+
+impl ChunkPosition {
+    fn from_world_position(p: &Vec3) -> Self {
+        ChunkPosition((*p / (CHUNK_SIZE as f32)).floor().as_ivec3())
+    }
+}
+
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 enum Block {
     #[default]
@@ -248,7 +314,7 @@ fn move_camera(
     mut q_camera: Query<&mut Transform, With<Camera3d>>,
 ) {
     const CAMERA_VERTICAL_BLOCKS_PER_SECOND: f32 = 7.5;
-    const CAMERA_HORIZONTAL_BLOCKS_PER_SECOND: f32 = 15.0;
+    const CAMERA_HORIZONTAL_BLOCKS_PER_SECOND: f32 = 30.0;
     for mut transform in q_camera.iter_mut() {
         if keys.pressed(KeyCode::Space) {
             transform.translation.y +=
