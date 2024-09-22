@@ -341,9 +341,9 @@ fn update_loaded_chunks(
     let chunk_pos = ChunkPosition::from_world_position(&camera_position);
     // Determine position of chunks that should be loaded
     let mut should_be_loaded_positions: HashSet<IVec3> = HashSet::new();
-    const LOAD_DISTANCE_CHUNKS: i32 = 24;
+    const LOAD_DISTANCE_CHUNKS: i32 = 16;
     for chunk_x in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
-        for chunk_y in 0..1 {
+        for chunk_y in 0..2 {
             for chunk_z in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
                 let cur_chunk_pos =
                     ChunkPosition(chunk_pos.0.with_y(0) + IVec3::new(chunk_x, chunk_y, chunk_z));
