@@ -33,7 +33,7 @@ fn main() {
             PerfUiPlugin,
             WireframePlugin,
         ))
-        .insert_resource(WorldGenNoise(Perlin::new(WORLD_SEED)))
+        .init_resource::<WorldGenNoise>()
         .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
         .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
         .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
@@ -197,8 +197,62 @@ fn create_mesh_from_quads(quads: &Vec<Quad>) -> Mesh {
     .with_inserted_indices(Indices::U32(indices))
 }
 
+struct NoiseGenerator {
+    perlin: Perlin,
+    scale: f64,
+    amplitude: f64,
+    offset: f64,
+}
+
+impl NoiseGenerator {
+    fn sample(&self, x: f64, y: f64) -> f64 {
+        let sample_x = x / self.scale + self.offset;
+        let sample_y = y / self.scale + self.offset;
+        return self.perlin.get([sample_x, sample_y]) * self.amplitude;
+    }
+}
+
 #[derive(Resource)]
-struct WorldGenNoise(Perlin);
+struct WorldGenNoise(Vec<NoiseGenerator>);
+
+impl WorldGenNoise {
+    // Returns in range [0, 1]
+    fn sample(&self, x: i32, y: i32) -> f64 {
+        let mut total_sample = 0.;
+        let mut total_amplitude = 0.;
+        for g in &self.0 {
+            total_sample += g.sample(x as f64, y as f64);
+            total_amplitude += g.amplitude;
+        }
+        total_sample /= total_amplitude;
+        0.5 + 0.5 * total_sample
+    }
+}
+
+impl Default for WorldGenNoise {
+    fn default() -> Self {
+        Self(vec![
+            NoiseGenerator {
+                perlin: Perlin::new(WORLD_SEED),
+                scale: 100.0,
+                amplitude: 1.0,
+                offset: 0.0,
+            },
+            NoiseGenerator {
+                perlin: Perlin::new(WORLD_SEED),
+                scale: 50.0,
+                amplitude: 0.5,
+                offset: 10.0,
+            },
+            NoiseGenerator {
+                perlin: Perlin::new(WORLD_SEED),
+                scale: 25.0,
+                amplitude: 0.25,
+                offset: 20.0,
+            },
+        ])
+    }
+}
 
 #[derive(Resource)]
 struct BlockMaterials {
@@ -287,7 +341,7 @@ fn update_loaded_chunks(
     let chunk_pos = ChunkPosition::from_world_position(&camera_position);
     // Determine position of chunks that should be loaded
     let mut should_be_loaded_positions: HashSet<IVec3> = HashSet::new();
-    const LOAD_DISTANCE_CHUNKS: i32 = 16;
+    const LOAD_DISTANCE_CHUNKS: i32 = 24;
     for chunk_x in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
         for chunk_y in 0..1 {
             for chunk_z in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
@@ -310,7 +364,7 @@ fn update_loaded_chunks(
     }
     // Finally, load the new chunks
     for pos in should_be_loaded_positions {
-        let chunk = generate_chunk(&world_gen_noise.0, &pos);
+        let chunk = generate_chunk(&world_gen_noise, &pos);
         commands.spawn((
             chunk,
             ChunkPosition(pos),
@@ -339,18 +393,15 @@ fn update_camera_chunk_position(
     }
 }
 
-fn generate_chunk(noise: &Perlin, chunk_pos: &IVec3) -> Chunk {
-    const SAMPLE_SPACING: f64 = 0.025;
+fn generate_chunk(noise: &WorldGenNoise, chunk_pos: &IVec3) -> Chunk {
     const SCALE: f64 = 60.0;
     let mut blocks = default::<[[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE]>();
     for z in 0..CHUNK_SIZE {
         for x in 0..CHUNK_SIZE {
-            let height = ((noise.get([
-                (x as i32 + chunk_pos.x * CHUNK_SIZE as i32) as f64 * SAMPLE_SPACING,
-                (z as i32 + chunk_pos.z * CHUNK_SIZE as i32) as f64 * SAMPLE_SPACING,
-            ]) * 0.5
-                + 0.5)
-                * SCALE) as i32
+            let height = (noise.sample(
+                x as i32 + chunk_pos.x * CHUNK_SIZE as i32,
+                z as i32 + chunk_pos.z * CHUNK_SIZE as i32,
+            ) * SCALE) as i32
                 + 1;
             let Some(chunk_height) = Some(height - (chunk_pos.y * CHUNK_SIZE as i32))
                 .filter(|h| h >= &1)
