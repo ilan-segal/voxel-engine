@@ -1,18 +1,18 @@
-use bevy::color::palettes::basic::{GREEN, SILVER};
-use bevy::math::VectorSpace;
-use bevy::prelude::*;
-use iyes_perf_ui::entries::PerfUiBundle;
-use iyes_perf_ui::prelude::*;
-use noise::{NoiseFn, Perlin};
-
 use bevy::{
+    color::palettes::basic::{GREEN, SILVER},
     core_pipeline::experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin},
+    input::mouse::MouseMotion,
     pbr::{
         wireframe::{WireframeConfig, WireframePlugin},
-        ScreenSpaceAmbientOcclusionBundle, ScreenSpaceAmbientOcclusionQualityLevel,
-        ScreenSpaceAmbientOcclusionSettings,
+        CascadeShadowConfigBuilder, ScreenSpaceAmbientOcclusionBundle,
+        ScreenSpaceAmbientOcclusionQualityLevel, ScreenSpaceAmbientOcclusionSettings,
     },
+    prelude::*,
+    window::CursorGrabMode,
 };
+use iyes_perf_ui::{entries::PerfUiBundle, prelude::*};
+use noise::{NoiseFn, Perlin};
+use std::f32::consts::PI;
 
 const WORLD_SEED: u32 = 0xDEADBEEF;
 const CHUNK_SIZE: usize = 32;
@@ -21,7 +21,13 @@ const BLOCK_SIZE: f32 = 1.0;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "Voxel Engine".into(),
+                    ..default()
+                }),
+                ..default()
+            }),
             PerfUiPlugin,
             TemporalAntiAliasPlugin,
             WireframePlugin,
@@ -38,7 +44,12 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut windows: Query<&mut Window>,
 ) {
+    let mut window = windows.single_mut();
+    window.cursor.visible = false;
+    window.cursor.grab_mode = CursorGrabMode::Locked;
+
     commands.spawn(PerfUiBundle::default());
 
     let camera_pos = Transform::from_xyz(-25.0, 20.0, -25.0);
@@ -54,15 +65,26 @@ fn setup(
         })
         .insert(TemporalAntiAliasBundle::default());
 
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
+    commands.spawn(DirectionalLightBundle {
+        directional_light: DirectionalLight {
+            illuminance: light_consts::lux::OVERCAST_DAY,
             shadows_enabled: true,
-            intensity: 10_000_000.,
-            range: f32::MAX,
-            shadow_depth_bias: 0.2,
             ..default()
         },
-        transform: Transform::from_xyz(-25.0, 20.0, 25.0),
+        transform: Transform {
+            translation: Vec3::new(0.0, 2.0, 0.0),
+            rotation: Quat::from_rotation_x(-PI / 4.),
+            ..default()
+        },
+        // The default cascade config is designed to handle large scenes.
+        // As this example has a much smaller world, we can tighten the shadow
+        // bounds for better visual quality.
+        cascade_shadow_config: CascadeShadowConfigBuilder {
+            first_cascade_far_bound: 4.0,
+            maximum_distance: 10_000.0,
+            ..default()
+        }
+        .into(),
         ..default()
     });
 
@@ -103,6 +125,7 @@ fn setup(
         ))
         .with_children(|child_builder| {
             // Naive culling, very inefficient
+            // TODO: Greedy binary meshing: https://www.youtube.com/watch?v=qnGoGq7DWMc&t=176s
             for x in 0..CHUNK_SIZE {
                 for y in 0..CHUNK_SIZE {
                     for z in 0..CHUNK_SIZE {
@@ -148,7 +171,7 @@ fn setup(
 struct TerrainMesh;
 
 fn generate_chunk(noise: &Perlin, pos: &IVec3) -> Chunk {
-    const SAMPLE_SPACING: f64 = 0.1;
+    const SAMPLE_SPACING: f64 = 0.05;
     const SCALE: f64 = 15.0;
     let mut blocks = default::<[[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE]>();
     for z in 0..CHUNK_SIZE {
@@ -215,6 +238,7 @@ fn toggle_wireframe(
 fn move_camera(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
+    mut mouse_events: EventReader<MouseMotion>,
     mut q_camera: Query<&mut Transform, With<Camera3d>>,
 ) {
     const CAMERA_VERTICAL_BLOCKS_PER_SECOND: f32 = 7.5;
@@ -242,15 +266,32 @@ fn move_camera(
             horizontal_movement.x += 1.0;
         }
         if horizontal_movement != Vec3::ZERO {
-            let real_horizontal = transform
+            let (yaw, _, _) = transform
                 .rotation
-                .mul_vec3(horizontal_movement)
-                .with_y(0.0)
-                .normalize()
+                .to_euler(EulerRot::YXZ);
+            let real_horizontal = (Quat::from_rotation_y(yaw) * horizontal_movement).normalize()
                 * CAMERA_HORIZONTAL_BLOCKS_PER_SECOND
                 * BLOCK_SIZE
                 * time.delta_seconds();
             transform.translation += real_horizontal;
+        }
+
+        const CAMERA_MOUSE_SENSITIVITY_X: f32 = 0.004;
+        const CAMERA_MOUSE_SENSITIVITY_Y: f32 = 0.0025;
+        for MouseMotion { delta } in mouse_events.read() {
+            transform.rotate_axis(Dir3::NEG_Y, delta.x * CAMERA_MOUSE_SENSITIVITY_X);
+            let (yaw, mut pitch, _) = transform
+                .rotation
+                .to_euler(EulerRot::YXZ);
+            pitch = (pitch - delta.y * CAMERA_MOUSE_SENSITIVITY_Y).clamp(-PI * 0.5, PI * 0.5);
+            transform.rotation = Quat::from_euler(
+                // YXZ order corresponds to the common
+                // "yaw"/"pitch"/"roll" convention
+                EulerRot::YXZ,
+                yaw,
+                pitch,
+                0.0,
+            );
         }
     }
 }
