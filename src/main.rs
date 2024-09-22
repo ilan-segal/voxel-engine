@@ -1,6 +1,5 @@
-use std::f32::consts::PI;
-
 use bevy::color::palettes::basic::{GREEN, SILVER};
+use bevy::math::VectorSpace;
 use bevy::prelude::*;
 use iyes_perf_ui::entries::PerfUiBundle;
 use iyes_perf_ui::prelude::*;
@@ -31,7 +30,7 @@ fn main() {
         .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
         .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
         .add_systems(Startup, setup)
-        .add_systems(Update, (rotate_chunk, toggle_wireframe))
+        .add_systems(Update, (move_camera, toggle_wireframe))
         .run();
 }
 
@@ -204,17 +203,54 @@ enum Block {
     Grass,
 }
 
-fn rotate_chunk(mut q: Query<&mut Transform, With<Chunk>>, time: Res<Time>) {
-    for mut t in q.iter_mut() {
-        t.rotate_local_axis(Dir3::Y, PI * time.delta_seconds() * 0.1);
-    }
-}
-
 fn toggle_wireframe(
     mut wireframe_config: ResMut<WireframeConfig>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
-    if keyboard.just_pressed(KeyCode::Space) {
+    if keyboard.just_pressed(KeyCode::Backquote) {
         wireframe_config.global = !wireframe_config.global;
+    }
+}
+
+fn move_camera(
+    time: Res<Time>,
+    keys: Res<ButtonInput<KeyCode>>,
+    mut q_camera: Query<&mut Transform, With<Camera3d>>,
+) {
+    const CAMERA_VERTICAL_BLOCKS_PER_SECOND: f32 = 7.5;
+    const CAMERA_HORIZONTAL_BLOCKS_PER_SECOND: f32 = 15.0;
+    for mut transform in q_camera.iter_mut() {
+        if keys.pressed(KeyCode::Space) {
+            transform.translation.y +=
+                CAMERA_VERTICAL_BLOCKS_PER_SECOND * BLOCK_SIZE * time.delta_seconds();
+        }
+        if keys.pressed(KeyCode::ShiftLeft) {
+            transform.translation.y -=
+                CAMERA_VERTICAL_BLOCKS_PER_SECOND * BLOCK_SIZE * time.delta_seconds();
+        }
+        let mut horizontal_movement = Vec3::ZERO;
+        if keys.pressed(KeyCode::KeyW) {
+            horizontal_movement.z -= 1.0;
+        }
+        if keys.pressed(KeyCode::KeyS) {
+            horizontal_movement.z += 1.0;
+        }
+        if keys.pressed(KeyCode::KeyA) {
+            horizontal_movement.x -= 1.0;
+        }
+        if keys.pressed(KeyCode::KeyD) {
+            horizontal_movement.x += 1.0;
+        }
+        if horizontal_movement != Vec3::ZERO {
+            let real_horizontal = transform
+                .rotation
+                .mul_vec3(horizontal_movement)
+                .with_y(0.0)
+                .normalize()
+                * CAMERA_HORIZONTAL_BLOCKS_PER_SECOND
+                * BLOCK_SIZE
+                * time.delta_seconds();
+            transform.translation += real_horizontal;
+        }
     }
 }
