@@ -30,7 +30,7 @@ fn main() {
         .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
         .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
         .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
-        .add_systems(Startup, (initialize_block_assets, setup).chain())
+        .add_systems(Startup, (initialize_block_assets, setup))
         .add_systems(
             Update,
             (
@@ -42,6 +42,13 @@ fn main() {
         )
         .run();
 }
+
+struct Quad {
+    vertices: [Vec3; 4],
+    material: Handle<StandardMaterial>,
+}
+
+fn greedy_binary_mesher(chunk: &Chunk) {}
 
 #[derive(Resource)]
 struct WorldGenNoise(Perlin);
