@@ -1,8 +1,15 @@
 use bevy::{
-    color::palettes::basic::{GREEN, SILVER},
+    color::palettes::{
+        basic::{GREEN, SILVER},
+        css::BROWN,
+    },
     input::mouse::MouseMotion,
     pbr::wireframe::{WireframeConfig, WireframePlugin},
     prelude::*,
+    render::{
+        mesh::{Indices, PrimitiveTopology},
+        render_asset::RenderAssetUsages,
+    },
     window::CursorGrabMode,
 };
 use iyes_perf_ui::{entries::PerfUiBundle, prelude::*};
@@ -36,19 +43,159 @@ fn main() {
             (
                 move_camera,
                 toggle_wireframe,
-                update_loaded_chunks,
                 update_camera_chunk_position,
+                (update_loaded_chunks, add_mesh_to_chunks).chain(),
             ),
         )
         .run();
 }
 
+#[derive(Debug)]
 struct Quad {
     vertices: [Vec3; 4],
-    material: Handle<StandardMaterial>,
+    block: Block,
 }
 
-fn greedy_binary_mesher(chunk: &Chunk) {}
+fn greedy_mesher(chunk: &Chunk) -> Vec<Quad> {
+    // Implement one face for now, then the rest should be easy
+    // Up faces
+    // Top of the chunk for now (y=31)
+    // Work from bottom up
+    let mut quads: Vec<Quad> = vec![];
+    let mut blocks = chunk.blocks;
+    let block_is_hidden_from_above = |x: usize, y: usize, z: usize| {
+        y < CHUNK_SIZE - 1 && chunk.blocks[x][y + 1][z] != Block::Air
+    };
+    for y in 0..CHUNK_SIZE {
+        for x_start in 0..CHUNK_SIZE {
+            for z_start in 0..CHUNK_SIZE {
+                let block = blocks[x_start][y][z_start];
+                if block == Block::Air || block_is_hidden_from_above(x_start, y, z_start) {
+                    continue;
+                }
+                let mut x_end = x_start;
+                let mut z_end = z_start;
+                while x_end < CHUNK_SIZE - 1
+                    && block == blocks[x_end + 1][y][z_end]
+                    && !block_is_hidden_from_above(x_end + 1, y, z_end)
+                {
+                    x_end += 1;
+                }
+                while z_end < CHUNK_SIZE - 1
+                    && (x_start..=x_end).all(|x| {
+                        block == blocks[x][y][z_end + 1]
+                            && !block_is_hidden_from_above(x, y, z_end + 1)
+                    })
+                {
+                    z_end += 1;
+                }
+                let y_f = y as f32;
+                let x_start_f = x_start as f32;
+                let z_start_f = z_start as f32;
+                let x_end_f = (x_end + 1) as f32; // +1 so we reach the far end of the square
+                let z_end_f = (z_end + 1) as f32;
+                let quad = Quad {
+                    vertices: [
+                        Vec3::new(x_start_f, y_f, z_start_f),
+                        Vec3::new(x_end_f, y_f, z_start_f),
+                        Vec3::new(x_end_f, y_f, z_end_f),
+                        Vec3::new(x_start_f, y_f, z_end_f),
+                    ],
+                    block,
+                };
+                quads.push(quad);
+                for x in x_start..=x_end {
+                    for z in z_start..=z_end {
+                        blocks[x][y][z] = Block::Air;
+                    }
+                }
+            }
+        }
+    }
+    return quads;
+}
+
+fn add_mesh_to_chunks(
+    mut commands: Commands,
+    q_chunk: Query<(Entity, &Transform, &Chunk), Without<Handle<Mesh>>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
+    for (e, transform, chunk) in q_chunk.iter() {
+        let quads = greedy_mesher(chunk);
+        let mesh = create_mesh_from_quads(&quads);
+        if let Some(mut entity) = commands.get_entity(e) {
+            entity.insert(PbrBundle {
+                mesh: meshes.add(mesh),
+                material: materials.add(Color::WHITE),
+                transform: *transform,
+                // transform: Transform::from_xyz(0.0, 0.0, 0.0),
+                ..default()
+            });
+        }
+    }
+}
+
+fn create_mesh_from_quads(quads: &Vec<Quad>) -> Mesh {
+    let vertices = quads
+        .iter()
+        .flat_map(|q| q.vertices.iter())
+        .map(|v| v.to_array())
+        .collect::<Vec<_>>();
+    let normals = quads
+        .iter()
+        .map(|q| q.vertices)
+        .map(|vs| {
+            let a = vs[1] - vs[0];
+            let b = vs[2] - vs[0];
+            return a.cross(b).normalize() * -1.0;
+        })
+        .map(|norm| norm.to_array())
+        .flat_map(|norm| std::iter::repeat_n(norm, 4))
+        .collect::<Vec<_>>();
+    let indices = (0..quads.len())
+        .flat_map(|quad_index| {
+            vec![
+                /*
+                3---2
+                |b /|
+                | / |
+                |/ a|
+                0---1
+                 */
+                // Triangle a
+                4 * quad_index + 2,
+                4 * quad_index + 1,
+                4 * quad_index + 0,
+                // Triangle b
+                4 * quad_index + 3,
+                4 * quad_index + 2,
+                4 * quad_index + 0,
+            ]
+        })
+        .map(|idx| idx as u32)
+        .collect::<Vec<_>>();
+    let colours = quads
+        .iter()
+        .map(|q| q.block)
+        .map(|block| {
+            block
+                .get_colour()
+                .expect("Meshed block should have colour")
+        })
+        .map(|c| c.to_linear().to_f32_array())
+        .flat_map(|m| std::iter::repeat_n(m, 4))
+        .collect::<Vec<_>>();
+    // Keep the mesh data accessible in future frames to be able to mutate it in toggle_texture.
+    Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colours)
+    .with_inserted_indices(Indices::U32(indices))
+}
 
 #[derive(Resource)]
 struct WorldGenNoise(Perlin);
@@ -60,21 +207,21 @@ struct BlockMaterials {
     grass: Handle<StandardMaterial>,
 }
 
-#[derive(Resource)]
-struct BlockMeshes {
-    cube: Handle<Mesh>,
+impl BlockMaterials {
+    fn get(&self, block: &Block) -> Option<Handle<StandardMaterial>> {
+        match block {
+            Block::Air => None,
+            Block::Stone => Some(self.stone.clone()),
+            Block::Dirt => Some(self.dirt.clone()),
+            Block::Grass => Some(self.grass.clone()),
+        }
+    }
 }
 
 fn initialize_block_assets(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let block_meshes = BlockMeshes {
-        cube: meshes.add(Cuboid::from_length(BLOCK_SIZE)),
-    };
-    commands.insert_resource(block_meshes);
-
     let stone = materials.add(StandardMaterial {
         base_color: Color::from(SILVER),
         perceptual_roughness: 1.0,
@@ -131,8 +278,6 @@ fn update_loaded_chunks(
     mut commands: Commands,
     q_camera_position: Query<&GlobalTransform, (With<Camera3d>, Changed<ChunkPosition>)>,
     q_chunk_position: Query<(Entity, &ChunkPosition), With<Chunk>>,
-    block_meshes: Res<BlockMeshes>,
-    block_materials: Res<BlockMaterials>,
     world_gen_noise: Res<WorldGenNoise>,
 ) {
     let Ok(pos) = q_camera_position.get_single() else {
@@ -142,7 +287,7 @@ fn update_loaded_chunks(
     let chunk_pos = ChunkPosition::from_world_position(&camera_position);
     // Determine position of chunks that should be loaded
     let mut should_be_loaded_positions: HashSet<IVec3> = HashSet::new();
-    const LOAD_DISTANCE_CHUNKS: i32 = 5;
+    const LOAD_DISTANCE_CHUNKS: i32 = 16;
     for chunk_x in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
         for chunk_y in 0..1 {
             for chunk_z in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
@@ -157,61 +302,28 @@ fn update_loaded_chunks(
     // which need to be loaded.
     for (entity, chunk_pos) in q_chunk_position.iter() {
         if !should_be_loaded_positions.remove(&chunk_pos.0) {
-            // The chunk shouldn't be loaded since it's not in our set
-            commands.entity(entity).despawn_recursive();
+            // The chunk should be unloaded since it's not in our set
+            commands
+                .entity(entity)
+                .despawn_recursive();
         }
     }
     // Finally, load the new chunks
     for pos in should_be_loaded_positions {
         let chunk = generate_chunk(&world_gen_noise.0, &pos);
-        commands
-            .spawn((
-                chunk,
-                ChunkPosition(pos),
-                SpatialBundle {
-                    transform: Transform {
-                        translation: (pos * CHUNK_SIZE as i32).as_vec3(),
-                        scale: Vec3::ONE * BLOCK_SIZE,
-                        ..Default::default()
-                    },
-                    visibility: Visibility::Visible,
-                    ..default()
+        commands.spawn((
+            chunk,
+            ChunkPosition(pos),
+            SpatialBundle {
+                transform: Transform {
+                    translation: (pos * CHUNK_SIZE as i32).as_vec3(),
+                    scale: Vec3::ONE * BLOCK_SIZE,
+                    ..Default::default()
                 },
-            ))
-            .with_children(|child_builder| {
-                // Naive culling, very inefficient
-                // TODO: Greedy binary meshing: https://www.youtube.com/watch?v=qnGoGq7DWMc&t=176s
-                for x in 0..CHUNK_SIZE {
-                    for y in 0..CHUNK_SIZE {
-                        for z in 0..CHUNK_SIZE {
-                            if !chunk.is_block_visible(x, y, z) {
-                                continue;
-                            }
-
-                            let maybe_material = match chunk.blocks[x][y][z] {
-                                Block::Stone => Some(block_materials.stone.clone()),
-                                Block::Dirt => Some(block_materials.dirt.clone()),
-                                Block::Grass => Some(block_materials.grass.clone()),
-                                _ => None,
-                            };
-                            let Some(material) = maybe_material else {
-                                continue;
-                            };
-                            let mesh = block_meshes.cube.clone();
-                            let transform = Transform::from_xyz(x as f32, y as f32, z as f32);
-                            child_builder.spawn((
-                                PbrBundle {
-                                    mesh,
-                                    material,
-                                    transform,
-                                    ..default()
-                                },
-                                TerrainMesh,
-                            ));
-                        }
-                    }
-                }
-            });
+                visibility: Visibility::Visible,
+                ..default()
+            },
+        ));
     }
 }
 
@@ -226,9 +338,6 @@ fn update_camera_chunk_position(
         chunk_pos.0 = new_chunk_pos.0;
     }
 }
-
-#[derive(Component)]
-struct TerrainMesh;
 
 fn generate_chunk(noise: &Perlin, chunk_pos: &IVec3) -> Chunk {
     const SAMPLE_SPACING: f64 = 0.025;
@@ -270,39 +379,38 @@ struct Chunk {
     blocks: [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE],
 }
 
-impl Chunk {
-    fn is_block_visible(&self, x: usize, y: usize, z: usize) -> bool {
-        x == 0
-            || y == 0
-            || z == 0
-            || x == CHUNK_SIZE - 1
-            || y == CHUNK_SIZE - 1
-            || z == CHUNK_SIZE - 1
-            || (x > 0 && self.blocks[x - 1][y][z] == Block::Air)
-            || (x < CHUNK_SIZE - 1 && self.blocks[x + 1][y][z] == Block::Air)
-            || (y > 0 && self.blocks[x][y - 1][z] == Block::Air)
-            || (y < CHUNK_SIZE - 1 && self.blocks[x][y + 1][z] == Block::Air)
-            || (z > 0 && self.blocks[x][y][z - 1] == Block::Air)
-            || (z < CHUNK_SIZE - 1 && self.blocks[x][y][z + 1] == Block::Air)
-    }
-}
-
 #[derive(Component, PartialEq, Eq, Default)]
 struct ChunkPosition(IVec3);
 
 impl ChunkPosition {
     fn from_world_position(p: &Vec3) -> Self {
-        ChunkPosition((*p / (CHUNK_SIZE as f32)).floor().as_ivec3())
+        ChunkPosition(
+            (*p / (CHUNK_SIZE as f32))
+                .floor()
+                .as_ivec3(),
+        )
     }
 }
 
-#[derive(Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 enum Block {
     #[default]
     Air,
     Stone,
     Dirt,
     Grass,
+}
+
+impl Block {
+    fn get_colour(&self) -> Option<Color> {
+        match self {
+            Self::Stone => Some(SILVER),
+            Self::Grass => Some(GREEN),
+            Self::Dirt => Some(BROWN),
+            _ => None,
+        }
+        .map(Color::from)
+    }
 }
 
 fn toggle_wireframe(
@@ -320,8 +428,8 @@ fn move_camera(
     mut mouse_events: EventReader<MouseMotion>,
     mut q_camera: Query<&mut Transform, With<Camera3d>>,
 ) {
-    const CAMERA_VERTICAL_BLOCKS_PER_SECOND: f32 = 7.5;
-    const CAMERA_HORIZONTAL_BLOCKS_PER_SECOND: f32 = 30.0;
+    const CAMERA_VERTICAL_BLOCKS_PER_SECOND: f32 = 75.0;
+    const CAMERA_HORIZONTAL_BLOCKS_PER_SECOND: f32 = 600.0;
     for mut transform in q_camera.iter_mut() {
         if keys.pressed(KeyCode::Space) {
             transform.translation.y +=
@@ -345,7 +453,9 @@ fn move_camera(
             horizontal_movement.x += 1.0;
         }
         if horizontal_movement != Vec3::ZERO {
-            let (yaw, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
+            let (yaw, _, _) = transform
+                .rotation
+                .to_euler(EulerRot::YXZ);
             let real_horizontal = (Quat::from_rotation_y(yaw) * horizontal_movement).normalize()
                 * CAMERA_HORIZONTAL_BLOCKS_PER_SECOND
                 * BLOCK_SIZE
@@ -357,7 +467,9 @@ fn move_camera(
         const CAMERA_MOUSE_SENSITIVITY_Y: f32 = 0.0025;
         for MouseMotion { delta } in mouse_events.read() {
             transform.rotate_axis(Dir3::NEG_Y, delta.x * CAMERA_MOUSE_SENSITIVITY_X);
-            let (yaw, mut pitch, _) = transform.rotation.to_euler(EulerRot::YXZ);
+            let (yaw, mut pitch, _) = transform
+                .rotation
+                .to_euler(EulerRot::YXZ);
             pitch = (pitch - delta.y * CAMERA_MOUSE_SENSITIVITY_Y).clamp(-PI * 0.5, PI * 0.5);
             transform.rotation = Quat::from_euler(
                 // YXZ order corresponds to the common
