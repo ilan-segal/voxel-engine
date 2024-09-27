@@ -37,7 +37,7 @@ fn main() {
         .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
         .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
         .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
-        .add_systems(Startup, (initialize_block_assets, setup))
+        .add_systems(Startup, setup)
         .add_systems(
             Update,
             (
@@ -56,63 +56,193 @@ struct Quad {
     block: Block,
 }
 
-fn greedy_mesher(chunk: &Chunk) -> Vec<Quad> {
-    // Implement one face for now, then the rest should be easy
-    // Up faces
-    // Top of the chunk for now (y=31)
-    // Work from bottom up
+enum BlockSide {
+    Up,
+    Down,
+    Left,
+    Right,
+    Front,
+    Back,
+}
+
+fn get_mesh_for_chunk(chunk: &Chunk) -> Mesh {
+    let mut quads = vec![];
+    quads.extend(greedy_mesh(chunk, BlockSide::Up));
+    quads.extend(greedy_mesh(chunk, BlockSide::Down));
+    quads.extend(greedy_mesh(chunk, BlockSide::Left));
+    quads.extend(greedy_mesh(chunk, BlockSide::Right));
+    quads.extend(greedy_mesh(chunk, BlockSide::Front));
+    quads.extend(greedy_mesh(chunk, BlockSide::Back));
+    return create_mesh_from_quads(&quads);
+}
+
+fn greedy_mesh(chunk: &Chunk, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
     let mut blocks = chunk.blocks;
-    let block_is_hidden_from_above = |x: usize, y: usize, z: usize| {
-        y < CHUNK_SIZE - 1 && chunk.blocks[x][y + 1][z] != Block::Air
-    };
-    for y in 0..CHUNK_SIZE {
-        for x_start in 0..CHUNK_SIZE {
-            for z_start in 0..CHUNK_SIZE {
-                let block = blocks[x_start][y][z_start];
-                if block == Block::Air || block_is_hidden_from_above(x_start, y, z_start) {
+    for layer in 0..CHUNK_SIZE {
+        for row in 0..CHUNK_SIZE {
+            for col in 0..CHUNK_SIZE {
+                let block_is_hidden_from_above = |row: usize, col: usize, layer: usize| {
+                    layer < CHUNK_SIZE - 1
+                        && blocks.get_from_layer_coords(&direction, layer + 1, row, col)
+                            != Block::Air
+                };
+                let block = blocks.get_from_layer_coords(&direction, layer, row, col);
+                if block == Block::Air || block_is_hidden_from_above(row, col, layer) {
                     continue;
                 }
-                let mut x_end = x_start;
-                let mut z_end = z_start;
-                while x_end < CHUNK_SIZE - 1
-                    && block == blocks[x_end + 1][y][z_end]
-                    && !block_is_hidden_from_above(x_end + 1, y, z_end)
+                let mut height = 0;
+                let mut width = 0;
+                while height + row < CHUNK_SIZE - 1
+                    && block
+                        == blocks.get_from_layer_coords(
+                            &direction,
+                            layer,
+                            height + row + 1,
+                            col + width,
+                        )
                 {
-                    x_end += 1;
+                    height += 1;
                 }
-                while z_end < CHUNK_SIZE - 1
-                    && (x_start..=x_end).all(|x| {
-                        block == blocks[x][y][z_end + 1]
-                            && !block_is_hidden_from_above(x, y, z_end + 1)
+                while col + width < CHUNK_SIZE - 1
+                    && (row..=height + row).all(|cur_row| {
+                        block
+                            == blocks.get_from_layer_coords(
+                                &direction,
+                                layer,
+                                cur_row,
+                                col + width + 1,
+                            )
+                            && !block_is_hidden_from_above(cur_row, col + width + 1, layer)
                     })
                 {
-                    z_end += 1;
+                    width += 1;
                 }
-                let y_f = y as f32;
-                let x_start_f = x_start as f32;
-                let z_start_f = z_start as f32;
-                let x_end_f = (x_end + 1) as f32; // +1 so we reach the far end of the square
-                let z_end_f = (z_end + 1) as f32;
-                let quad = Quad {
-                    vertices: [
-                        Vec3::new(x_start_f, y_f, z_start_f),
-                        Vec3::new(x_end_f, y_f, z_start_f),
-                        Vec3::new(x_end_f, y_f, z_end_f),
-                        Vec3::new(x_start_f, y_f, z_end_f),
-                    ],
-                    block,
-                };
+                let vertices = blocks.get_quad_corners(&direction, layer, row, height, col, width);
+                let quad = Quad { vertices, block };
                 quads.push(quad);
-                for x in x_start..=x_end {
-                    for z in z_start..=z_end {
-                        blocks[x][y][z] = Block::Air;
+                for cur_row in row..=height + row {
+                    for cur_col in col..=col + width {
+                        blocks.clear_at(&direction, layer, cur_row, cur_col);
                     }
                 }
             }
         }
     }
     return quads;
+}
+
+trait LayerIndexable {
+    fn get_from_layer_coords(
+        &self,
+        direction: &BlockSide,
+        layer: usize,
+        row: usize,
+        col: usize,
+    ) -> Block;
+
+    fn clear_at(&mut self, direction: &BlockSide, layer: usize, row: usize, col: usize);
+
+    fn get_quad_corners(
+        &self,
+        direction: &BlockSide,
+        layer: usize,
+        row: usize,
+        height: usize,
+        col: usize,
+        width: usize,
+    ) -> [Vec3; 4];
+}
+
+impl LayerIndexable for [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE] {
+    fn get_from_layer_coords(
+        &self,
+        direction: &BlockSide,
+        layer: usize,
+        row: usize,
+        col: usize,
+    ) -> Block {
+        let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
+        self[x][y][z]
+    }
+
+    fn clear_at(&mut self, direction: &BlockSide, layer: usize, row: usize, col: usize) {
+        let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
+        self[x][y][z] = Block::Air;
+    }
+
+    fn get_quad_corners(
+        &self,
+        direction: &BlockSide,
+        layer: usize,
+        row: usize,
+        height: usize,
+        col: usize,
+        width: usize,
+    ) -> [Vec3; 4] {
+        let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
+        let (xf, yf, zf, h, w) = (
+            x as f32,
+            y as f32,
+            z as f32,
+            height as f32 + 1.0,
+            width as f32 + 1.0,
+        );
+        match direction {
+            BlockSide::Up => [
+                Vec3::new(xf, yf, zf),
+                Vec3::new(xf + h, yf, zf),
+                Vec3::new(xf + h, yf, zf + w),
+                Vec3::new(xf, yf, zf + w),
+            ],
+            BlockSide::Down => [
+                Vec3::new(xf, yf - 1.0, zf + w),
+                Vec3::new(xf + h, yf - 1.0, zf + w),
+                Vec3::new(xf + h, yf - 1.0, zf),
+                Vec3::new(xf, yf - 1.0, zf),
+            ],
+            BlockSide::Left => [
+                Vec3::new(xf + 1.0, yf - 1.0, zf + w),
+                Vec3::new(xf + 1.0, yf - 1.0 + h, zf + w),
+                Vec3::new(xf + 1.0, yf - 1.0 + h, zf),
+                Vec3::new(xf + 1.0, yf - 1.0, zf),
+            ],
+            BlockSide::Right => [
+                Vec3::new(xf, yf - 1.0, zf),
+                Vec3::new(xf, yf - 1.0 + h, zf),
+                Vec3::new(xf, yf - 1.0 + h, zf + w),
+                Vec3::new(xf, yf - 1.0, zf + w),
+            ],
+            BlockSide::Front => [
+                Vec3::new(xf + h, yf - 1.0, zf),
+                Vec3::new(xf + h, yf - 1.0 + w, zf),
+                Vec3::new(xf, yf - 1.0 + w, zf),
+                Vec3::new(xf, yf - 1.0, zf),
+            ],
+            BlockSide::Back => [
+                Vec3::new(xf, yf - 1.0, zf + 1.0),
+                Vec3::new(xf, yf - 1.0 + w, zf + 1.0),
+                Vec3::new(xf + h, yf - 1.0 + w, zf + 1.0),
+                Vec3::new(xf + h, yf - 1.0, zf + 1.0),
+            ],
+        }
+    }
+}
+
+fn get_xyz_from_layer_indices(
+    direction: &BlockSide,
+    layer: usize,
+    row: usize,
+    col: usize,
+) -> (usize, usize, usize) {
+    match direction {
+        BlockSide::Up => (row, layer, col),
+        BlockSide::Down => (row, CHUNK_SIZE - 1 - layer, col),
+        BlockSide::Left => (layer, row, col),
+        BlockSide::Right => (CHUNK_SIZE - 1 - layer, row, col),
+        BlockSide::Back => (row, col, layer),
+        BlockSide::Front => (row, col, CHUNK_SIZE - 1 - layer),
+    }
 }
 
 fn add_mesh_to_chunks(
@@ -122,8 +252,9 @@ fn add_mesh_to_chunks(
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     for (e, transform, chunk) in q_chunk.iter() {
-        let quads = greedy_mesher(chunk);
-        let mesh = create_mesh_from_quads(&quads);
+        // let quads = greedy_mesher_y(chunk);
+        // let mesh = create_mesh_from_quads(&quads);
+        let mesh = get_mesh_for_chunk(chunk);
         if let Some(mut entity) = commands.get_entity(e) {
             entity.insert(PbrBundle {
                 mesh: meshes.add(mesh),
@@ -254,49 +385,6 @@ impl Default for WorldGenNoise {
     }
 }
 
-#[derive(Resource)]
-struct BlockMaterials {
-    stone: Handle<StandardMaterial>,
-    dirt: Handle<StandardMaterial>,
-    grass: Handle<StandardMaterial>,
-}
-
-impl BlockMaterials {
-    fn get(&self, block: &Block) -> Option<Handle<StandardMaterial>> {
-        match block {
-            Block::Air => None,
-            Block::Stone => Some(self.stone.clone()),
-            Block::Dirt => Some(self.dirt.clone()),
-            Block::Grass => Some(self.grass.clone()),
-        }
-    }
-}
-
-fn initialize_block_assets(
-    mut commands: Commands,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    let stone = materials.add(StandardMaterial {
-        base_color: Color::from(SILVER),
-        perceptual_roughness: 1.0,
-        reflectance: 0.0,
-        ..Default::default()
-    });
-    let dirt = materials.add(StandardMaterial {
-        base_color: Color::from(Srgba::rgb(0.455, 0.278, 0.0)),
-        perceptual_roughness: 1.0,
-        reflectance: 0.0,
-        ..Default::default()
-    });
-    let grass = materials.add(StandardMaterial {
-        base_color: Color::from(GREEN),
-        perceptual_roughness: 1.0,
-        reflectance: 0.0,
-        ..Default::default()
-    });
-    commands.insert_resource(BlockMaterials { stone, dirt, grass });
-}
-
 fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
     let mut window = windows.single_mut();
     window.cursor.visible = false;
@@ -341,7 +429,7 @@ fn update_loaded_chunks(
     let chunk_pos = ChunkPosition::from_world_position(&camera_position);
     // Determine position of chunks that should be loaded
     let mut should_be_loaded_positions: HashSet<IVec3> = HashSet::new();
-    const LOAD_DISTANCE_CHUNKS: i32 = 16;
+    const LOAD_DISTANCE_CHUNKS: i32 = 4;
     for chunk_x in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
         for chunk_y in 0..2 {
             for chunk_z in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
@@ -479,7 +567,7 @@ fn move_camera(
     mut mouse_events: EventReader<MouseMotion>,
     mut q_camera: Query<&mut Transform, With<Camera3d>>,
 ) {
-    const CAMERA_VERTICAL_BLOCKS_PER_SECOND: f32 = 75.0;
+    const CAMERA_VERTICAL_BLOCKS_PER_SECOND: f32 = 30.0;
     const CAMERA_HORIZONTAL_BLOCKS_PER_SECOND: f32 = 600.0;
     for mut transform in q_camera.iter_mut() {
         if keys.pressed(KeyCode::Space) {
