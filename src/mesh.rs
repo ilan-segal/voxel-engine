@@ -1,38 +1,91 @@
 use crate::block::Block;
-use crate::chunk::{Chunk, CHUNK_SIZE};
+use crate::chunk::{Chunk, ChunkPosition, CHUNK_SIZE};
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
 use bevy::render::render_asset::RenderAssetUsages;
+use bevy::tasks::futures_lite::future;
+use bevy::tasks::{block_on, AsyncComputeTaskPool, Task};
+use bevy::utils::HashMap;
 
 pub struct MeshPlugin;
 
 impl Plugin for MeshPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, add_mesh_to_chunks.after(crate::world::WorldSet));
+        app.init_resource::<MeshGenTasks>()
+            .add_systems(Startup, setup)
+            .add_systems(
+                Update,
+                (
+                    begin_mesh_gen_tasks,
+                    receive_mesh_gen_tasks.after(crate::world::WorldSet),
+                ),
+            );
     }
 }
 
+fn setup(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>) {
+    let common_materials = CommonMaterials {
+        white: materials.add(Color::WHITE),
+    };
+    commands.insert_resource(common_materials);
+}
+
+#[derive(Resource)]
+struct CommonMaterials {
+    white: Handle<StandardMaterial>,
+}
+
+pub struct MeshTaskData {
+    entity: Entity,
+    mesh: Mesh,
+}
+
+#[derive(Resource, Default)]
+pub struct MeshGenTasks(pub HashMap<ChunkPosition, Task<MeshTaskData>>);
+
 // TODO: Non-blocking system
-fn add_mesh_to_chunks(
-    mut commands: Commands,
-    q_chunk: Query<(Entity, &Transform, &Chunk), Without<Handle<Mesh>>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut meshes: ResMut<Assets<Mesh>>,
+fn begin_mesh_gen_tasks(
+    mut tasks: ResMut<MeshGenTasks>,
+    q_chunk: Query<(Entity, &Chunk, &ChunkPosition), Without<Handle<Mesh>>>,
 ) {
-    for (e, transform, chunk) in q_chunk.iter() {
-        // let quads = greedy_mesher_y(chunk);
-        // let mesh = create_mesh_from_quads(&quads);
-        let mesh = get_mesh_for_chunk(chunk);
+    for (entity, chunk, pos) in q_chunk.iter() {
+        let task_pool = AsyncComputeTaskPool::get();
+        if tasks.0.contains_key(pos) {
+            continue;
+        }
+        let cloned_chunk = chunk.clone();
+        let task = task_pool.spawn(async move {
+            MeshTaskData {
+                entity,
+                mesh: get_mesh_for_chunk(cloned_chunk),
+            }
+        });
+        tasks.0.insert(*pos, task);
+    }
+}
+
+fn receive_mesh_gen_tasks(
+    mut commands: Commands,
+    mut tasks: ResMut<MeshGenTasks>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    materials: Res<CommonMaterials>,
+    q_transform: Query<&Transform>,
+) {
+    tasks.0.retain(|_, task| {
+        let Some(data) = block_on(future::poll_once(task)) else {
+            return true;
+        };
+        let e = data.entity;
         if let Some(mut entity) = commands.get_entity(e) {
             entity.insert(PbrBundle {
-                mesh: meshes.add(mesh),
-                material: materials.add(Color::WHITE),
-                transform: *transform,
-                // transform: Transform::from_xyz(0.0, 0.0, 0.0),
+                mesh: meshes.add(data.mesh),
+                material: materials.white.clone(),
+                transform: *q_transform.get(e).unwrap(),
                 ..default()
             });
-        }
-    }
+        };
+        return false;
+    });
 }
 
 #[derive(Debug)]
@@ -50,14 +103,14 @@ enum BlockSide {
     Back,
 }
 
-fn get_mesh_for_chunk(chunk: &Chunk) -> Mesh {
+fn get_mesh_for_chunk(chunk: Chunk) -> Mesh {
     let mut quads = vec![];
-    quads.extend(greedy_mesh(chunk, BlockSide::Up));
-    quads.extend(greedy_mesh(chunk, BlockSide::Down));
-    quads.extend(greedy_mesh(chunk, BlockSide::Left));
-    quads.extend(greedy_mesh(chunk, BlockSide::Right));
-    quads.extend(greedy_mesh(chunk, BlockSide::Front));
-    quads.extend(greedy_mesh(chunk, BlockSide::Back));
+    quads.extend(greedy_mesh(&chunk, BlockSide::Up));
+    quads.extend(greedy_mesh(&chunk, BlockSide::Down));
+    quads.extend(greedy_mesh(&chunk, BlockSide::Left));
+    quads.extend(greedy_mesh(&chunk, BlockSide::Right));
+    quads.extend(greedy_mesh(&chunk, BlockSide::Front));
+    quads.extend(greedy_mesh(&chunk, BlockSide::Back));
     return create_mesh_from_quads(&quads);
 }
 

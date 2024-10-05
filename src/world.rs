@@ -8,6 +8,7 @@ use crate::{
 };
 
 const WORLD_SEED: u32 = 0xDEADBEEF;
+const LOAD_DISTANCE_CHUNKS: i32 = 20;
 
 pub struct WorldPlugin;
 
@@ -94,6 +95,7 @@ fn update_camera_chunk_position(
 
 fn update_loaded_chunks(
     mut commands: Commands,
+    mut mesh_gen_tasks: ResMut<crate::mesh::MeshGenTasks>,
     q_camera_position: Query<&GlobalTransform, (With<Camera3d>, Changed<ChunkPosition>)>,
     q_chunk_position: Query<(Entity, &ChunkPosition), With<Chunk>>,
     world_gen_noise: Res<WorldGenNoise>,
@@ -105,7 +107,6 @@ fn update_loaded_chunks(
     let chunk_pos = ChunkPosition::from_world_position(&camera_position);
     // Determine position of chunks that should be loaded
     let mut should_be_loaded_positions: HashSet<IVec3> = HashSet::new();
-    const LOAD_DISTANCE_CHUNKS: i32 = 4;
     for chunk_x in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
         for chunk_y in 0..2 {
             for chunk_z in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
@@ -122,6 +123,7 @@ fn update_loaded_chunks(
         if !should_be_loaded_positions.remove(&chunk_pos.0) {
             // The chunk should be unloaded since it's not in our set
             commands.entity(entity).despawn_recursive();
+            mesh_gen_tasks.0.remove(chunk_pos);
         }
     }
     // Finally, load the new chunks

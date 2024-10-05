@@ -10,7 +10,7 @@ pub struct Chunk {
     pub blocks: [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE],
 }
 
-#[derive(Component, PartialEq, Eq, Default)]
+#[derive(Component, PartialEq, Eq, Default, Hash, Clone, Copy)]
 pub struct ChunkPosition(pub IVec3);
 
 impl ChunkPosition {
