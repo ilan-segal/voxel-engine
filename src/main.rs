@@ -10,7 +10,7 @@ use std::f32::consts::PI;
 
 mod block;
 mod chunk;
-mod debug;
+mod debug_plugin;
 mod mesh;
 mod world;
 
@@ -30,7 +30,7 @@ fn main() {
             WireframePlugin,
             mesh::MeshPlugin,
             world::WorldPlugin,
-            debug::DebugPlugin,
+            debug_plugin::DebugPlugin,
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, (move_camera, toggle_wireframe))
@@ -83,7 +83,7 @@ fn move_camera(
     mut q_camera: Query<&mut Transform, With<Camera3d>>,
 ) {
     const CAMERA_VERTICAL_BLOCKS_PER_SECOND: f32 = 30.0;
-    const CAMERA_HORIZONTAL_BLOCKS_PER_SECOND: f32 = 600.0;
+    const CAMERA_HORIZONTAL_BLOCKS_PER_SECOND: f32 = 10.0;
     for mut transform in q_camera.iter_mut() {
         if keys.pressed(KeyCode::Space) {
             transform.translation.y +=
@@ -108,10 +108,15 @@ fn move_camera(
         }
         if horizontal_movement != Vec3::ZERO {
             let (yaw, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
-            let real_horizontal = (Quat::from_rotation_y(yaw) * horizontal_movement).normalize()
+            let mut real_horizontal = (Quat::from_rotation_y(yaw) * horizontal_movement)
+                .normalize()
                 * CAMERA_HORIZONTAL_BLOCKS_PER_SECOND
                 * BLOCK_SIZE
                 * time.delta_seconds();
+
+            if keys.pressed(KeyCode::AltLeft) {
+                real_horizontal *= 10.0;
+            }
             transform.translation += real_horizontal;
         }
 

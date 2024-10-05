@@ -1,4 +1,4 @@
-use crate::block::Block;
+use crate::block::{Block, BlockSide};
 use crate::chunk::{Chunk, ChunkPosition, CHUNK_SIZE};
 use crate::WORLD_LAYER;
 use bevy::prelude::*;
@@ -98,23 +98,14 @@ struct Quad {
     block: Block,
 }
 
-enum BlockSide {
-    Up,
-    Down,
-    Left,
-    Right,
-    Front,
-    Back,
-}
-
 fn get_mesh_for_chunk(chunk: Chunk) -> Mesh {
     let mut quads = vec![];
     quads.extend(greedy_mesh(&chunk, BlockSide::Up));
     quads.extend(greedy_mesh(&chunk, BlockSide::Down));
-    quads.extend(greedy_mesh(&chunk, BlockSide::Left));
-    quads.extend(greedy_mesh(&chunk, BlockSide::Right));
-    quads.extend(greedy_mesh(&chunk, BlockSide::Front));
-    quads.extend(greedy_mesh(&chunk, BlockSide::Back));
+    quads.extend(greedy_mesh(&chunk, BlockSide::North));
+    quads.extend(greedy_mesh(&chunk, BlockSide::South));
+    quads.extend(greedy_mesh(&chunk, BlockSide::West));
+    quads.extend(greedy_mesh(&chunk, BlockSide::East));
     return create_mesh_from_quads(&quads);
 }
 
@@ -244,25 +235,25 @@ impl LayerIndexable for [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE] {
                 Vec3::new(xf + h, yf - 1.0, zf),
                 Vec3::new(xf, yf - 1.0, zf),
             ],
-            BlockSide::Left => [
+            BlockSide::North => [
                 Vec3::new(xf + 1.0, yf - 1.0, zf + w),
                 Vec3::new(xf + 1.0, yf - 1.0 + h, zf + w),
                 Vec3::new(xf + 1.0, yf - 1.0 + h, zf),
                 Vec3::new(xf + 1.0, yf - 1.0, zf),
             ],
-            BlockSide::Right => [
+            BlockSide::South => [
                 Vec3::new(xf, yf - 1.0, zf),
                 Vec3::new(xf, yf - 1.0 + h, zf),
                 Vec3::new(xf, yf - 1.0 + h, zf + w),
                 Vec3::new(xf, yf - 1.0, zf + w),
             ],
-            BlockSide::Front => [
+            BlockSide::West => [
                 Vec3::new(xf + h, yf - 1.0, zf),
                 Vec3::new(xf + h, yf - 1.0 + w, zf),
                 Vec3::new(xf, yf - 1.0 + w, zf),
                 Vec3::new(xf, yf - 1.0, zf),
             ],
-            BlockSide::Back => [
+            BlockSide::East => [
                 Vec3::new(xf, yf - 1.0, zf + 1.0),
                 Vec3::new(xf, yf - 1.0 + w, zf + 1.0),
                 Vec3::new(xf + h, yf - 1.0 + w, zf + 1.0),
@@ -281,10 +272,10 @@ fn get_xyz_from_layer_indices(
     match direction {
         BlockSide::Up => (row, layer, col),
         BlockSide::Down => (row, CHUNK_SIZE - 1 - layer, col),
-        BlockSide::Left => (layer, row, col),
-        BlockSide::Right => (CHUNK_SIZE - 1 - layer, row, col),
-        BlockSide::Back => (row, col, layer),
-        BlockSide::Front => (row, col, CHUNK_SIZE - 1 - layer),
+        BlockSide::North => (layer, row, col),
+        BlockSide::South => (CHUNK_SIZE - 1 - layer, row, col),
+        BlockSide::East => (row, col, layer),
+        BlockSide::West => (row, col, CHUNK_SIZE - 1 - layer),
     }
 }
 
