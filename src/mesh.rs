@@ -1,8 +1,10 @@
 use crate::block::Block;
 use crate::chunk::{Chunk, ChunkPosition, CHUNK_SIZE};
+use crate::WORLD_LAYER;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
 use bevy::render::render_asset::RenderAssetUsages;
+use bevy::render::view::RenderLayers;
 use bevy::tasks::futures_lite::future;
 use bevy::tasks::{block_on, AsyncComputeTaskPool, Task};
 use bevy::utils::HashMap;
@@ -43,7 +45,6 @@ pub struct MeshTaskData {
 #[derive(Resource, Default)]
 pub struct MeshGenTasks(pub HashMap<ChunkPosition, Task<MeshTaskData>>);
 
-// TODO: Non-blocking system
 fn begin_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
     q_chunk: Query<(Entity, &Chunk, &ChunkPosition), Without<Handle<Mesh>>>,
@@ -77,12 +78,15 @@ fn receive_mesh_gen_tasks(
         };
         let e = data.entity;
         if let Some(mut entity) = commands.get_entity(e) {
-            entity.insert(PbrBundle {
-                mesh: meshes.add(data.mesh),
-                material: materials.white.clone(),
-                transform: *q_transform.get(e).unwrap(),
-                ..default()
-            });
+            entity.insert((
+                PbrBundle {
+                    mesh: meshes.add(data.mesh),
+                    material: materials.white.clone(),
+                    transform: *q_transform.get(e).unwrap(),
+                    ..default()
+                },
+                RenderLayers::layer(WORLD_LAYER),
+            ));
         };
         return false;
     });

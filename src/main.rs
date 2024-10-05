@@ -2,18 +2,20 @@ use bevy::{
     input::mouse::MouseMotion,
     pbr::wireframe::{WireframeConfig, WireframePlugin},
     prelude::*,
+    render::view::{Layer, RenderLayers},
     window::CursorGrabMode,
 };
 use chunk::ChunkPosition;
-use iyes_perf_ui::{entries::PerfUiBundle, prelude::*};
 use std::f32::consts::PI;
 
 mod block;
 mod chunk;
+mod debug;
 mod mesh;
 mod world;
 
 const BLOCK_SIZE: f32 = 1.0;
+const WORLD_LAYER: Layer = 0;
 
 fn main() {
     App::new()
@@ -25,14 +27,11 @@ fn main() {
                 }),
                 ..default()
             }),
-            PerfUiPlugin,
             WireframePlugin,
             mesh::MeshPlugin,
             world::WorldPlugin,
+            debug::DebugPlugin,
         ))
-        .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
-        .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
-        .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, (move_camera, toggle_wireframe))
         .run();
@@ -43,8 +42,6 @@ fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
     window.cursor.visible = false;
     window.cursor.grab_mode = CursorGrabMode::Locked;
 
-    commands.spawn(PerfUiBundle::default());
-
     let camera_pos = Transform::from_xyz(0.0, 60.0, 0.0);
 
     commands.spawn((
@@ -53,6 +50,7 @@ fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
             ..Default::default()
         },
         ChunkPosition::default(),
+        RenderLayers::layer(WORLD_LAYER),
     ));
 
     commands.spawn(DirectionalLightBundle {
