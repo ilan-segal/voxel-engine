@@ -1,12 +1,12 @@
 use bevy::{
     color::palettes::{
         basic::{GREEN, SILVER},
-        css::BROWN,
+        css::CHOCOLATE,
     },
     prelude::*,
 };
 
-#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Block {
     #[default]
     Air,
@@ -20,7 +20,7 @@ impl Block {
         match self {
             Self::Stone => Some(SILVER),
             Self::Grass => Some(GREEN),
-            Self::Dirt => Some(BROWN),
+            Self::Dirt => Some(CHOCOLATE),
             _ => None,
         }
         .map(Color::from)

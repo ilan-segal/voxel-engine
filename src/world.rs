@@ -8,16 +8,17 @@ use crate::{
 };
 
 const WORLD_SEED: u32 = 0xDEADBEEF;
-const LOAD_DISTANCE_CHUNKS: i32 = 20;
+const LOAD_DISTANCE_CHUNKS: i32 = 30;
 
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<WorldGenNoise>().add_systems(
-            Update,
-            (update_loaded_chunks, update_camera_chunk_position).in_set(WorldSet),
-        );
+        app.init_resource::<WorldGenNoise>()
+            .add_systems(
+                Update,
+                (update_loaded_chunks, update_camera_chunk_position).in_set(WorldSet),
+            );
     }
 }
 
@@ -122,7 +123,9 @@ fn update_loaded_chunks(
     for (entity, chunk_pos) in q_chunk_position.iter() {
         if !should_be_loaded_positions.remove(&chunk_pos.0) {
             // The chunk should be unloaded since it's not in our set
-            commands.entity(entity).despawn_recursive();
+            commands
+                .entity(entity)
+                .despawn_recursive();
             mesh_gen_tasks.0.remove(chunk_pos);
         }
     }
@@ -172,5 +175,5 @@ fn generate_chunk(noise: &WorldGenNoise, chunk_pos: &IVec3) -> Chunk {
             }
         }
     }
-    Chunk { blocks }
+    Chunk::new(blocks)
 }
