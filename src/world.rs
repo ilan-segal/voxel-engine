@@ -1,10 +1,10 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::hashbrown::HashMap};
 use noise::{NoiseFn, Perlin};
 use std::collections::HashSet;
 
 use crate::{
     block::Block,
-    chunk::{Chunk, ChunkPosition, CHUNK_SIZE},
+    chunk::{Chunk, ChunkMask, ChunkPosition, VoxelMask, CHUNK_SIZE},
 };
 
 const WORLD_SEED: u32 = 0xDEADBEEF;
@@ -150,7 +150,9 @@ fn update_loaded_chunks(
 
 fn generate_chunk(noise: &WorldGenNoise, chunk_pos: &IVec3) -> Chunk {
     const SCALE: f64 = 60.0;
-    let mut blocks = default::<[[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE]>();
+    let mut stone_mask = ChunkMask::default();
+    let mut dirt_mask = ChunkMask::default();
+    let mut grass_mask = ChunkMask::default();
     for z in 0..CHUNK_SIZE {
         for x in 0..CHUNK_SIZE {
             let height = (noise.sample(
@@ -165,15 +167,19 @@ fn generate_chunk(noise: &WorldGenNoise, chunk_pos: &IVec3) -> Chunk {
                 continue;
             };
             for y in (0..chunk_height - 1).filter(|h| h < &CHUNK_SIZE) {
-                blocks[x][y][z] = Block::Stone;
+                stone_mask.set_bit(x, y, z, true);
             }
             if chunk_height - 1 < CHUNK_SIZE {
-                blocks[x][chunk_height - 1][z] = Block::Dirt;
+                dirt_mask.set_bit(x, chunk_height - 1, z, true);
             }
             if chunk_height < CHUNK_SIZE {
-                blocks[x][chunk_height][z] = Block::Grass;
+                grass_mask.set_bit(x, chunk_height, z, true);
             }
         }
     }
-    Chunk::new(blocks)
+    let mut masks = HashMap::new();
+    masks.insert(Block::Stone, stone_mask);
+    masks.insert(Block::Dirt, dirt_mask);
+    masks.insert(Block::Grass, grass_mask);
+    return Chunk { masks };
 }

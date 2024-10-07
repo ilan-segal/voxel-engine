@@ -1,3 +1,5 @@
+#![feature(iter_map_windows)]
+
 use bevy::{
     input::mouse::MouseMotion,
     pbr::wireframe::{WireframeConfig, WireframePlugin},

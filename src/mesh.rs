@@ -1,5 +1,5 @@
 use crate::block::{Block, BlockSide};
-use crate::chunk::{Chunk, ChunkPosition, CHUNK_SIZE};
+use crate::chunk::{BitWiseOps, Chunk, ChunkMask, ChunkPosition, LayerMask, CHUNK_SIZE};
 use crate::WORLD_LAYER;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
@@ -92,177 +92,176 @@ fn receive_mesh_gen_tasks(
     });
 }
 
-#[derive(Debug)]
+fn get_mesh_for_chunk(chunk: Chunk) -> Mesh {
+    let mut quads = vec![];
+    quads.extend(get_quads_for_side(&chunk, BlockSide::Up));
+    // quads.extend(greedy_mesh(&chunk, BlockSide::Up));
+    // quads.extend(greedy_mesh(&chunk, BlockSide::Down));
+    // quads.extend(greedy_mesh(&chunk, BlockSide::North));
+    // quads.extend(greedy_mesh(&chunk, BlockSide::South));
+    // quads.extend(greedy_mesh(&chunk, BlockSide::West));
+    // quads.extend(greedy_mesh(&chunk, BlockSide::East));
+    return greedy_quads_to_mesh(&quads);
+}
+
 struct Quad {
     vertices: [Vec3; 4],
     block: Block,
 }
 
-fn get_mesh_for_chunk(chunk: Chunk) -> Mesh {
-    let mut quads = vec![];
-    quads.extend(greedy_mesh(&chunk, BlockSide::Up));
-    quads.extend(greedy_mesh(&chunk, BlockSide::Down));
-    quads.extend(greedy_mesh(&chunk, BlockSide::North));
-    quads.extend(greedy_mesh(&chunk, BlockSide::South));
-    quads.extend(greedy_mesh(&chunk, BlockSide::West));
-    quads.extend(greedy_mesh(&chunk, BlockSide::East));
-    return create_mesh_from_quads(&quads);
+struct GreedyQuad {
+    row: u32,
+    col: u32,
+    h: u32,
+    w: u32,
 }
 
-// TODO: Replace slow implementation with binary mesher
-fn greedy_mesh(chunk: &Chunk, direction: BlockSide) -> Vec<Quad> {
-    let mut quads: Vec<Quad> = vec![];
-    let mut blocks = chunk.blocks;
-    for layer in 0..CHUNK_SIZE {
-        for row in 0..CHUNK_SIZE {
-            for col in 0..CHUNK_SIZE {
-                let block_is_hidden_from_above = |row: usize, col: usize, layer: usize| {
-                    layer < CHUNK_SIZE - 1
-                        && blocks.get_from_layer_coords(&direction, layer + 1, row, col)
-                            != Block::Air
-                };
-                let block = blocks.get_from_layer_coords(&direction, layer, row, col);
-                if block == Block::Air || block_is_hidden_from_above(row, col, layer) {
-                    continue;
-                }
-                let mut height = 0;
-                let mut width = 0;
-                while height + row < CHUNK_SIZE - 1
-                    && block
-                        == blocks.get_from_layer_coords(
-                            &direction,
-                            layer,
-                            height + row + 1,
-                            col + width,
-                        )
-                {
-                    height += 1;
-                }
-                while col + width < CHUNK_SIZE - 1
-                    && (row..=height + row).all(|cur_row| {
-                        block
-                            == blocks.get_from_layer_coords(
-                                &direction,
-                                layer,
-                                cur_row,
-                                col + width + 1,
-                            )
-                            && !block_is_hidden_from_above(cur_row, col + width + 1, layer)
-                    })
-                {
-                    width += 1;
-                }
-                let vertices = blocks.get_quad_corners(&direction, layer, row, height, col, width);
-                let quad = Quad { vertices, block };
-                quads.push(quad);
-                for cur_row in row..=height + row {
-                    for cur_col in col..=col + width {
-                        blocks.clear_at(&direction, layer, cur_row, cur_col);
-                    }
-                }
+fn get_quads_for_side(chunk: &Chunk, side: BlockSide) -> Vec<Quad> {
+    let mut quads = vec![];
+    let empty_layer = LayerMask::default();
+    let visibility = chunk
+        .get_opacity_mask()
+        .iter()
+        .chain(std::iter::once(&empty_layer))
+        .map_windows(|[la, lb]| std::array::from_fn(|i| la[i] & !lb[i]))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+    for (block, mask) in chunk.masks.iter() {
+        if block == &Block::Air {
+            continue;
+        }
+        let cur_quads = greedy_quad_vertices_for_side(mask, &visibility, &side)
+            .iter()
+            .map(|vertices| Quad {
+                vertices: *vertices,
+                block: *block,
+            })
+            .collect::<Vec<_>>();
+        quads.extend(cur_quads);
+    }
+    return quads;
+}
+
+fn greedy_quad_vertices_for_side(
+    chunk: &ChunkMask,
+    visibility: &ChunkMask,
+    side: &BlockSide,
+) -> Vec<[Vec3; 4]> {
+    let mut vertices = vec![];
+
+    for (layer_idx, layer) in chunk
+        .iter()
+        .zip(visibility)
+        .map(|(layer, vis)| vis.and(layer))
+        .enumerate()
+    {
+        let corners = greedy_quads_for_layer(layer)
+            .iter()
+            .map(|q| {
+                get_quad_corners(
+                    side,
+                    layer_idx,
+                    q.row as usize,
+                    q.col as usize,
+                    q.h as usize,
+                    q.w as usize,
+                )
+            })
+            .collect::<Vec<_>>();
+        vertices.extend(corners);
+    }
+    return vertices;
+}
+
+fn greedy_quads_for_layer(mut layer: LayerMask) -> Vec<GreedyQuad> {
+    let mut quads = vec![];
+    for row in 0..layer.len() {
+        let mut y = 0;
+        while y < CHUNK_SIZE as u32 {
+            y += (layer[row] >> y).trailing_zeros();
+            if y >= CHUNK_SIZE as u32 {
+                continue;
             }
+            let h = (layer[row] >> y).trailing_ones();
+            let h_as_mask = u32::checked_shl(1, h).map_or(!0, |v| v - 1);
+            let mask = h_as_mask << y;
+            let mut w = 1;
+            while row + w < CHUNK_SIZE {
+                let masked_next_row = layer[row + w] & mask;
+                if masked_next_row != mask {
+                    break;
+                }
+                layer[row + w] &= !mask;
+                w += 1;
+            }
+            quads.push(GreedyQuad {
+                col: row as u32,
+                row: y,
+                h: h - 1,
+                w: w as u32 - 1,
+            });
+            y += h;
         }
     }
     return quads;
 }
 
-trait LayerIndexable {
-    fn get_from_layer_coords(
-        &self,
-        direction: &BlockSide,
-        layer: usize,
-        row: usize,
-        col: usize,
-    ) -> Block;
-
-    fn clear_at(&mut self, direction: &BlockSide, layer: usize, row: usize, col: usize);
-
-    fn get_quad_corners(
-        &self,
-        direction: &BlockSide,
-        layer: usize,
-        row: usize,
-        height: usize,
-        col: usize,
-        width: usize,
-    ) -> [Vec3; 4];
-}
-
-impl LayerIndexable for [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE] {
-    fn get_from_layer_coords(
-        &self,
-        direction: &BlockSide,
-        layer: usize,
-        row: usize,
-        col: usize,
-    ) -> Block {
-        let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
-        self[x][y][z]
-    }
-
-    fn clear_at(&mut self, direction: &BlockSide, layer: usize, row: usize, col: usize) {
-        let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
-        self[x][y][z] = Block::Air;
-    }
-
-    fn get_quad_corners(
-        &self,
-        direction: &BlockSide,
-        layer: usize,
-        row: usize,
-        height: usize,
-        col: usize,
-        width: usize,
-    ) -> [Vec3; 4] {
-        let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
-        let (xf, yf, zf, h, w) = (
-            x as f32,
-            y as f32,
-            z as f32,
-            height as f32 + 1.0,
-            width as f32 + 1.0,
-        );
-        match direction {
-            BlockSide::Up => [
-                Vec3::new(xf, yf, zf),
-                Vec3::new(xf + h, yf, zf),
-                Vec3::new(xf + h, yf, zf + w),
-                Vec3::new(xf, yf, zf + w),
-            ],
-            BlockSide::Down => [
-                Vec3::new(xf, yf - 1.0, zf + w),
-                Vec3::new(xf + h, yf - 1.0, zf + w),
-                Vec3::new(xf + h, yf - 1.0, zf),
-                Vec3::new(xf, yf - 1.0, zf),
-            ],
-            BlockSide::North => [
-                Vec3::new(xf + 1.0, yf - 1.0, zf + w),
-                Vec3::new(xf + 1.0, yf - 1.0 + h, zf + w),
-                Vec3::new(xf + 1.0, yf - 1.0 + h, zf),
-                Vec3::new(xf + 1.0, yf - 1.0, zf),
-            ],
-            BlockSide::South => [
-                Vec3::new(xf, yf - 1.0, zf),
-                Vec3::new(xf, yf - 1.0 + h, zf),
-                Vec3::new(xf, yf - 1.0 + h, zf + w),
-                Vec3::new(xf, yf - 1.0, zf + w),
-            ],
-            BlockSide::West => [
-                Vec3::new(xf + h, yf - 1.0, zf),
-                Vec3::new(xf + h, yf - 1.0 + w, zf),
-                Vec3::new(xf, yf - 1.0 + w, zf),
-                Vec3::new(xf, yf - 1.0, zf),
-            ],
-            BlockSide::East => [
-                Vec3::new(xf, yf - 1.0, zf + 1.0),
-                Vec3::new(xf, yf - 1.0 + w, zf + 1.0),
-                Vec3::new(xf + h, yf - 1.0 + w, zf + 1.0),
-                Vec3::new(xf + h, yf - 1.0, zf + 1.0),
-            ],
-        }
+fn get_quad_corners(
+    direction: &BlockSide,
+    layer: usize,
+    row: usize,
+    col: usize,
+    height: usize,
+    width: usize,
+) -> [Vec3; 4] {
+    let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
+    let (xf, yf, zf, h, w) = (
+        x as f32,
+        y as f32,
+        z as f32,
+        height as f32 + 1.0,
+        width as f32 + 1.0,
+    );
+    match direction {
+        BlockSide::Up => [
+            Vec3::new(xf, yf, zf),
+            Vec3::new(xf + h, yf, zf),
+            Vec3::new(xf + h, yf, zf + w),
+            Vec3::new(xf, yf, zf + w),
+        ],
+        BlockSide::Down => [
+            Vec3::new(xf, yf - 1.0, zf + w),
+            Vec3::new(xf + h, yf - 1.0, zf + w),
+            Vec3::new(xf + h, yf - 1.0, zf),
+            Vec3::new(xf, yf - 1.0, zf),
+        ],
+        BlockSide::North => [
+            Vec3::new(xf + 1.0, yf - 1.0, zf + w),
+            Vec3::new(xf + 1.0, yf - 1.0 + h, zf + w),
+            Vec3::new(xf + 1.0, yf - 1.0 + h, zf),
+            Vec3::new(xf + 1.0, yf - 1.0, zf),
+        ],
+        BlockSide::South => [
+            Vec3::new(xf, yf - 1.0, zf),
+            Vec3::new(xf, yf - 1.0 + h, zf),
+            Vec3::new(xf, yf - 1.0 + h, zf + w),
+            Vec3::new(xf, yf - 1.0, zf + w),
+        ],
+        BlockSide::West => [
+            Vec3::new(xf + h, yf - 1.0, zf),
+            Vec3::new(xf + h, yf - 1.0 + w, zf),
+            Vec3::new(xf, yf - 1.0 + w, zf),
+            Vec3::new(xf, yf - 1.0, zf),
+        ],
+        BlockSide::East => [
+            Vec3::new(xf, yf - 1.0, zf + 1.0),
+            Vec3::new(xf, yf - 1.0 + w, zf + 1.0),
+            Vec3::new(xf + h, yf - 1.0 + w, zf + 1.0),
+            Vec3::new(xf + h, yf - 1.0, zf + 1.0),
+        ],
     }
 }
-
 fn get_xyz_from_layer_indices(
     direction: &BlockSide,
     layer: usize,
@@ -279,7 +278,7 @@ fn get_xyz_from_layer_indices(
     }
 }
 
-fn create_mesh_from_quads(quads: &Vec<Quad>) -> Mesh {
+fn greedy_quads_to_mesh(quads: &Vec<Quad>) -> Mesh {
     let vertices = quads
         .iter()
         .flat_map(|q| q.vertices.iter())
@@ -321,7 +320,11 @@ fn create_mesh_from_quads(quads: &Vec<Quad>) -> Mesh {
     let colours = quads
         .iter()
         .map(|q| q.block)
-        .map(|block| block.get_colour().expect("Meshed block should have colour"))
+        .map(|block| {
+            block
+                .get_colour()
+                .expect("Meshed block should have colour")
+        })
         .map(|c| c.to_linear().to_f32_array())
         .flat_map(|m| std::iter::repeat_n(m, 4))
         .collect::<Vec<_>>();

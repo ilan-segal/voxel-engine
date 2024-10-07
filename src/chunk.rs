@@ -3,32 +3,66 @@ use bevy::{prelude::*, utils::HashMap};
 
 pub const CHUNK_SIZE: usize = 32;
 
-type LayerMask = [u32; CHUNK_SIZE];
-type ChunkMask = [LayerMask; CHUNK_SIZE];
+pub type LayerMask = [u32; CHUNK_SIZE];
+pub type ChunkMask = [LayerMask; CHUNK_SIZE];
+
+pub trait BitWiseOps {
+    fn or(&self, other: &Self) -> Self;
+    fn and(&self, other: &Self) -> Self;
+}
+
+impl BitWiseOps for LayerMask {
+    fn or(&self, other: &Self) -> Self {
+        std::array::from_fn(|i| self[i] | other[i])
+    }
+    fn and(&self, other: &Self) -> Self {
+        std::array::from_fn(|i| self[i] & other[i])
+    }
+}
+
+impl BitWiseOps for ChunkMask {
+    fn or(&self, other: &Self) -> Self {
+        std::array::from_fn(|i| self[i].or(&other[i]))
+    }
+    fn and(&self, other: &Self) -> Self {
+        std::array::from_fn(|i| self[i].and(&other[i]))
+    }
+}
+
+pub trait VoxelMask {
+    fn set_bit(&mut self, x: usize, y: usize, z: usize, value: bool);
+}
+
+impl VoxelMask for ChunkMask {
+    fn set_bit(&mut self, x: usize, y: usize, z: usize, value: bool) {
+        if value {
+            self[y][z] |= 1 << x;
+        } else {
+            self[y][z] &= (!1) << x;
+        }
+    }
+}
 
 // 32x32x32 chunk of blocks
 #[derive(Component, Clone)]
 pub struct Chunk {
     // x, y, z
-    pub blocks: [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE],
     pub masks: HashMap<Block, ChunkMask>,
 }
 
 impl Chunk {
-    pub fn new(blocks: [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE]) -> Self {
-        let mut masks = HashMap::default();
-        for x in 0..CHUNK_SIZE {
-            for y in 0..CHUNK_SIZE {
-                for z in 0..CHUNK_SIZE {
-                    let block = blocks[x][y][z];
-                    let mask = masks
-                        .entry(block)
-                        .or_insert_with(ChunkMask::default);
-                    mask[y][z] |= 1 << x;
+    pub fn get_opacity_mask(&self) -> ChunkMask {
+        self.masks
+            .iter()
+            .filter_map(|(block, mask)| {
+                if block == &Block::Air {
+                    None
+                } else {
+                    Some(*mask)
                 }
-            }
-        }
-        Self { blocks, masks }
+            })
+            .reduce(|a, b| a.or(&b))
+            .unwrap()
     }
 }
 
