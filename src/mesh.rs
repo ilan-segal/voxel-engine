@@ -27,7 +27,11 @@ impl Plugin for MeshPlugin {
 
 fn setup(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>) {
     let common_materials = CommonMaterials {
-        white: materials.add(Color::WHITE),
+        white: materials.add(StandardMaterial {
+            perceptual_roughness: 1.0,
+            reflectance: 0.0,
+            ..Default::default()
+        }),
     };
     commands.insert_resource(common_materials);
 }
@@ -116,13 +120,8 @@ fn greedy_mesh(chunk: &Chunk, direction: BlockSide) -> Vec<Quad> {
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {
             for col in 0..CHUNK_SIZE {
-                let block_is_hidden_from_above = |row: usize, col: usize, layer: usize| {
-                    layer < CHUNK_SIZE - 1
-                        && blocks.get_from_layer_coords(&direction, layer + 1, row, col)
-                            != Block::Air
-                };
                 let block = blocks.get_from_layer_coords(&direction, layer, row, col);
-                if block == Block::Air || block_is_hidden_from_above(row, col, layer) {
+                if block == Block::Air || blocks.is_hidden_from_above(&direction, row, col, layer) {
                     continue;
                 }
                 let mut height = 0;
@@ -147,7 +146,12 @@ fn greedy_mesh(chunk: &Chunk, direction: BlockSide) -> Vec<Quad> {
                                 cur_row,
                                 col + width + 1,
                             )
-                            && !block_is_hidden_from_above(cur_row, col + width + 1, layer)
+                            && !blocks.is_hidden_from_above(
+                                &direction,
+                                cur_row,
+                                col + width + 1,
+                                layer,
+                            )
                     })
                 {
                     width += 1;
@@ -186,6 +190,17 @@ trait LayerIndexable {
         col: usize,
         width: usize,
     ) -> [Vec3; 4];
+
+    fn is_hidden_from_above(
+        &self,
+        direction: &BlockSide,
+        row: usize,
+        col: usize,
+        layer: usize,
+    ) -> bool {
+        layer < CHUNK_SIZE - 1
+            && self.get_from_layer_coords(&direction, layer + 1, row, col) != Block::Air
+    }
 }
 
 impl LayerIndexable for [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE] {
@@ -321,7 +336,11 @@ fn create_mesh_from_quads(quads: &Vec<Quad>) -> Mesh {
     let colours = quads
         .iter()
         .map(|q| q.block)
-        .map(|block| block.get_colour().expect("Meshed block should have colour"))
+        .map(|block| {
+            block
+                .get_colour()
+                .expect("Meshed block should have colour")
+        })
         .map(|c| c.to_linear().to_f32_array())
         .flat_map(|m| std::iter::repeat_n(m, 4))
         .collect::<Vec<_>>();
