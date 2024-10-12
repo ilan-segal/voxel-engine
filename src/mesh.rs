@@ -1,5 +1,5 @@
 use crate::block::{Block, BlockSide};
-use crate::chunk::{Chunk, ChunkPosition, CHUNK_SIZE};
+use crate::chunk::{Chunk, ChunkNeighborhood, ChunkPosition, ChunkSpatialIndex, CHUNK_SIZE};
 use crate::WORLD_LAYER;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
@@ -49,20 +49,44 @@ pub struct MeshTaskData {
 #[derive(Resource, Default)]
 pub struct MeshGenTasks(pub HashMap<ChunkPosition, Task<MeshTaskData>>);
 
+// fn begin_mesh_gen_tasks(
+//     mut tasks: ResMut<MeshGenTasks>,
+//     q_chunk: Query<(Entity, &Chunk, &ChunkPosition), Without<Handle<Mesh>>>,
+// ) {
+//     for (entity, chunk, pos) in q_chunk.iter() {
+//         let task_pool = AsyncComputeTaskPool::get();
+//         if tasks.0.contains_key(pos) {
+//             continue;
+//         }
+//         let cloned_chunk = chunk.clone();
+//         let task = task_pool.spawn(async move {
+//             MeshTaskData {
+//                 entity,
+//                 mesh: get_mesh_for_chunk(cloned_chunk),
+//             }
+//         });
+//         tasks.0.insert(*pos, task);
+//     }
+// }
+
 fn begin_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
-    q_chunk: Query<(Entity, &Chunk, &ChunkPosition), Without<Handle<Mesh>>>,
+    q_pos: Query<(Entity, &ChunkPosition), (With<Chunk>, Without<Handle<Mesh>>)>,
+    q_chunk: Query<&Chunk>,
+    index: Res<ChunkSpatialIndex>,
 ) {
-    for (entity, chunk, pos) in q_chunk.iter() {
+    for (entity, pos) in q_pos.iter() {
         let task_pool = AsyncComputeTaskPool::get();
         if tasks.0.contains_key(pos) {
             continue;
         }
-        let cloned_chunk = chunk.clone();
+        let Some(neighborhood) = index.get_neighborhood(pos, &q_chunk) else {
+            continue;
+        };
         let task = task_pool.spawn(async move {
             MeshTaskData {
                 entity,
-                mesh: get_mesh_for_chunk(cloned_chunk),
+                mesh: get_mesh_for_chunk(&neighborhood),
             }
         });
         tasks.0.insert(*pos, task);
@@ -102,26 +126,33 @@ struct Quad {
     block: Block,
 }
 
-fn get_mesh_for_chunk(chunk: Chunk) -> Mesh {
+fn get_mesh_for_chunk(neighborhood: &ChunkNeighborhood) -> Mesh {
     let mut quads = vec![];
-    quads.extend(greedy_mesh(&chunk, BlockSide::Up));
-    quads.extend(greedy_mesh(&chunk, BlockSide::Down));
-    quads.extend(greedy_mesh(&chunk, BlockSide::North));
-    quads.extend(greedy_mesh(&chunk, BlockSide::South));
-    quads.extend(greedy_mesh(&chunk, BlockSide::West));
-    quads.extend(greedy_mesh(&chunk, BlockSide::East));
+    quads.extend(greedy_mesh(neighborhood, BlockSide::Up));
+    quads.extend(greedy_mesh(neighborhood, BlockSide::Down));
+    quads.extend(greedy_mesh(neighborhood, BlockSide::North));
+    quads.extend(greedy_mesh(neighborhood, BlockSide::South));
+    quads.extend(greedy_mesh(neighborhood, BlockSide::West));
+    quads.extend(greedy_mesh(neighborhood, BlockSide::East));
     return create_mesh_from_quads(&quads);
 }
 
 // TODO: Replace slow implementation with binary mesher
-fn greedy_mesh(chunk: &Chunk, direction: BlockSide) -> Vec<Quad> {
+fn greedy_mesh(neighborhood: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let mut blocks = chunk.blocks;
+    let mut blocks = neighborhood.middle.blocks;
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {
             for col in 0..CHUNK_SIZE {
                 let block = blocks.get_from_layer_coords(&direction, layer, row, col);
-                if block == Block::Air || blocks.is_hidden_from_above(&direction, row, col, layer) {
+                if block == Block::Air
+                    || neighborhood.block_is_hidden_from_above(
+                        &direction,
+                        layer as i32,
+                        row as i32,
+                        col as i32,
+                    )
+                {
                     continue;
                 }
                 let mut height = 0;
@@ -146,17 +177,17 @@ fn greedy_mesh(chunk: &Chunk, direction: BlockSide) -> Vec<Quad> {
                                 cur_row,
                                 col + width + 1,
                             )
-                            && !blocks.is_hidden_from_above(
+                            && !neighborhood.block_is_hidden_from_above(
                                 &direction,
-                                cur_row,
-                                col + width + 1,
-                                layer,
+                                layer as i32,
+                                cur_row as i32,
+                                (col + width + 1) as i32,
                             )
                     })
                 {
                     width += 1;
                 }
-                let vertices = blocks.get_quad_corners(&direction, layer, row, height, col, width);
+                let vertices = get_quad_corners(&direction, layer, row, height, col, width);
                 let quad = Quad { vertices, block };
                 quads.push(quad);
                 for cur_row in row..=height + row {
@@ -180,27 +211,6 @@ trait LayerIndexable {
     ) -> Block;
 
     fn clear_at(&mut self, direction: &BlockSide, layer: usize, row: usize, col: usize);
-
-    fn get_quad_corners(
-        &self,
-        direction: &BlockSide,
-        layer: usize,
-        row: usize,
-        height: usize,
-        col: usize,
-        width: usize,
-    ) -> [Vec3; 4];
-
-    fn is_hidden_from_above(
-        &self,
-        direction: &BlockSide,
-        row: usize,
-        col: usize,
-        layer: usize,
-    ) -> bool {
-        layer < CHUNK_SIZE - 1
-            && self.get_from_layer_coords(&direction, layer + 1, row, col) != Block::Air
-    }
 }
 
 impl LayerIndexable for [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE] {
@@ -219,62 +229,61 @@ impl LayerIndexable for [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE] {
         let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
         self[x][y][z] = Block::Air;
     }
+}
 
-    fn get_quad_corners(
-        &self,
-        direction: &BlockSide,
-        layer: usize,
-        row: usize,
-        height: usize,
-        col: usize,
-        width: usize,
-    ) -> [Vec3; 4] {
-        let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
-        let (xf, yf, zf, h, w) = (
-            x as f32,
-            y as f32,
-            z as f32,
-            height as f32 + 1.0,
-            width as f32 + 1.0,
-        );
-        match direction {
-            BlockSide::Up => [
-                Vec3::new(xf, yf, zf),
-                Vec3::new(xf + h, yf, zf),
-                Vec3::new(xf + h, yf, zf + w),
-                Vec3::new(xf, yf, zf + w),
-            ],
-            BlockSide::Down => [
-                Vec3::new(xf, yf - 1.0, zf + w),
-                Vec3::new(xf + h, yf - 1.0, zf + w),
-                Vec3::new(xf + h, yf - 1.0, zf),
-                Vec3::new(xf, yf - 1.0, zf),
-            ],
-            BlockSide::North => [
-                Vec3::new(xf + 1.0, yf - 1.0, zf + w),
-                Vec3::new(xf + 1.0, yf - 1.0 + h, zf + w),
-                Vec3::new(xf + 1.0, yf - 1.0 + h, zf),
-                Vec3::new(xf + 1.0, yf - 1.0, zf),
-            ],
-            BlockSide::South => [
-                Vec3::new(xf, yf - 1.0, zf),
-                Vec3::new(xf, yf - 1.0 + h, zf),
-                Vec3::new(xf, yf - 1.0 + h, zf + w),
-                Vec3::new(xf, yf - 1.0, zf + w),
-            ],
-            BlockSide::West => [
-                Vec3::new(xf + h, yf - 1.0, zf),
-                Vec3::new(xf + h, yf - 1.0 + w, zf),
-                Vec3::new(xf, yf - 1.0 + w, zf),
-                Vec3::new(xf, yf - 1.0, zf),
-            ],
-            BlockSide::East => [
-                Vec3::new(xf, yf - 1.0, zf + 1.0),
-                Vec3::new(xf, yf - 1.0 + w, zf + 1.0),
-                Vec3::new(xf + h, yf - 1.0 + w, zf + 1.0),
-                Vec3::new(xf + h, yf - 1.0, zf + 1.0),
-            ],
-        }
+fn get_quad_corners(
+    direction: &BlockSide,
+    layer: usize,
+    row: usize,
+    height: usize,
+    col: usize,
+    width: usize,
+) -> [Vec3; 4] {
+    let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
+    let (xf, yf, zf, h, w) = (
+        x as f32,
+        y as f32,
+        z as f32,
+        height as f32 + 1.0,
+        width as f32 + 1.0,
+    );
+    match direction {
+        BlockSide::Up => [
+            Vec3::new(xf, yf, zf),
+            Vec3::new(xf + h, yf, zf),
+            Vec3::new(xf + h, yf, zf + w),
+            Vec3::new(xf, yf, zf + w),
+        ],
+        BlockSide::Down => [
+            Vec3::new(xf, yf - 1.0, zf + w),
+            Vec3::new(xf + h, yf - 1.0, zf + w),
+            Vec3::new(xf + h, yf - 1.0, zf),
+            Vec3::new(xf, yf - 1.0, zf),
+        ],
+        BlockSide::North => [
+            Vec3::new(xf + 1.0, yf - 1.0, zf + w),
+            Vec3::new(xf + 1.0, yf - 1.0 + h, zf + w),
+            Vec3::new(xf + 1.0, yf - 1.0 + h, zf),
+            Vec3::new(xf + 1.0, yf - 1.0, zf),
+        ],
+        BlockSide::South => [
+            Vec3::new(xf, yf - 1.0, zf),
+            Vec3::new(xf, yf - 1.0 + h, zf),
+            Vec3::new(xf, yf - 1.0 + h, zf + w),
+            Vec3::new(xf, yf - 1.0, zf + w),
+        ],
+        BlockSide::West => [
+            Vec3::new(xf + h, yf - 1.0, zf),
+            Vec3::new(xf + h, yf - 1.0 + w, zf),
+            Vec3::new(xf, yf - 1.0 + w, zf),
+            Vec3::new(xf, yf - 1.0, zf),
+        ],
+        BlockSide::East => [
+            Vec3::new(xf, yf - 1.0, zf + 1.0),
+            Vec3::new(xf, yf - 1.0 + w, zf + 1.0),
+            Vec3::new(xf + h, yf - 1.0 + w, zf + 1.0),
+            Vec3::new(xf + h, yf - 1.0, zf + 1.0),
+        ],
     }
 }
 

@@ -37,6 +37,19 @@ pub enum BlockSide {
     East,
 }
 
+impl BlockSide {
+    pub fn get_direction(&self) -> IVec3 {
+        match self {
+            Self::North => IVec3::X,
+            Self::South => IVec3::NEG_X,
+            Self::Up => IVec3::Y,
+            Self::Down => IVec3::NEG_Y,
+            Self::East => IVec3::Z,
+            Self::West => IVec3::NEG_Z,
+        }
+    }
+}
+
 impl From<Dir3> for BlockSide {
     fn from(value: Dir3) -> Self {
         let closest = [
