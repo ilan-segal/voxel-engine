@@ -152,7 +152,7 @@ fn greedy_mesh(chunk: &Chunk, direction: BlockSide) -> Vec<Quad> {
                 {
                     width += 1;
                 }
-                let vertices = blocks.get_quad_corners(&direction, layer, row, height, col, width);
+                let vertices = get_quad_corners(&direction, layer, row, height, col, width);
                 let quad = Quad { vertices, block };
                 quads.push(quad);
                 for cur_row in row..=height + row {
@@ -176,16 +176,6 @@ trait LayerIndexable {
     ) -> Block;
 
     fn clear_at(&mut self, direction: &BlockSide, layer: usize, row: usize, col: usize);
-
-    fn get_quad_corners(
-        &self,
-        direction: &BlockSide,
-        layer: usize,
-        row: usize,
-        height: usize,
-        col: usize,
-        width: usize,
-    ) -> [Vec3; 4];
 }
 
 impl LayerIndexable for [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE] {
@@ -204,62 +194,61 @@ impl LayerIndexable for [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE] {
         let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
         self[x][y][z] = Block::Air;
     }
+}
 
-    fn get_quad_corners(
-        &self,
-        direction: &BlockSide,
-        layer: usize,
-        row: usize,
-        height: usize,
-        col: usize,
-        width: usize,
-    ) -> [Vec3; 4] {
-        let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
-        let (xf, yf, zf, h, w) = (
-            x as f32,
-            y as f32,
-            z as f32,
-            height as f32 + 1.0,
-            width as f32 + 1.0,
-        );
-        match direction {
-            BlockSide::Up => [
-                Vec3::new(xf, yf, zf),
-                Vec3::new(xf, yf, zf + w),
-                Vec3::new(xf + h, yf, zf + w),
-                Vec3::new(xf + h, yf, zf),
-            ],
-            BlockSide::Down => [
-                Vec3::new(xf, yf - 1.0, zf),
-                Vec3::new(xf + h, yf - 1.0, zf),
-                Vec3::new(xf + h, yf - 1.0, zf + w),
-                Vec3::new(xf, yf - 1.0, zf + w),
-            ],
-            BlockSide::North => [
-                Vec3::new(xf + 1.0, yf - 1.0, zf),
-                Vec3::new(xf + 1.0, yf - 1.0 + h, zf),
-                Vec3::new(xf + 1.0, yf - 1.0 + h, zf + w),
-                Vec3::new(xf + 1.0, yf - 1.0, zf + w),
-            ],
-            BlockSide::South => [
-                Vec3::new(xf, yf - 1.0, zf),
-                Vec3::new(xf, yf - 1.0, zf + w),
-                Vec3::new(xf, yf - 1.0 + h, zf + w),
-                Vec3::new(xf, yf - 1.0 + h, zf),
-            ],
-            BlockSide::West => [
-                Vec3::new(xf, yf - 1.0, zf),
-                Vec3::new(xf, yf - 1.0 + w, zf),
-                Vec3::new(xf + h, yf - 1.0 + w, zf),
-                Vec3::new(xf + h, yf - 1.0, zf),
-            ],
-            BlockSide::East => [
-                Vec3::new(xf, yf - 1.0, zf + 1.0),
-                Vec3::new(xf + h, yf - 1.0, zf + 1.0),
-                Vec3::new(xf + h, yf - 1.0 + w, zf + 1.0),
-                Vec3::new(xf, yf - 1.0 + w, zf + 1.0),
-            ],
-        }
+fn get_quad_corners(
+    direction: &BlockSide,
+    layer: usize,
+    row: usize,
+    height: usize,
+    col: usize,
+    width: usize,
+) -> [Vec3; 4] {
+    let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
+    let (xf, yf, zf, h, w) = (
+        x as f32,
+        y as f32,
+        z as f32,
+        height as f32 + 1.0,
+        width as f32 + 1.0,
+    );
+    match direction {
+        BlockSide::Up => [
+            Vec3::new(xf, yf, zf),
+            Vec3::new(xf, yf, zf + w),
+            Vec3::new(xf + h, yf, zf + w),
+            Vec3::new(xf + h, yf, zf),
+        ],
+        BlockSide::Down => [
+            Vec3::new(xf, yf - 1.0, zf),
+            Vec3::new(xf + h, yf - 1.0, zf),
+            Vec3::new(xf + h, yf - 1.0, zf + w),
+            Vec3::new(xf, yf - 1.0, zf + w),
+        ],
+        BlockSide::North => [
+            Vec3::new(xf + 1.0, yf - 1.0, zf),
+            Vec3::new(xf + 1.0, yf - 1.0 + h, zf),
+            Vec3::new(xf + 1.0, yf - 1.0 + h, zf + w),
+            Vec3::new(xf + 1.0, yf - 1.0, zf + w),
+        ],
+        BlockSide::South => [
+            Vec3::new(xf, yf - 1.0, zf),
+            Vec3::new(xf, yf - 1.0, zf + w),
+            Vec3::new(xf, yf - 1.0 + h, zf + w),
+            Vec3::new(xf, yf - 1.0 + h, zf),
+        ],
+        BlockSide::West => [
+            Vec3::new(xf, yf - 1.0, zf),
+            Vec3::new(xf, yf - 1.0 + w, zf),
+            Vec3::new(xf + h, yf - 1.0 + w, zf),
+            Vec3::new(xf + h, yf - 1.0, zf),
+        ],
+        BlockSide::East => [
+            Vec3::new(xf, yf - 1.0, zf + 1.0),
+            Vec3::new(xf + h, yf - 1.0, zf + 1.0),
+            Vec3::new(xf + h, yf - 1.0 + w, zf + 1.0),
+            Vec3::new(xf, yf - 1.0 + w, zf + 1.0),
+        ],
     }
 }
 
