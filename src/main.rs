@@ -31,6 +31,7 @@ fn main() {
             mesh::MeshPlugin,
             world::WorldPlugin,
             debug_plugin::DebugPlugin,
+            chunk::ChunkPlugin,
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, (move_camera, toggle_wireframe))
