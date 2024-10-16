@@ -117,4 +117,18 @@ impl ChunkNeighborhood {
         };
         self.at(x, y, z)
     }
+
+    pub fn middle(&self) -> Arc<ChunkData> {
+        self.chunks[1][1][1].clone().unwrap()
+    }
+
+    pub fn block_is_hidden_from_above(
+        &self,
+        side: &BlockSide,
+        layer: i32,
+        row: i32,
+        col: i32,
+    ) -> bool {
+        self.at_layer(side, layer + 1, row, col) != Block::Air
+    }
 }

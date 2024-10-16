@@ -1,5 +1,5 @@
 use crate::block::{Block, BlockSide};
-use crate::chunk::{Chunk, ChunkPosition, CHUNK_SIZE};
+use crate::chunk::{Chunk, ChunkIndex, ChunkNeighborhood, ChunkPosition, CHUNK_SIZE};
 use crate::WORLD_LAYER;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
@@ -51,14 +51,15 @@ pub struct MeshGenTasks(pub HashMap<ChunkPosition, Task<MeshTaskData>>);
 
 fn begin_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
-    q_chunk: Query<(Entity, &Chunk, &ChunkPosition), Without<Handle<Mesh>>>,
+    q_chunk: Query<(Entity, &ChunkPosition), (With<Chunk>, Without<Handle<Mesh>>)>,
+    chunk_index: Res<ChunkIndex>,
 ) {
-    for (entity, chunk, pos) in q_chunk.iter() {
+    for (entity, pos) in q_chunk.iter() {
         let task_pool = AsyncComputeTaskPool::get();
         if tasks.0.contains_key(pos) {
             continue;
         }
-        let cloned_chunk = chunk.clone();
+        let cloned_chunk = chunk_index.get_neighborhood(&pos.0);
         let task = task_pool.spawn(async move {
             MeshTaskData {
                 entity,
@@ -102,7 +103,7 @@ struct Quad {
     block: Block,
 }
 
-fn get_mesh_for_chunk(chunk: Chunk) -> Mesh {
+fn get_mesh_for_chunk(chunk: ChunkNeighborhood) -> Mesh {
     let mut quads = vec![];
     quads.extend(greedy_mesh(&chunk, BlockSide::Up));
     quads.extend(greedy_mesh(&chunk, BlockSide::Down));
@@ -114,19 +115,21 @@ fn get_mesh_for_chunk(chunk: Chunk) -> Mesh {
 }
 
 // TODO: Replace slow implementation with binary mesher
-fn greedy_mesh(chunk: &Chunk, direction: BlockSide) -> Vec<Quad> {
+fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let mut blocks = *chunk.blocks;
+    let mut blocks = *chunk.middle();
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {
             for col in 0..CHUNK_SIZE {
-                let block_is_hidden_from_above = |row: usize, col: usize, layer: usize| {
-                    layer < CHUNK_SIZE - 1
-                        && blocks.get_from_layer_coords(&direction, layer + 1, row, col)
-                            != Block::Air
-                };
                 let block = blocks.get_from_layer_coords(&direction, layer, row, col);
-                if block == Block::Air || block_is_hidden_from_above(row, col, layer) {
+                if block == Block::Air
+                    || chunk.block_is_hidden_from_above(
+                        &direction,
+                        layer as i32,
+                        row as i32,
+                        col as i32,
+                    )
+                {
                     continue;
                 }
                 let mut height = 0;
@@ -151,7 +154,12 @@ fn greedy_mesh(chunk: &Chunk, direction: BlockSide) -> Vec<Quad> {
                                 cur_row,
                                 col + width + 1,
                             )
-                            && !block_is_hidden_from_above(cur_row, col + width + 1, layer)
+                            && !chunk.block_is_hidden_from_above(
+                                &direction,
+                                layer as i32,
+                                cur_row as i32,
+                                (col + width) as i32 + 1,
+                            )
                     })
                 {
                     width += 1;
