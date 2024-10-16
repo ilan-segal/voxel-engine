@@ -1,13 +1,17 @@
+use std::sync::Arc;
+
 use crate::block::Block;
 use bevy::prelude::*;
 
 pub const CHUNK_SIZE: usize = 32;
 
+pub type ChunkData = [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
+
 // 32x32x32 chunk of blocks
-#[derive(Component, Clone, Copy)]
+#[derive(Component, Clone)]
 pub struct Chunk {
     // x, y, z
-    pub blocks: [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE],
+    pub blocks: Arc<ChunkData>,
 }
 
 #[derive(Component, PartialEq, Eq, Default, Hash, Clone, Copy)]

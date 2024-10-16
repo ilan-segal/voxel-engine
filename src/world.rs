@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 use crate::{
     block::Block,
-    chunk::{Chunk, ChunkPosition, CHUNK_SIZE},
+    chunk::{Chunk, ChunkData, ChunkPosition, CHUNK_SIZE},
 };
 
 const WORLD_SEED: u32 = 0xDEADBEEF;
@@ -147,7 +147,7 @@ fn update_loaded_chunks(
 
 fn generate_chunk(noise: &WorldGenNoise, chunk_pos: &IVec3) -> Chunk {
     const SCALE: f64 = 60.0;
-    let mut blocks = default::<[[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE]>();
+    let mut chunk_data = default::<ChunkData>();
     for z in 0..CHUNK_SIZE {
         for x in 0..CHUNK_SIZE {
             let height = (noise.sample(
@@ -162,15 +162,16 @@ fn generate_chunk(noise: &WorldGenNoise, chunk_pos: &IVec3) -> Chunk {
                 continue;
             };
             for y in (0..chunk_height - 1).filter(|h| h < &CHUNK_SIZE) {
-                blocks[x][y][z] = Block::Stone;
+                chunk_data[x][y][z] = Block::Stone;
             }
             if chunk_height - 1 < CHUNK_SIZE {
-                blocks[x][chunk_height - 1][z] = Block::Dirt;
+                chunk_data[x][chunk_height - 1][z] = Block::Dirt;
             }
             if chunk_height < CHUNK_SIZE {
-                blocks[x][chunk_height][z] = Block::Grass;
+                chunk_data[x][chunk_height][z] = Block::Grass;
             }
         }
     }
+    let blocks = Arc::new(chunk_data);
     Chunk { blocks }
 }

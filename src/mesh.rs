@@ -116,7 +116,7 @@ fn get_mesh_for_chunk(chunk: Chunk) -> Mesh {
 // TODO: Replace slow implementation with binary mesher
 fn greedy_mesh(chunk: &Chunk, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let mut blocks = chunk.blocks;
+    let mut blocks = *chunk.blocks;
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {
             for col in 0..CHUNK_SIZE {
