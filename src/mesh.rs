@@ -225,39 +225,39 @@ impl LayerIndexable for [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE] {
         match direction {
             BlockSide::Up => [
                 Vec3::new(xf, yf, zf),
-                Vec3::new(xf + h, yf, zf),
-                Vec3::new(xf + h, yf, zf + w),
                 Vec3::new(xf, yf, zf + w),
+                Vec3::new(xf + h, yf, zf + w),
+                Vec3::new(xf + h, yf, zf),
             ],
             BlockSide::Down => [
-                Vec3::new(xf, yf - 1.0, zf + w),
-                Vec3::new(xf + h, yf - 1.0, zf + w),
-                Vec3::new(xf + h, yf - 1.0, zf),
                 Vec3::new(xf, yf - 1.0, zf),
+                Vec3::new(xf + h, yf - 1.0, zf),
+                Vec3::new(xf + h, yf - 1.0, zf + w),
+                Vec3::new(xf, yf - 1.0, zf + w),
             ],
             BlockSide::North => [
-                Vec3::new(xf + 1.0, yf - 1.0, zf + w),
-                Vec3::new(xf + 1.0, yf - 1.0 + h, zf + w),
-                Vec3::new(xf + 1.0, yf - 1.0 + h, zf),
                 Vec3::new(xf + 1.0, yf - 1.0, zf),
+                Vec3::new(xf + 1.0, yf - 1.0 + h, zf),
+                Vec3::new(xf + 1.0, yf - 1.0 + h, zf + w),
+                Vec3::new(xf + 1.0, yf - 1.0, zf + w),
             ],
             BlockSide::South => [
                 Vec3::new(xf, yf - 1.0, zf),
-                Vec3::new(xf, yf - 1.0 + h, zf),
-                Vec3::new(xf, yf - 1.0 + h, zf + w),
                 Vec3::new(xf, yf - 1.0, zf + w),
+                Vec3::new(xf, yf - 1.0 + h, zf + w),
+                Vec3::new(xf, yf - 1.0 + h, zf),
             ],
             BlockSide::West => [
-                Vec3::new(xf + h, yf - 1.0, zf),
-                Vec3::new(xf + h, yf - 1.0 + w, zf),
-                Vec3::new(xf, yf - 1.0 + w, zf),
                 Vec3::new(xf, yf - 1.0, zf),
+                Vec3::new(xf, yf - 1.0 + w, zf),
+                Vec3::new(xf + h, yf - 1.0 + w, zf),
+                Vec3::new(xf + h, yf - 1.0, zf),
             ],
             BlockSide::East => [
                 Vec3::new(xf, yf - 1.0, zf + 1.0),
-                Vec3::new(xf, yf - 1.0 + w, zf + 1.0),
-                Vec3::new(xf + h, yf - 1.0 + w, zf + 1.0),
                 Vec3::new(xf + h, yf - 1.0, zf + 1.0),
+                Vec3::new(xf + h, yf - 1.0 + w, zf + 1.0),
+                Vec3::new(xf, yf - 1.0 + w, zf + 1.0),
             ],
         }
     }
@@ -291,7 +291,7 @@ fn create_mesh_from_quads(quads: &Vec<Quad>) -> Mesh {
         .map(|vs| {
             let a = vs[1] - vs[0];
             let b = vs[2] - vs[0];
-            return a.cross(b).normalize() * -1.0;
+            return a.cross(b).normalize();
         })
         .map(|norm| norm.to_array())
         .flat_map(|norm| std::iter::repeat_n(norm, 4))
@@ -307,13 +307,13 @@ fn create_mesh_from_quads(quads: &Vec<Quad>) -> Mesh {
                 0---1
                  */
                 // Triangle a
-                4 * quad_index + 2,
+                4 * quad_index + 0,
                 4 * quad_index + 1,
-                4 * quad_index + 0,
-                // Triangle b
-                4 * quad_index + 3,
                 4 * quad_index + 2,
+                // Triangle b
                 4 * quad_index + 0,
+                4 * quad_index + 2,
+                4 * quad_index + 3,
             ]
         })
         .map(|idx| idx as u32)
