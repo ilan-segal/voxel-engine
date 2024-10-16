@@ -105,16 +105,7 @@ impl ChunkNeighborhood {
     }
 
     pub fn at_layer(&self, side: &BlockSide, layer: i32, row: i32, col: i32) -> Block {
-        let (x, y, z) = {
-            match side {
-                BlockSide::Up => (row, layer, col),
-                BlockSide::Down => (row, CHUNK_SIZE as i32 - 1 - layer, col),
-                BlockSide::North => (layer, row, col),
-                BlockSide::South => (CHUNK_SIZE as i32 - 1 - layer, row, col),
-                BlockSide::East => (row, col, layer),
-                BlockSide::West => (row, col, CHUNK_SIZE as i32 - 1 - layer),
-            }
-        };
+        let (x, y, z) = layer_to_xyz(side, layer, row, col);
         self.at(x, y, z)
     }
 
@@ -131,4 +122,26 @@ impl ChunkNeighborhood {
     ) -> bool {
         self.at_layer(side, layer + 1, row, col) != Block::Air
     }
+
+    pub fn count_block(&self, side: &BlockSide, layer: i32, row: i32, col: i32) -> u8 {
+        if self.at_layer(side, layer, row, col) == Block::Air {
+            0
+        } else {
+            1
+        }
+    }
+}
+
+pub fn layer_to_xyz(side: &BlockSide, layer: i32, row: i32, col: i32) -> (i32, i32, i32) {
+    let (x, y, z) = {
+        match side {
+            BlockSide::Up => (row, layer, col),
+            BlockSide::Down => (row, CHUNK_SIZE as i32 - 1 - layer, col),
+            BlockSide::North => (layer, row, col),
+            BlockSide::South => (CHUNK_SIZE as i32 - 1 - layer, row, col),
+            BlockSide::East => (row, col, layer),
+            BlockSide::West => (row, col, CHUNK_SIZE as i32 - 1 - layer),
+        }
+    };
+    (x, y, z)
 }

@@ -1,8 +1,5 @@
 use bevy::{
-    color::palettes::{
-        basic::{GREEN, SILVER},
-        css::BROWN,
-    },
+    color::palettes::{basic::SILVER, css::BROWN},
     prelude::*,
 };
 
@@ -19,7 +16,7 @@ impl Block {
     pub fn get_colour(&self) -> Option<Color> {
         match self {
             Self::Stone => Some(SILVER),
-            Self::Grass => Some(GREEN),
+            Self::Grass => Some(Srgba::new(1.0, 1.0, 1.0, 1.0)), // temp change
             Self::Dirt => Some(BROWN),
             _ => None,
         }

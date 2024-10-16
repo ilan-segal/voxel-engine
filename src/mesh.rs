@@ -1,5 +1,5 @@
 use crate::block::{Block, BlockSide};
-use crate::chunk::{Chunk, ChunkIndex, ChunkNeighborhood, ChunkPosition, CHUNK_SIZE};
+use crate::chunk::{layer_to_xyz, Chunk, ChunkIndex, ChunkNeighborhood, ChunkPosition, CHUNK_SIZE};
 use crate::WORLD_LAYER;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
@@ -100,6 +100,7 @@ fn receive_mesh_gen_tasks(
 #[derive(Debug)]
 struct Quad {
     vertices: [Vec3; 4],
+    ao_factors: [u8; 4],
     block: Block,
 }
 
@@ -165,7 +166,60 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                     width += 1;
                 }
                 let vertices = get_quad_corners(&direction, layer, row, height, col, width);
-                let quad = Quad { vertices, block };
+                // TODO: Break up quads if AO factor changes across edge
+                // TODO: Correct patterns for occlusion factors
+                let bottom_left_ao_factor =
+                    chunk.count_block(&direction, layer as i32 + 1, row as i32 - 1, col as i32)
+                        + chunk.count_block(
+                            &direction,
+                            layer as i32 + 1,
+                            row as i32,
+                            col as i32 - 1,
+                        );
+                let bottom_right_ao_factor = chunk.count_block(
+                    &direction,
+                    layer as i32 + 1,
+                    row as i32 - 1,
+                    (col + width) as i32,
+                ) + chunk.count_block(
+                    &direction,
+                    layer as i32 + 1,
+                    row as i32,
+                    (col + width) as i32 + 1,
+                );
+                let top_right_ao_factor = chunk.count_block(
+                    &direction,
+                    layer as i32 + 1,
+                    (row + height) as i32 + 1,
+                    (col + width) as i32,
+                ) + chunk.count_block(
+                    &direction,
+                    layer as i32 + 1,
+                    (row + height) as i32,
+                    (col + width) as i32 + 1,
+                );
+                let top_left_ao_factor = chunk.count_block(
+                    &direction,
+                    layer as i32 + 1,
+                    (row + height) as i32 + 1,
+                    col as i32,
+                ) + chunk.count_block(
+                    &direction,
+                    layer as i32 + 1,
+                    (row + height) as i32,
+                    col as i32 - 1,
+                );
+                let ao_factors = [
+                    bottom_left_ao_factor,
+                    bottom_right_ao_factor,
+                    top_right_ao_factor,
+                    top_left_ao_factor,
+                ];
+                let quad = Quad {
+                    vertices,
+                    ao_factors,
+                    block,
+                };
                 quads.push(quad);
                 for cur_row in row..=height + row {
                     for cur_col in col..=col + width {
@@ -198,13 +252,13 @@ impl LayerIndexable for [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE] {
         row: usize,
         col: usize,
     ) -> Block {
-        let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
-        self[x][y][z]
+        let (x, y, z) = layer_to_xyz(direction, layer as i32, row as i32, col as i32);
+        self[x as usize][y as usize][z as usize]
     }
 
     fn clear_at(&mut self, direction: &BlockSide, layer: usize, row: usize, col: usize) {
-        let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
-        self[x][y][z] = Block::Air;
+        let (x, y, z) = layer_to_xyz(direction, layer as i32, row as i32, col as i32);
+        self[x as usize][y as usize][z as usize] = Block::Air;
     }
 }
 
@@ -216,7 +270,7 @@ fn get_quad_corners(
     col: usize,
     width: usize,
 ) -> [Vec3; 4] {
-    let (x, y, z) = get_xyz_from_layer_indices(direction, layer, row, col);
+    let (x, y, z) = layer_to_xyz(direction, layer as i32, row as i32, col as i32);
     let (xf, yf, zf, h, w) = (
         x as f32,
         y as f32,
@@ -264,22 +318,6 @@ fn get_quad_corners(
     }
 }
 
-fn get_xyz_from_layer_indices(
-    direction: &BlockSide,
-    layer: usize,
-    row: usize,
-    col: usize,
-) -> (usize, usize, usize) {
-    match direction {
-        BlockSide::Up => (row, layer, col),
-        BlockSide::Down => (row, CHUNK_SIZE - 1 - layer, col),
-        BlockSide::North => (layer, row, col),
-        BlockSide::South => (CHUNK_SIZE - 1 - layer, row, col),
-        BlockSide::East => (row, col, layer),
-        BlockSide::West => (row, col, CHUNK_SIZE - 1 - layer),
-    }
-}
-
 fn create_mesh_from_quads(quads: &Vec<Quad>) -> Mesh {
     let vertices = quads
         .iter()
@@ -321,10 +359,20 @@ fn create_mesh_from_quads(quads: &Vec<Quad>) -> Mesh {
         .collect::<Vec<_>>();
     let colours = quads
         .iter()
-        .map(|q| q.block)
-        .map(|block| block.get_colour().expect("Meshed block should have colour"))
+        .flat_map(|q: &Quad| {
+            // TODO: Shade according to AO factor
+            // let colour = q.block
+            //     .get_colour()
+            //     .expect("Meshed block should have colour");
+            return q.ao_factors.iter().map(|factor| match factor {
+                0 => Color::linear_rgb(1.0, 1.0, 1.0),
+                1 => Color::linear_rgb(1.0, 0.0, 0.0),
+                2 => Color::linear_rgb(0.0, 1.0, 0.0),
+                3 => Color::linear_rgb(0.0, 0.0, 1.0),
+                _ => panic!(),
+            });
+        })
         .map(|c| c.to_linear().to_f32_array())
-        .flat_map(|m| std::iter::repeat_n(m, 4))
         .collect::<Vec<_>>();
     // Keep the mesh data accessible in future frames to be able to mutate it in toggle_texture.
     Mesh::new(
