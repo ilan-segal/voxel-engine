@@ -27,7 +27,11 @@ impl Plugin for MeshPlugin {
 
 fn setup(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>) {
     let common_materials = CommonMaterials {
-        white: materials.add(Color::WHITE),
+        white: materials.add(StandardMaterial {
+            perceptual_roughness: 1.0,
+            base_color: Color::WHITE,
+            ..Default::default()
+        }),
     };
     commands.insert_resource(common_materials);
 }

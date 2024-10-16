@@ -59,8 +59,8 @@ fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
             ..default()
         },
         transform: Transform {
-            translation: Vec3::new(0.0, 2.0, 0.0),
-            rotation: Quat::from_rotation_x(-PI / 4.),
+            translation: Vec3::new(0.0, 200.0, 0.0),
+            rotation: Quat::from_rotation_x(-PI / 4.) + Quat::from_rotation_z(-PI / 8.),
             ..default()
         },
         ..default()
