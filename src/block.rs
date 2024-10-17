@@ -16,7 +16,7 @@ impl Block {
     pub fn get_colour(&self) -> Option<Color> {
         match self {
             Self::Stone => Some(SILVER),
-            Self::Grass => Some(Srgba::new(1.0, 1.0, 1.0, 1.0)), // temp change
+            Self::Grass => Some(Srgba::new(0.075, 0.3, 0.05, 1.0)),
             Self::Dirt => Some(BROWN),
             _ => None,
         }

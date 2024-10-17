@@ -133,73 +133,107 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                 {
                     continue;
                 }
+                let bottom_left_ao_factor =
+                    get_ao_factor(chunk, &direction, layer, row, col, AoCorner::BottomLeft);
+                let top_left_ao_factor =
+                    get_ao_factor(chunk, &direction, layer, row, col, AoCorner::TopLeft);
+                let bottom_right_ao_factor =
+                    get_ao_factor(chunk, &direction, layer, row, col, AoCorner::BottomRight);
+                let top_right_ao_factor =
+                    get_ao_factor(chunk, &direction, layer, row, col, AoCorner::TopRight);
                 let mut height = 0;
-                let mut width = 0;
-                while height + row < CHUNK_SIZE - 1
-                    && block
-                        == blocks.get_from_layer_coords(
-                            &direction,
-                            layer,
-                            height + row + 1,
-                            col + width,
-                        )
-                    && !chunk.block_is_hidden_from_above(
-                        &direction,
-                        layer as i32,
-                        (height + row + 1) as i32,
-                        (col + width) as i32,
-                    )
+                if bottom_left_ao_factor == top_left_ao_factor
+                    && bottom_right_ao_factor == top_right_ao_factor
                 {
-                    height += 1;
-                }
-                while col + width < CHUNK_SIZE - 1
-                    && (row..=height + row).all(|cur_row| {
-                        block
+                    while height + row < CHUNK_SIZE - 1
+                        && block
                             == blocks.get_from_layer_coords(
                                 &direction,
                                 layer,
-                                cur_row,
-                                col + width + 1,
+                                height + row + 1,
+                                col,
                             )
-                            && !chunk.block_is_hidden_from_above(
-                                &direction,
-                                layer as i32,
-                                cur_row as i32,
-                                (col + width) as i32 + 1,
-                            )
-                    })
-                {
-                    width += 1;
+                        && !chunk.block_is_hidden_from_above(
+                            &direction,
+                            layer as i32,
+                            (height + row + 1) as i32,
+                            col as i32,
+                        )
+                    {
+                        let new_top_left_factor = get_ao_factor(
+                            chunk,
+                            &direction,
+                            layer,
+                            row + height + 1,
+                            col,
+                            AoCorner::TopLeft,
+                        );
+                        if new_top_left_factor != top_left_ao_factor {
+                            break;
+                        }
+                        let new_top_right_factor = get_ao_factor(
+                            chunk,
+                            &direction,
+                            layer,
+                            row + height + 1,
+                            col,
+                            AoCorner::TopRight,
+                        );
+                        if new_top_right_factor != top_right_ao_factor {
+                            break;
+                        }
+
+                        height += 1;
+                    }
                 }
+                let mut width = 0;
+                if bottom_left_ao_factor == bottom_right_ao_factor
+                    && top_left_ao_factor == top_right_ao_factor
+                {
+                    while col + width < CHUNK_SIZE - 1
+                        && (row..=height + row).all(|cur_row| {
+                            block
+                                == blocks.get_from_layer_coords(
+                                    &direction,
+                                    layer,
+                                    cur_row,
+                                    col + width + 1,
+                                )
+                                && !chunk.block_is_hidden_from_above(
+                                    &direction,
+                                    layer as i32,
+                                    cur_row as i32,
+                                    (col + width) as i32 + 1,
+                                )
+                        })
+                    {
+                        let new_bottom_right_factor = get_ao_factor(
+                            chunk,
+                            &direction,
+                            layer,
+                            row + height,
+                            col + width + 1,
+                            AoCorner::BottomRight,
+                        );
+                        if new_bottom_right_factor != bottom_right_ao_factor {
+                            break;
+                        }
+                        let new_top_right_factor = get_ao_factor(
+                            chunk,
+                            &direction,
+                            layer,
+                            row + height,
+                            col + width + 1,
+                            AoCorner::TopRight,
+                        );
+                        if new_top_right_factor != top_right_ao_factor {
+                            break;
+                        }
+                        width += 1;
+                    }
+                }
+                // TODO rotate vertices if necessary, to prevent anisotropy
                 let vertices = get_quad_corners(&direction, layer, row, height, col, width);
-                // TODO: Break up quads if AO factor changes across edge
-                // TODO: Correct patterns for occlusion factors
-                let bottom_left_ao_factor =
-                    get_ao_factor(chunk, &direction, layer, row, col, AoCorner::BottomLeft);
-                let bottom_right_ao_factor = get_ao_factor(
-                    chunk,
-                    &direction,
-                    layer,
-                    row,
-                    col + width,
-                    AoCorner::BottomRight,
-                );
-                let top_right_ao_factor = get_ao_factor(
-                    chunk,
-                    &direction,
-                    layer,
-                    row + height,
-                    col + width,
-                    AoCorner::TopRight,
-                );
-                let top_left_ao_factor = get_ao_factor(
-                    chunk,
-                    &direction,
-                    layer,
-                    row + height,
-                    col,
-                    AoCorner::TopLeft,
-                );
                 let ao_factors = [
                     bottom_left_ao_factor,
                     bottom_right_ao_factor,
@@ -386,16 +420,14 @@ fn create_mesh_from_quads(quads: &Vec<Quad>) -> Mesh {
     let colours = quads
         .iter()
         .flat_map(|q: &Quad| {
-            // TODO: Shade according to AO factor
-            // let colour = q.block
-            //     .get_colour()
-            //     .expect("Meshed block should have colour");
-            return q.ao_factors.iter().map(|factor| match factor {
-                0 => Color::linear_rgb(1.0, 1.0, 1.0),
-                1 => Color::linear_rgb(1.0, 0.0, 0.0),
-                2 => Color::linear_rgb(0.0, 1.0, 0.0),
-                3 => Color::linear_rgb(0.0, 0.0, 1.0),
-                _ => panic!(),
+            let colour = q
+                .block
+                .get_colour()
+                .expect("Meshed block should have colour");
+
+            return q.ao_factors.iter().map(move |factor| {
+                let lum = 0.6_f32.powi((*factor).into());
+                return colour.with_luminance(lum);
             });
         })
         .map(|c| c.to_linear().to_f32_array())
