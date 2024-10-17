@@ -35,6 +35,9 @@ fn main() {
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, (move_camera, toggle_wireframe))
+        .insert_resource(ClearColor(
+            Color::linear_rgb(0.25, 0.60, 0.92).with_luminance(0.5),
+        ))
         .run();
 }
 

@@ -14,10 +14,11 @@ pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<WorldGenNoise>().add_systems(
-            Update,
-            (update_loaded_chunks, update_camera_chunk_position).in_set(WorldSet),
-        );
+        app.init_resource::<WorldGenNoise>()
+            .add_systems(
+                Update,
+                (update_loaded_chunks, update_camera_chunk_position).in_set(WorldSet),
+            );
     }
 }
 
@@ -108,7 +109,7 @@ fn update_loaded_chunks(
     // Determine position of chunks that should be loaded
     let mut should_be_loaded_positions: HashSet<IVec3> = HashSet::new();
     for chunk_x in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
-        for chunk_y in 0..2 {
+        for chunk_y in 0..=1 {
             for chunk_z in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
                 let cur_chunk_pos =
                     ChunkPosition(chunk_pos.0.with_y(0) + IVec3::new(chunk_x, chunk_y, chunk_z));
@@ -122,7 +123,9 @@ fn update_loaded_chunks(
     for (entity, chunk_pos) in q_chunk_position.iter() {
         if !should_be_loaded_positions.remove(&chunk_pos.0) {
             // The chunk should be unloaded since it's not in our set
-            commands.entity(entity).despawn_recursive();
+            commands
+                .entity(entity)
+                .despawn_recursive();
             mesh_gen_tasks.0.remove(chunk_pos);
         }
     }
@@ -156,16 +159,18 @@ fn generate_chunk(noise: &WorldGenNoise, chunk_pos: &IVec3) -> Chunk {
             ) * SCALE) as i32
                 + 1;
             let Some(chunk_height) = Some(height - (chunk_pos.y * CHUNK_SIZE as i32))
-                .filter(|h| h >= &1)
+                .filter(|h| h >= &0)
                 .map(|h| h as usize)
             else {
                 continue;
             };
-            for y in (0..chunk_height - 1).filter(|h| h < &CHUNK_SIZE) {
-                chunk_data[x][y][z] = Block::Stone;
-            }
-            if chunk_height - 1 < CHUNK_SIZE {
-                chunk_data[x][chunk_height - 1][z] = Block::Dirt;
+            if chunk_height > 1 {
+                for y in (0..chunk_height - 1).filter(|h| h < &CHUNK_SIZE) {
+                    chunk_data[x][y][z] = Block::Stone;
+                }
+                if chunk_height - 1 < CHUNK_SIZE {
+                    chunk_data[x][chunk_height - 1][z] = Block::Dirt;
+                }
             }
             if chunk_height < CHUNK_SIZE {
                 chunk_data[x][chunk_height][z] = Block::Grass;
