@@ -137,9 +137,9 @@ pub fn layer_to_xyz(side: &BlockSide, layer: i32, row: i32, col: i32) -> (i32, i
         match side {
             BlockSide::Up => (row, layer, col),
             BlockSide::Down => (row, CHUNK_SIZE as i32 - 1 - layer, col),
-            BlockSide::North => (layer, row, col),
+            BlockSide::North => (layer, col, row),
             BlockSide::South => (CHUNK_SIZE as i32 - 1 - layer, row, col),
-            BlockSide::East => (row, col, layer),
+            BlockSide::East => (col, row, layer),
             BlockSide::West => (row, col, CHUNK_SIZE as i32 - 1 - layer),
         }
     };

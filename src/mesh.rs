@@ -293,9 +293,9 @@ fn get_quad_corners(
         ],
         BlockSide::North => [
             Vec3::new(xf + 1.0, yf - 1.0, zf),
-            Vec3::new(xf + 1.0, yf - 1.0 + h, zf),
-            Vec3::new(xf + 1.0, yf - 1.0 + h, zf + w),
-            Vec3::new(xf + 1.0, yf - 1.0, zf + w),
+            Vec3::new(xf + 1.0, yf - 1.0 + w, zf),
+            Vec3::new(xf + 1.0, yf - 1.0 + w, zf + h),
+            Vec3::new(xf + 1.0, yf - 1.0, zf + h),
         ],
         BlockSide::South => [
             Vec3::new(xf, yf - 1.0, zf),
@@ -311,9 +311,9 @@ fn get_quad_corners(
         ],
         BlockSide::East => [
             Vec3::new(xf, yf - 1.0, zf + 1.0),
-            Vec3::new(xf + h, yf - 1.0, zf + 1.0),
-            Vec3::new(xf + h, yf - 1.0 + w, zf + 1.0),
-            Vec3::new(xf, yf - 1.0 + w, zf + 1.0),
+            Vec3::new(xf + w, yf - 1.0, zf + 1.0),
+            Vec3::new(xf + w, yf - 1.0 + h, zf + 1.0),
+            Vec3::new(xf, yf - 1.0 + h, zf + 1.0),
         ],
     }
 }
