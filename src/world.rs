@@ -164,7 +164,7 @@ fn generate_chunk(noise: &WorldGenNoise, chunk_pos: &IVec3) -> Chunk {
             else {
                 continue;
             };
-            if chunk_height > 1 {
+            if chunk_height >= 1 {
                 for y in (0..chunk_height - 1).filter(|h| h < &CHUNK_SIZE) {
                     chunk_data[x][y][z] = Block::Stone;
                 }

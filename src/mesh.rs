@@ -104,6 +104,15 @@ struct Quad {
     block: Block,
 }
 
+impl Quad {
+    fn rotate_against_anisotropy(&mut self) {
+        if self.ao_factors[0] + self.ao_factors[2] > self.ao_factors[1] + self.ao_factors[3] {
+            self.vertices.rotate_left(1);
+            self.ao_factors.rotate_left(1);
+        }
+    }
+}
+
 fn get_mesh_for_chunk(chunk: ChunkNeighborhood) -> Mesh {
     let mut quads = vec![];
     quads.extend(greedy_mesh(&chunk, BlockSide::Up));
@@ -112,7 +121,7 @@ fn get_mesh_for_chunk(chunk: ChunkNeighborhood) -> Mesh {
     quads.extend(greedy_mesh(&chunk, BlockSide::South));
     quads.extend(greedy_mesh(&chunk, BlockSide::West));
     quads.extend(greedy_mesh(&chunk, BlockSide::East));
-    return create_mesh_from_quads(&quads);
+    return create_mesh_from_quads(quads);
 }
 
 // TODO: Replace slow implementation with binary mesher
@@ -378,7 +387,10 @@ fn get_quad_corners(
     }
 }
 
-fn create_mesh_from_quads(quads: &Vec<Quad>) -> Mesh {
+fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Mesh {
+    for i in 1..quads.len() {
+        quads[i].rotate_against_anisotropy();
+    }
     let vertices = quads
         .iter()
         .flat_map(|q| q.vertices.iter())
