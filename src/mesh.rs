@@ -143,6 +143,12 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                             height + row + 1,
                             col + width,
                         )
+                    && !chunk.block_is_hidden_from_above(
+                        &direction,
+                        layer as i32,
+                        (height + row + 1) as i32,
+                        (col + width) as i32,
+                    )
                 {
                     height += 1;
                 }
@@ -169,45 +175,30 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                 // TODO: Break up quads if AO factor changes across edge
                 // TODO: Correct patterns for occlusion factors
                 let bottom_left_ao_factor =
-                    chunk.count_block(&direction, layer as i32 + 1, row as i32 - 1, col as i32)
-                        + chunk.count_block(
-                            &direction,
-                            layer as i32 + 1,
-                            row as i32,
-                            col as i32 - 1,
-                        );
-                let bottom_right_ao_factor = chunk.count_block(
+                    get_ao_factor(chunk, &direction, layer, row, col, AoCorner::BottomLeft);
+                let bottom_right_ao_factor = get_ao_factor(
+                    chunk,
                     &direction,
-                    layer as i32 + 1,
-                    row as i32 - 1,
-                    (col + width) as i32,
-                ) + chunk.count_block(
-                    &direction,
-                    layer as i32 + 1,
-                    row as i32,
-                    (col + width) as i32 + 1,
+                    layer,
+                    row,
+                    col + width,
+                    AoCorner::BottomRight,
                 );
-                let top_right_ao_factor = chunk.count_block(
+                let top_right_ao_factor = get_ao_factor(
+                    chunk,
                     &direction,
-                    layer as i32 + 1,
-                    (row + height) as i32 + 1,
-                    (col + width) as i32,
-                ) + chunk.count_block(
-                    &direction,
-                    layer as i32 + 1,
-                    (row + height) as i32,
-                    (col + width) as i32 + 1,
+                    layer,
+                    row + height,
+                    col + width,
+                    AoCorner::TopRight,
                 );
-                let top_left_ao_factor = chunk.count_block(
+                let top_left_ao_factor = get_ao_factor(
+                    chunk,
                     &direction,
-                    layer as i32 + 1,
-                    (row + height) as i32 + 1,
-                    col as i32,
-                ) + chunk.count_block(
-                    &direction,
-                    layer as i32 + 1,
-                    (row + height) as i32,
-                    col as i32 - 1,
+                    layer,
+                    row + height,
+                    col,
+                    AoCorner::TopLeft,
                 );
                 let ao_factors = [
                     bottom_left_ao_factor,
@@ -230,6 +221,41 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
         }
     }
     return quads;
+}
+
+fn get_ao_factor(
+    chunk: &ChunkNeighborhood,
+    side: &BlockSide,
+    layer: usize,
+    row: usize,
+    col: usize,
+    corner: AoCorner,
+) -> u8 {
+    let layer = layer as i32;
+    let row = row as i32;
+    let col = col as i32;
+    let ((left_row, left_col), (right_row, right_col), (corner_row, corner_col)) = match corner {
+        AoCorner::BottomLeft => ((row - 1, col), (row, col - 1), (row - 1, col - 1)),
+        AoCorner::BottomRight => ((row - 1, col), (row, col + 1), (row - 1, col + 1)),
+        AoCorner::TopLeft => ((row + 1, col), (row, col - 1), (row + 1, col - 1)),
+        AoCorner::TopRight => ((row + 1, col), (row, col + 1), (row + 1, col + 1)),
+    };
+    let left_block = chunk.count_block(side, layer + 1, left_row, left_col);
+    let right_block = chunk.count_block(side, layer + 1, right_row, right_col);
+    if left_block != 0 && right_block != 0 {
+        return 3;
+    } else {
+        return left_block
+            + right_block
+            + chunk.count_block(side, layer + 1, corner_row, corner_col);
+    }
+}
+
+enum AoCorner {
+    BottomLeft,
+    TopLeft,
+    BottomRight,
+    TopRight,
 }
 
 trait LayerIndexable {
