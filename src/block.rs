@@ -1,7 +1,4 @@
-use bevy::{
-    color::palettes::{basic::SILVER, css::BROWN},
-    prelude::*,
-};
+use bevy::prelude::*;
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Block {
@@ -15,12 +12,11 @@ pub enum Block {
 impl Block {
     pub fn get_colour(&self) -> Option<Color> {
         match self {
-            Self::Stone => Some(SILVER),
-            Self::Grass => Some(Srgba::new(0.075, 0.3, 0.05, 1.0)),
-            Self::Dirt => Some(BROWN),
+            Self::Stone => Some(Color::linear_rgb(0.2, 0.2, 0.2)),
+            Self::Grass => Some(Color::linear_rgb(0.2, 0.6, 0.0)),
+            Self::Dirt => Some(Color::hsv(35.0, 0.65, 0.65)),
             _ => None,
         }
-        .map(Color::from)
     }
 }
 

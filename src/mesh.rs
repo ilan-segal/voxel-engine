@@ -426,7 +426,7 @@ fn create_mesh_from_quads(quads: &Vec<Quad>) -> Mesh {
                 .expect("Meshed block should have colour");
 
             return q.ao_factors.iter().map(move |factor| {
-                let lum = 0.6_f32.powi((*factor).into());
+                let lum = 0.6_f32.powi((*factor).into()) * colour.luminance();
                 return colour.with_luminance(lum);
             });
         })

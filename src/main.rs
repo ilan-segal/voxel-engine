@@ -57,6 +57,7 @@ fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
             illuminance: light_consts::lux::OVERCAST_DAY,
+            color: Color::default(),
             ..default()
         },
         transform: Transform {
@@ -108,7 +109,9 @@ fn move_camera(
             horizontal_movement.x += 1.0;
         }
         if horizontal_movement != Vec3::ZERO {
-            let (yaw, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
+            let (yaw, _, _) = transform
+                .rotation
+                .to_euler(EulerRot::YXZ);
             let mut real_horizontal = (Quat::from_rotation_y(yaw) * horizontal_movement)
                 .normalize()
                 * CAMERA_HORIZONTAL_BLOCKS_PER_SECOND
@@ -125,7 +128,9 @@ fn move_camera(
         const CAMERA_MOUSE_SENSITIVITY_Y: f32 = 0.0025;
         for MouseMotion { delta } in mouse_events.read() {
             transform.rotate_axis(Dir3::NEG_Y, delta.x * CAMERA_MOUSE_SENSITIVITY_X);
-            let (yaw, mut pitch, _) = transform.rotation.to_euler(EulerRot::YXZ);
+            let (yaw, mut pitch, _) = transform
+                .rotation
+                .to_euler(EulerRot::YXZ);
             pitch = (pitch - delta.y * CAMERA_MOUSE_SENSITIVITY_Y).clamp(-PI * 0.5, PI * 0.5);
             transform.rotation = Quat::from_euler(
                 // YXZ order corresponds to the common
