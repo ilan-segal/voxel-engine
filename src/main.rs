@@ -118,7 +118,7 @@ fn move_camera(
                 * BLOCK_SIZE
                 * time.delta_seconds();
 
-            if keys.pressed(KeyCode::AltLeft) {
+            if keys.pressed(KeyCode::ControlLeft) {
                 real_horizontal *= 10.0;
             }
             transform.translation += real_horizontal;
