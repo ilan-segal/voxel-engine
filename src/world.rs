@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, f64::consts::E, sync::Arc};
 
 use crate::{
     block::Block,
-    chunk::{Chunk, ChunkData, ChunkPosition, CHUNK_SIZE},
+    chunk::{Chunk, ChunkData, ChunkIndex, ChunkPosition, CHUNK_SIZE},
 };
 
 const WORLD_SEED: u32 = 0xDEADBEEF;
@@ -41,9 +41,41 @@ impl NoiseGenerator {
 }
 
 #[derive(Resource)]
-struct WorldGenNoise(Vec<NoiseGenerator>);
+struct WorldGenNoise {
+    noise_a: StackedNoise,
+    noise_b: StackedNoise,
+    regime: NoiseGenerator,
+}
 
 impl WorldGenNoise {
+    fn sample(&self, x: i32, y: i32) -> f64 {
+        let naive_regime = (self.regime.sample(x as f64, y as f64) + 1.0) * 0.5;
+        let regime = sharpen_noise(naive_regime, 20.0);
+        let sample_a = self.noise_a.sample(x, y);
+        let sample_b = self.noise_b.sample(x, y);
+        return regime * sample_a + (1.0 - regime) * (0.5 * sample_b + 1.0);
+    }
+}
+
+/*
+value in [0, 1]
+amount in [1, ∞)
+*/
+fn sharpen_noise(value: f64, amount: f64) -> f64 {
+    if amount < 1.0 {
+        panic!();
+    }
+    let exaggerated = (value - 0.5) * amount;
+    return sigmoid(exaggerated);
+}
+
+fn sigmoid(x: f64) -> f64 {
+    (1.0 + E.powf(-x)).recip()
+}
+
+struct StackedNoise(Vec<NoiseGenerator>);
+
+impl StackedNoise {
     // Returns in range [0, 1]
     fn sample(&self, x: i32, y: i32) -> f64 {
         let mut total_sample = 0.;
@@ -59,26 +91,54 @@ impl WorldGenNoise {
 
 impl Default for WorldGenNoise {
     fn default() -> Self {
-        Self(vec![
-            NoiseGenerator {
-                perlin: Perlin::new(WORLD_SEED),
-                scale: 100.0,
+        Self {
+            noise_a: StackedNoise(vec![
+                NoiseGenerator {
+                    perlin: Perlin::new(WORLD_SEED),
+                    scale: 100.0,
+                    amplitude: 1.0,
+                    offset: 0.0,
+                },
+                NoiseGenerator {
+                    perlin: Perlin::new(WORLD_SEED),
+                    scale: 50.0,
+                    amplitude: 0.5,
+                    offset: 10.0,
+                },
+                NoiseGenerator {
+                    perlin: Perlin::new(WORLD_SEED),
+                    scale: 25.0,
+                    amplitude: 0.25,
+                    offset: 20.0,
+                },
+            ]),
+            noise_b: StackedNoise(vec![
+                NoiseGenerator {
+                    perlin: Perlin::new(!WORLD_SEED),
+                    scale: 100.0,
+                    amplitude: 1.0,
+                    offset: 0.0,
+                },
+                NoiseGenerator {
+                    perlin: Perlin::new(!WORLD_SEED),
+                    scale: 50.0,
+                    amplitude: 0.5,
+                    offset: 10.0,
+                },
+                NoiseGenerator {
+                    perlin: Perlin::new(!WORLD_SEED),
+                    scale: 25.0,
+                    amplitude: 0.25,
+                    offset: 20.0,
+                },
+            ]),
+            regime: NoiseGenerator {
+                perlin: Perlin::new(WORLD_SEED << 1),
+                scale: 150.0,
                 amplitude: 1.0,
                 offset: 0.0,
             },
-            NoiseGenerator {
-                perlin: Perlin::new(WORLD_SEED),
-                scale: 50.0,
-                amplitude: 0.5,
-                offset: 10.0,
-            },
-            NoiseGenerator {
-                perlin: Perlin::new(WORLD_SEED),
-                scale: 25.0,
-                amplitude: 0.25,
-                offset: 20.0,
-            },
-        ])
+        }
     }
 }
 
@@ -100,6 +160,7 @@ fn update_loaded_chunks(
     q_camera_position: Query<&GlobalTransform, (With<Camera3d>, Changed<ChunkPosition>)>,
     q_chunk_position: Query<(Entity, &ChunkPosition), With<Chunk>>,
     world_gen_noise: Res<WorldGenNoise>,
+    index: Res<ChunkIndex>,
 ) {
     let Ok(pos) = q_camera_position.get_single() else {
         return;
@@ -109,7 +170,7 @@ fn update_loaded_chunks(
     // Determine position of chunks that should be loaded
     let mut should_be_loaded_positions: HashSet<IVec3> = HashSet::new();
     for chunk_x in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
-        for chunk_y in 0..=1 {
+        for chunk_y in 0..=3 {
             for chunk_z in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
                 let cur_chunk_pos =
                     ChunkPosition(chunk_pos.0.with_y(0) + IVec3::new(chunk_x, chunk_y, chunk_z));

@@ -29,20 +29,27 @@ pub struct ChunkPosition(pub IVec3);
 
 impl ChunkPosition {
     pub fn from_world_position(p: &Vec3) -> Self {
-        ChunkPosition((*p / (CHUNK_SIZE as f32)).floor().as_ivec3())
+        ChunkPosition(
+            (*p / (CHUNK_SIZE as f32))
+                .floor()
+                .as_ivec3(),
+        )
     }
 }
 
 fn on_chunk_loaded(
     trigger: Trigger<OnAdd, Chunk>,
-    query: Query<(&ChunkPosition, &Chunk)>,
+    query: Query<(Entity, &ChunkPosition, &Chunk)>,
     mut index: ResMut<ChunkIndex>,
 ) {
-    let Ok((chunk_pos, chunk)) = query.get(trigger.entity()) else {
+    let Ok((e, chunk_pos, chunk)) = query.get(trigger.entity()) else {
         return;
     };
     let data = chunk.blocks.clone();
-    index.map.insert(chunk_pos.0, data);
+    index
+        .chunk_map
+        .insert(chunk_pos.0, data);
+    index.entity_map.insert(chunk_pos.0, e);
 }
 
 fn on_chunk_unloaded(
@@ -53,12 +60,13 @@ fn on_chunk_unloaded(
     let Ok(chunk_pos) = query.get(trigger.entity()) else {
         return;
     };
-    index.map.remove(&chunk_pos.0);
+    index.chunk_map.remove(&chunk_pos.0);
 }
 
 #[derive(Resource, Default)]
 pub struct ChunkIndex {
-    map: HashMap<IVec3, Arc<ChunkData>>,
+    chunk_map: HashMap<IVec3, Arc<ChunkData>>,
+    entity_map: HashMap<IVec3, Entity>,
 }
 
 impl ChunkIndex {
@@ -70,7 +78,7 @@ impl ChunkIndex {
             .for_each(|((x, y), z)| {
                 let cur_pos = IVec3::new(x, y, z) + *pos;
                 chunks[(x + 1) as usize][(y + 1) as usize][(z + 1) as usize] =
-                    self.map.get(&cur_pos).cloned();
+                    self.chunk_map.get(&cur_pos).cloned();
             });
         return ChunkNeighborhood { chunks };
     }
