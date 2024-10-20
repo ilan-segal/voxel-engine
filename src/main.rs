@@ -51,7 +51,7 @@ fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
 
     commands.spawn((
         Camera3dBundle {
-            transform: camera_pos.looking_at(Vec3::ZERO, Vec3::Y),
+            transform: camera_pos.looking_to(Vec3::X, Vec3::Y),
             ..Default::default()
         },
         ChunkPosition::default(),
