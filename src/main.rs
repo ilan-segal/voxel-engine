@@ -38,6 +38,7 @@ fn main() {
         .insert_resource(ClearColor(
             Color::linear_rgb(0.25, 0.60, 0.92).with_luminance(0.5),
         ))
+        .insert_resource(Msaa::Sample8)
         .run();
 }
 
