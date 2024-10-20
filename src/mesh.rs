@@ -8,6 +8,7 @@ use bevy::render::view::RenderLayers;
 use bevy::tasks::futures_lite::future;
 use bevy::tasks::{block_on, AsyncComputeTaskPool, Task};
 use bevy::utils::HashMap;
+use itertools::Itertools;
 
 pub struct MeshPlugin;
 
@@ -21,7 +22,8 @@ impl Plugin for MeshPlugin {
                     begin_mesh_gen_tasks,
                     receive_mesh_gen_tasks.after(crate::world::WorldSet),
                 ),
-            );
+            )
+            .observe(rerender_neighbors);
     }
 }
 
@@ -46,13 +48,20 @@ pub struct MeshTaskData {
     mesh: Mesh,
 }
 
+#[derive(Component)]
+pub struct ReRender;
+
 #[derive(Resource, Default)]
 pub struct MeshGenTasks(pub HashMap<ChunkPosition, Task<MeshTaskData>>);
 
 fn begin_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
-    q_chunk: Query<(Entity, &ChunkPosition), (With<Chunk>, Without<Handle<Mesh>>)>,
+    q_chunk: Query<
+        (Entity, &ChunkPosition),
+        (With<Chunk>, Or<(Without<Handle<Mesh>>, With<ReRender>)>),
+    >,
     chunk_index: Res<ChunkIndex>,
+    mut commands: Commands,
 ) {
     for (entity, pos) in q_chunk.iter() {
         let task_pool = AsyncComputeTaskPool::get();
@@ -67,7 +76,33 @@ fn begin_mesh_gen_tasks(
             }
         });
         tasks.0.insert(*pos, task);
+        commands
+            .entity(entity)
+            .remove::<ReRender>();
     }
+}
+
+fn rerender_neighbors(
+    trigger: Trigger<OnAdd, Chunk>,
+    chunk_index: Res<ChunkIndex>,
+    chunk_positions: Query<&ChunkPosition>,
+    mut commands: Commands,
+) {
+    let Ok(pos) = chunk_positions.get(trigger.entity()) else {
+        return;
+    };
+    (-1..=1)
+        .cartesian_product(-1..=1)
+        .cartesian_product(-1..=1)
+        .for_each(|((x, y), z)| {
+            let cur_pos = IVec3::new(x, y, z) + pos.0;
+            let Some(neighbor_entity) = chunk_index.entity_map.get(&cur_pos) else {
+                return;
+            };
+            if let Some(mut entity_commands) = commands.get_entity(*neighbor_entity) {
+                entity_commands.insert(ReRender);
+            };
+        });
 }
 
 fn receive_mesh_gen_tasks(

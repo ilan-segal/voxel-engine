@@ -65,8 +65,8 @@ fn on_chunk_unloaded(
 
 #[derive(Resource, Default)]
 pub struct ChunkIndex {
-    chunk_map: HashMap<IVec3, Arc<ChunkData>>,
-    entity_map: HashMap<IVec3, Entity>,
+    pub chunk_map: HashMap<IVec3, Arc<ChunkData>>,
+    pub entity_map: HashMap<IVec3, Entity>,
 }
 
 impl ChunkIndex {

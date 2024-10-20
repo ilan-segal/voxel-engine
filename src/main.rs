@@ -28,8 +28,8 @@ fn main() {
                 ..default()
             }),
             WireframePlugin,
-            mesh::MeshPlugin,
             world::WorldPlugin,
+            mesh::MeshPlugin,
             debug_plugin::DebugPlugin,
             chunk::ChunkPlugin,
         ))

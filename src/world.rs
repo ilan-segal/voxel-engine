@@ -4,7 +4,7 @@ use std::{collections::HashSet, f64::consts::E, sync::Arc};
 
 use crate::{
     block::Block,
-    chunk::{Chunk, ChunkData, ChunkIndex, ChunkPosition, CHUNK_SIZE},
+    chunk::{Chunk, ChunkData, ChunkPosition, CHUNK_SIZE},
 };
 
 const WORLD_SEED: u32 = 0xDEADBEEF;
@@ -160,7 +160,6 @@ fn update_loaded_chunks(
     q_camera_position: Query<&GlobalTransform, (With<Camera3d>, Changed<ChunkPosition>)>,
     q_chunk_position: Query<(Entity, &ChunkPosition), With<Chunk>>,
     world_gen_noise: Res<WorldGenNoise>,
-    index: Res<ChunkIndex>,
 ) {
     let Ok(pos) = q_camera_position.get_single() else {
         return;
