@@ -1,10 +1,11 @@
 use bevy::prelude::*;
-use noise::{NoiseFn, Perlin};
-use std::{collections::HashSet, f64::consts::E, sync::Arc};
+use noise::NoiseFn;
+use std::{collections::HashSet, sync::Arc};
 
 use crate::{
     block::Block,
     chunk::{Chunk, ChunkData, ChunkPosition, CHUNK_SIZE},
+    world_noise::WorldGenNoise,
 };
 
 const WORLD_SEED: u32 = 0xDEADBEEF;
@@ -14,7 +15,7 @@ pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<WorldGenNoise>()
+        app.insert_resource(WorldGenNoise::new(WORLD_SEED))
             .add_systems(
                 Update,
                 (update_loaded_chunks, update_camera_chunk_position).in_set(WorldSet),
@@ -24,123 +25,6 @@ impl Plugin for WorldPlugin {
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WorldSet;
-
-struct NoiseGenerator {
-    perlin: Perlin,
-    scale: f64,
-    amplitude: f64,
-    offset: f64,
-}
-
-impl NoiseGenerator {
-    fn sample(&self, x: f64, y: f64) -> f64 {
-        let sample_x = x / self.scale + self.offset;
-        let sample_y = y / self.scale + self.offset;
-        return self.perlin.get([sample_x, sample_y]) * self.amplitude;
-    }
-}
-
-#[derive(Resource)]
-struct WorldGenNoise {
-    noise_a: StackedNoise,
-    noise_b: StackedNoise,
-    regime: NoiseGenerator,
-}
-
-impl WorldGenNoise {
-    fn sample(&self, x: i32, y: i32) -> f64 {
-        let naive_regime = (self.regime.sample(x as f64, y as f64) + 1.0) * 0.5;
-        let regime = sharpen_noise(naive_regime, 20.0);
-        let sample_a = self.noise_a.sample(x, y);
-        let sample_b = self.noise_b.sample(x, y);
-        return regime * sample_a + (1.0 - regime) * (0.5 * sample_b + 1.0);
-    }
-}
-
-/*
-value in [0, 1]
-amount in [1, ∞)
-*/
-fn sharpen_noise(value: f64, amount: f64) -> f64 {
-    if amount < 1.0 {
-        panic!();
-    }
-    let exaggerated = (value - 0.5) * amount;
-    return sigmoid(exaggerated);
-}
-
-fn sigmoid(x: f64) -> f64 {
-    (1.0 + E.powf(-x)).recip()
-}
-
-struct StackedNoise(Vec<NoiseGenerator>);
-
-impl StackedNoise {
-    // Returns in range [0, 1]
-    fn sample(&self, x: i32, y: i32) -> f64 {
-        let mut total_sample = 0.;
-        let mut total_amplitude = 0.;
-        for g in &self.0 {
-            total_sample += g.sample(x as f64, y as f64);
-            total_amplitude += g.amplitude;
-        }
-        total_sample /= total_amplitude;
-        0.5 + 0.5 * total_sample
-    }
-}
-
-impl Default for WorldGenNoise {
-    fn default() -> Self {
-        Self {
-            noise_a: StackedNoise(vec![
-                NoiseGenerator {
-                    perlin: Perlin::new(WORLD_SEED),
-                    scale: 100.0,
-                    amplitude: 1.0,
-                    offset: 0.0,
-                },
-                NoiseGenerator {
-                    perlin: Perlin::new(WORLD_SEED),
-                    scale: 50.0,
-                    amplitude: 0.5,
-                    offset: 10.0,
-                },
-                NoiseGenerator {
-                    perlin: Perlin::new(WORLD_SEED),
-                    scale: 25.0,
-                    amplitude: 0.25,
-                    offset: 20.0,
-                },
-            ]),
-            noise_b: StackedNoise(vec![
-                NoiseGenerator {
-                    perlin: Perlin::new(!WORLD_SEED),
-                    scale: 100.0,
-                    amplitude: 1.0,
-                    offset: 0.0,
-                },
-                NoiseGenerator {
-                    perlin: Perlin::new(!WORLD_SEED),
-                    scale: 50.0,
-                    amplitude: 0.5,
-                    offset: 10.0,
-                },
-                NoiseGenerator {
-                    perlin: Perlin::new(!WORLD_SEED),
-                    scale: 25.0,
-                    amplitude: 0.25,
-                    offset: 20.0,
-                },
-            ]),
-            regime: NoiseGenerator {
-                perlin: Perlin::new(WORLD_SEED << 1),
-                scale: 150.0,
-                amplitude: 1.0,
-                offset: 0.0,
-            },
-        }
-    }
-}
 
 fn update_camera_chunk_position(
     mut q_camera: Query<(&mut ChunkPosition, &GlobalTransform), With<Camera3d>>,
@@ -213,10 +97,10 @@ fn generate_chunk(noise: &WorldGenNoise, chunk_pos: &IVec3) -> Chunk {
     let mut chunk_data = default::<ChunkData>();
     for z in 0..CHUNK_SIZE {
         for x in 0..CHUNK_SIZE {
-            let height = (noise.sample(
+            let height = (noise.get([
                 x as i32 + chunk_pos.x * CHUNK_SIZE as i32,
                 z as i32 + chunk_pos.z * CHUNK_SIZE as i32,
-            ) * SCALE) as i32
+            ]) * SCALE) as i32
                 + 1;
             let Some(chunk_height) = Some(height - (chunk_pos.y * CHUNK_SIZE as i32))
                 .filter(|h| h >= &0)

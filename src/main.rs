@@ -13,6 +13,7 @@ mod chunk;
 mod debug_plugin;
 mod mesh;
 mod world;
+mod world_noise;
 
 const BLOCK_SIZE: f32 = 1.0;
 const WORLD_LAYER: Layer = 0;
