@@ -45,7 +45,7 @@ struct CommonMaterials {
 
 pub struct MeshTaskData {
     entity: Entity,
-    mesh: Mesh,
+    mesh: Option<Mesh>,
 }
 
 #[derive(Component)]
@@ -116,11 +116,14 @@ fn receive_mesh_gen_tasks(
         let Some(data) = block_on(future::poll_once(task)) else {
             return true;
         };
+        let Some(mesh) = data.mesh else {
+            return false;
+        };
         let e = data.entity;
         if let Some(mut entity) = commands.get_entity(e) {
             entity.insert((
                 PbrBundle {
-                    mesh: meshes.add(data.mesh),
+                    mesh: meshes.add(mesh),
                     material: materials.white.clone(),
                     transform: *q_transform.get(e).unwrap(),
                     ..default()
@@ -148,7 +151,7 @@ impl Quad {
     }
 }
 
-fn get_mesh_for_chunk(chunk: ChunkNeighborhood) -> Mesh {
+fn get_mesh_for_chunk(chunk: ChunkNeighborhood) -> Option<Mesh> {
     let mut quads = vec![];
     quads.extend(greedy_mesh(&chunk, BlockSide::Up));
     quads.extend(greedy_mesh(&chunk, BlockSide::Down));
@@ -422,7 +425,10 @@ fn get_quad_corners(
     }
 }
 
-fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Mesh {
+fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
+    if quads.is_empty() {
+        return None;
+    }
     for i in 1..quads.len() {
         quads[i].rotate_against_anisotropy();
     }
@@ -480,12 +486,13 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Mesh {
         .map(|c| c.to_linear().to_f32_array())
         .collect::<Vec<_>>();
     // Keep the mesh data accessible in future frames to be able to mutate it in toggle_texture.
-    Mesh::new(
+    let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
     )
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colours)
-    .with_inserted_indices(Indices::U32(indices))
+    .with_inserted_indices(Indices::U32(indices));
+    return Some(mesh);
 }
