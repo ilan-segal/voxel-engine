@@ -9,6 +9,7 @@ use bevy::tasks::futures_lite::future;
 use bevy::tasks::{block_on, AsyncComputeTaskPool, Task};
 use bevy::utils::HashMap;
 use itertools::Itertools;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 pub struct MeshPlugin;
 
@@ -19,7 +20,7 @@ impl Plugin for MeshPlugin {
             .add_systems(
                 Update,
                 (
-                    begin_mesh_gen_tasks,
+                    (update_mesh_status, begin_mesh_gen_tasks).chain(),
                     receive_mesh_gen_tasks.after(crate::world::WorldSet),
                 ),
             )
@@ -48,22 +49,45 @@ pub struct MeshTaskData {
     mesh: Option<Mesh>,
 }
 
-#[derive(Component)]
-pub struct ReRender;
+#[derive(Component, PartialEq, Eq)]
+pub enum ChunkMeshStatus {
+    NeedsMesh,
+    NoMesh,
+}
+
+fn update_mesh_status(mut commands: Commands, q_chunk: Query<(Entity, &Chunk), Changed<Chunk>>) {
+    for (entity, chunk) in q_chunk.iter() {
+        if chunk
+            .blocks
+            .into_par_iter()
+            .flatten()
+            .flatten()
+            .any(|v| v.is_meshable())
+        {
+            commands
+                .entity(entity)
+                .insert(ChunkMeshStatus::NeedsMesh);
+        } else {
+            commands
+                .entity(entity)
+                .insert(ChunkMeshStatus::NoMesh);
+        }
+    }
+}
 
 #[derive(Resource, Default)]
 pub struct MeshGenTasks(pub HashMap<ChunkPosition, Task<MeshTaskData>>);
 
 fn begin_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
-    q_chunk: Query<
-        (Entity, &ChunkPosition),
-        (With<Chunk>, Or<(Without<Handle<Mesh>>, With<ReRender>)>),
-    >,
+    q_chunk: Query<(Entity, &ChunkPosition, &ChunkMeshStatus), With<Chunk>>,
     chunk_index: Res<ChunkIndex>,
     mut commands: Commands,
 ) {
-    for (entity, pos) in q_chunk.iter() {
+    for (entity, pos, mesh_status) in q_chunk.iter() {
+        if mesh_status != &ChunkMeshStatus::NeedsMesh {
+            continue;
+        }
         let task_pool = AsyncComputeTaskPool::get();
         if tasks.0.contains_key(pos) {
             continue;
@@ -78,7 +102,7 @@ fn begin_mesh_gen_tasks(
         tasks.0.insert(*pos, task);
         commands
             .entity(entity)
-            .remove::<ReRender>();
+            .insert(ChunkMeshStatus::NoMesh);
     }
 }
 
@@ -100,7 +124,7 @@ fn rerender_neighbors(
                 return;
             };
             if let Some(mut entity_commands) = commands.get_entity(*neighbor_entity) {
-                entity_commands.insert(ReRender);
+                entity_commands.insert(ChunkMeshStatus::NeedsMesh);
             };
         });
 }

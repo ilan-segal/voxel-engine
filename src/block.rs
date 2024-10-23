@@ -18,6 +18,13 @@ impl Block {
             _ => None,
         }
     }
+
+    pub fn is_meshable(&self) -> bool {
+        match self {
+            Self::Air => false,
+            _ => true,
+        }
+    }
 }
 
 #[derive(Debug)]
