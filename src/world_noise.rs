@@ -68,8 +68,8 @@ impl NoiseFn<i32, 2> for WorldGenNoise {
         let naive_regime = (self.regime.get(point) + 1.0) * 0.5;
         let regime = sharpen_noise(naive_regime, 20.0);
         let sample_a = self.noise_a.get(point);
-        let sample_b = self.noise_b.get(point);
-        return regime * sample_a + (1.0 - regime) * (0.5 * sample_b + 1.0);
+        let sample_b = self.noise_b.get(point) * 0.5 + 1.0;
+        return regime * sample_a + (1.0 - regime) * sample_b;
     }
 }
 
