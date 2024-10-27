@@ -51,8 +51,10 @@ pub struct MeshTaskData {
 
 #[derive(Component, PartialEq, Eq)]
 pub enum ChunkMeshStatus {
-    NeedsMesh,
-    NoMesh,
+    UnMeshed,
+    Meshing,
+    Meshed,
+    NeedsNoMesh,
 }
 
 fn update_mesh_status(mut commands: Commands, q_chunk: Query<(Entity, &Chunk), Changed<Chunk>>) {
@@ -66,11 +68,11 @@ fn update_mesh_status(mut commands: Commands, q_chunk: Query<(Entity, &Chunk), C
         {
             commands
                 .entity(entity)
-                .insert(ChunkMeshStatus::NeedsMesh);
+                .insert(ChunkMeshStatus::UnMeshed);
         } else {
             commands
                 .entity(entity)
-                .insert(ChunkMeshStatus::NoMesh);
+                .insert(ChunkMeshStatus::NeedsNoMesh);
         }
     }
 }
@@ -85,7 +87,7 @@ fn begin_mesh_gen_tasks(
     mut commands: Commands,
 ) {
     for (entity, pos, mesh_status) in q_chunk.iter() {
-        if mesh_status != &ChunkMeshStatus::NeedsMesh {
+        if mesh_status != &ChunkMeshStatus::UnMeshed {
             continue;
         }
         let task_pool = AsyncComputeTaskPool::get();
@@ -102,17 +104,19 @@ fn begin_mesh_gen_tasks(
         tasks.0.insert(*pos, task);
         commands
             .entity(entity)
-            .insert(ChunkMeshStatus::NoMesh);
+            .insert(ChunkMeshStatus::Meshing);
     }
 }
 
 fn rerender_neighbors(
     trigger: Trigger<OnAdd, Chunk>,
     chunk_index: Res<ChunkIndex>,
-    chunk_positions: Query<&ChunkPosition>,
+    q_chunk: Query<&ChunkPosition>,
+    q_status: Query<&ChunkMeshStatus>,
     mut commands: Commands,
+    mut tasks: ResMut<MeshGenTasks>,
 ) {
-    let Ok(pos) = chunk_positions.get(trigger.entity()) else {
+    let Ok(pos) = q_chunk.get(trigger.entity()) else {
         return;
     };
     (-1..=1)
@@ -123,8 +127,14 @@ fn rerender_neighbors(
             let Some(neighbor_entity) = chunk_index.entity_map.get(&cur_pos) else {
                 return;
             };
+            if let Ok(neighbor_status) = q_status.get(*neighbor_entity)
+                && neighbor_status == &ChunkMeshStatus::NeedsNoMesh
+            {
+                return;
+            }
             if let Some(mut entity_commands) = commands.get_entity(*neighbor_entity) {
-                entity_commands.insert(ChunkMeshStatus::NeedsMesh);
+                entity_commands.insert(ChunkMeshStatus::UnMeshed);
+                tasks.0.remove(&ChunkPosition(cur_pos));
             };
         });
 }
@@ -140,20 +150,25 @@ fn receive_mesh_gen_tasks(
         let Some(data) = block_on(future::poll_once(task)) else {
             return true;
         };
-        let Some(mesh) = data.mesh else {
-            return false;
-        };
         let e = data.entity;
         if let Some(mut entity) = commands.get_entity(e) {
-            entity.insert((
-                PbrBundle {
-                    mesh: meshes.add(mesh),
-                    material: materials.white.clone(),
-                    transform: *q_transform.get(e).unwrap(),
-                    ..default()
-                },
-                RenderLayers::layer(WORLD_LAYER),
-            ));
+            if let Some(mesh) = data.mesh {
+                entity.insert((
+                    PbrBundle {
+                        mesh: meshes.add(mesh),
+                        material: materials.white.clone(),
+                        transform: *q_transform.get(e).unwrap(),
+                        ..default()
+                    },
+                    RenderLayers::layer(WORLD_LAYER),
+                    ChunkMeshStatus::Meshed,
+                ));
+            } else {
+                entity
+                    .insert(ChunkMeshStatus::NeedsNoMesh)
+                    .remove::<Handle<Mesh>>()
+                    .remove::<RenderLayers>();
+            }
         };
         return false;
     });
@@ -303,7 +318,6 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                         width += 1;
                     }
                 }
-                // TODO rotate vertices if necessary, to prevent anisotropy
                 let vertices = get_quad_corners(&direction, layer, row, height, col, width);
                 let ao_factors = [
                     bottom_left_ao_factor,

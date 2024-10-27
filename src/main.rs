@@ -1,3 +1,5 @@
+#![feature(let_chains)]
+
 use bevy::{
     input::mouse::MouseMotion,
     pbr::wireframe::{WireframeConfig, WireframePlugin},
