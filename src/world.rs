@@ -9,7 +9,8 @@ use crate::{
 };
 
 const WORLD_SEED: u32 = 0xDEADBEEF;
-const LOAD_DISTANCE_CHUNKS: i32 = 20;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 20;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 2;
 
 pub struct WorldPlugin;
 
@@ -52,11 +53,11 @@ fn update_loaded_chunks(
     let chunk_pos = ChunkPosition::from_world_position(&camera_position);
     // Determine position of chunks that should be loaded
     let mut should_be_loaded_positions: HashSet<IVec3> = HashSet::new();
-    for chunk_x in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
-        for chunk_y in 0..=10 {
-            for chunk_z in -LOAD_DISTANCE_CHUNKS..=LOAD_DISTANCE_CHUNKS {
+    for chunk_x in -CHUNK_LOAD_DISTANCE_HORIZONTAL..=CHUNK_LOAD_DISTANCE_HORIZONTAL {
+        for chunk_z in -CHUNK_LOAD_DISTANCE_HORIZONTAL..=CHUNK_LOAD_DISTANCE_HORIZONTAL {
+            for chunk_y in -CHUNK_LOAD_DISTANCE_VERTICAL..=CHUNK_LOAD_DISTANCE_VERTICAL {
                 let cur_chunk_pos =
-                    ChunkPosition(chunk_pos.0.with_y(0) + IVec3::new(chunk_x, chunk_y, chunk_z));
+                    ChunkPosition(chunk_pos.0 + IVec3::new(chunk_x, chunk_y, chunk_z));
                 should_be_loaded_positions.insert(cur_chunk_pos.0);
             }
         }
