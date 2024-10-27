@@ -12,6 +12,7 @@ use std::f32::consts::PI;
 
 mod block;
 mod chunk;
+mod chunk_data;
 mod debug_plugin;
 mod mesh;
 mod world;

@@ -4,7 +4,8 @@ use std::{collections::HashSet, sync::Arc};
 
 use crate::{
     block::Block,
-    chunk::{Chunk, ChunkData, ChunkPosition, CHUNK_SIZE},
+    chunk::{Chunk, ChunkPosition},
+    chunk_data::{ChunkData, CHUNK_SIZE},
     world_noise::WorldGenNoise,
 };
 
@@ -111,14 +112,14 @@ fn generate_chunk(noise: &WorldGenNoise, chunk_pos: &IVec3) -> Chunk {
             };
             if chunk_height >= 1 {
                 for y in (0..chunk_height - 1).filter(|h| h < &CHUNK_SIZE) {
-                    chunk_data[x][y][z] = Block::Stone;
+                    *chunk_data.at_mut(x, y, z) = Block::Stone;
                 }
                 if chunk_height - 1 < CHUNK_SIZE {
-                    chunk_data[x][chunk_height - 1][z] = Block::Dirt;
+                    *chunk_data.at_mut(x, chunk_height - 1, z) = Block::Dirt;
                 }
             }
             if chunk_height < CHUNK_SIZE {
-                chunk_data[x][chunk_height][z] = Block::Grass;
+                *chunk_data.at_mut(x, chunk_height, z) = Block::Grass;
             }
         }
     }

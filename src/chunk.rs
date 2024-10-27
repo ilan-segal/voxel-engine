@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
-use crate::block::{Block, BlockSide};
+use crate::{
+    block::{Block, BlockSide},
+    chunk_data::{ChunkData, CHUNK_SIZE},
+};
 use bevy::{prelude::*, utils::HashMap};
 use itertools::Itertools;
-
-pub const CHUNK_SIZE: usize = 32;
-
-pub type ChunkData = [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
 
 pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {
@@ -71,7 +70,7 @@ pub struct ChunkIndex {
 
 impl ChunkIndex {
     pub fn get_neighborhood(&self, pos: &IVec3) -> ChunkNeighborhood {
-        let mut chunks: [[[Option<Arc<[[[Block; 32]; 32]; 32]>>; 3]; 3]; 3] = Default::default();
+        let mut chunks: [[[Option<Arc<ChunkData>>; 3]; 3]; 3] = Default::default();
         (-1..=1)
             .cartesian_product(-1..=1)
             .cartesian_product(-1..=1)
@@ -108,7 +107,7 @@ impl ChunkNeighborhood {
 
         return self.chunks[chunk_x][chunk_y][chunk_z]
             .as_deref()
-            .map(|data| data[x][y][z])
+            .map(|data| data.at(x, y, z))
             .unwrap_or_default();
     }
 

@@ -1,5 +1,6 @@
 use crate::block::{Block, BlockSide};
-use crate::chunk::{layer_to_xyz, Chunk, ChunkIndex, ChunkNeighborhood, ChunkPosition, CHUNK_SIZE};
+use crate::chunk::{layer_to_xyz, Chunk, ChunkIndex, ChunkNeighborhood, ChunkPosition};
+use crate::chunk_data::{ChunkData, CHUNK_SIZE};
 use crate::WORLD_LAYER;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
@@ -9,7 +10,6 @@ use bevy::tasks::futures_lite::future;
 use bevy::tasks::{block_on, AsyncComputeTaskPool, Task};
 use bevy::utils::HashMap;
 use itertools::Itertools;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 pub struct MeshPlugin;
 
@@ -59,13 +59,7 @@ pub enum ChunkMeshStatus {
 
 fn update_mesh_status(mut commands: Commands, q_chunk: Query<(Entity, &Chunk), Changed<Chunk>>) {
     for (entity, chunk) in q_chunk.iter() {
-        if chunk
-            .blocks
-            .into_par_iter()
-            .flatten()
-            .flatten()
-            .any(|v| v.is_meshable())
-        {
+        if chunk.blocks.is_meshable() {
             commands
                 .entity(entity)
                 .insert(ChunkMeshStatus::UnMeshed);
@@ -389,7 +383,7 @@ trait LayerIndexable {
     fn clear_at(&mut self, direction: &BlockSide, layer: usize, row: usize, col: usize);
 }
 
-impl LayerIndexable for [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE] {
+impl LayerIndexable for ChunkData {
     fn get_from_layer_coords(
         &self,
         direction: &BlockSide,
@@ -398,12 +392,12 @@ impl LayerIndexable for [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE] {
         col: usize,
     ) -> Block {
         let (x, y, z) = layer_to_xyz(direction, layer as i32, row as i32, col as i32);
-        self[x as usize][y as usize][z as usize]
+        self.at(x as usize, y as usize, z as usize)
     }
 
     fn clear_at(&mut self, direction: &BlockSide, layer: usize, row: usize, col: usize) {
         let (x, y, z) = layer_to_xyz(direction, layer as i32, row as i32, col as i32);
-        self[x as usize][y as usize][z as usize] = Block::Air;
+        *self.at_mut(x as usize, y as usize, z as usize) = Block::Air;
     }
 }
 
