@@ -24,7 +24,8 @@ impl Plugin for MeshPlugin {
                     receive_mesh_gen_tasks.after(crate::world::WorldSet),
                 ),
             )
-            .observe(rerender_neighbors);
+            .observe(rerender_neighbors)
+            .observe(end_mesh_tasks_for_unloaded_chunks);
     }
 }
 
@@ -44,7 +45,7 @@ struct CommonMaterials {
     white: Handle<StandardMaterial>,
 }
 
-pub struct MeshTaskData {
+struct MeshTaskData {
     entity: Entity,
     mesh: Option<Mesh>,
 }
@@ -72,7 +73,18 @@ fn update_mesh_status(mut commands: Commands, q_chunk: Query<(Entity, &Chunk), C
 }
 
 #[derive(Resource, Default)]
-pub struct MeshGenTasks(pub HashMap<ChunkPosition, Task<MeshTaskData>>);
+pub struct MeshGenTasks(HashMap<ChunkPosition, Task<MeshTaskData>>);
+
+fn end_mesh_tasks_for_unloaded_chunks(
+    trigger: Trigger<OnRemove, ChunkPosition>,
+    chunks: Query<&ChunkPosition, With<Chunk>>,
+    mut tasks: ResMut<MeshGenTasks>,
+) {
+    let Ok(pos) = chunks.get(trigger.entity()) else {
+        return;
+    };
+    tasks.0.remove(pos);
+}
 
 fn begin_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,

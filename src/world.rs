@@ -42,7 +42,6 @@ fn update_camera_chunk_position(
 
 fn update_loaded_chunks(
     mut commands: Commands,
-    mut mesh_gen_tasks: ResMut<crate::mesh::MeshGenTasks>,
     q_camera_position: Query<&GlobalTransform, (With<Camera3d>, Changed<ChunkPosition>)>,
     q_chunk_position: Query<(Entity, &ChunkPosition), With<Chunk>>,
     world_gen_noise: Res<WorldGenNoise>,
@@ -72,7 +71,6 @@ fn update_loaded_chunks(
             commands
                 .entity(entity)
                 .despawn_recursive();
-            mesh_gen_tasks.0.remove(chunk_pos);
         }
     }
     // Finally, load the new chunks
