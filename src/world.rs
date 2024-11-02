@@ -123,9 +123,7 @@ fn update_chunks(
     for (entity, chunk_pos) in q_chunk_position.iter() {
         if !should_be_loaded_positions.remove(&chunk_pos.0) {
             // The chunk should be unloaded since it's not in our set
-            commands
-                .entity(entity)
-                .despawn_recursive();
+            commands.entity(entity).despawn();
         }
     }
     // Finally, load the new chunks
