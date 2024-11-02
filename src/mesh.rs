@@ -157,25 +157,26 @@ fn receive_mesh_gen_tasks(
             return true;
         };
         let e = data.entity;
-        if let Some(mut entity) = commands.get_entity(e) {
-            if let Some(mesh) = data.mesh {
-                entity.insert((
-                    PbrBundle {
-                        mesh: meshes.add(mesh),
-                        material: materials.white.clone(),
-                        transform: *q_transform.get(e).unwrap(),
-                        ..default()
-                    },
-                    RenderLayers::layer(WORLD_LAYER),
-                    ChunkMeshStatus::Meshed,
-                ));
-            } else {
-                entity
-                    .insert(ChunkMeshStatus::NeedsNoMesh)
-                    .remove::<Handle<Mesh>>()
-                    .remove::<RenderLayers>();
-            }
+        let Some(mut entity) = commands.get_entity(e) else {
+            return true;
         };
+        if let Some(mesh) = data.mesh {
+            entity.insert((
+                PbrBundle {
+                    mesh: meshes.add(mesh),
+                    material: materials.white.clone(),
+                    transform: *q_transform.get(e).unwrap(),
+                    ..default()
+                },
+                RenderLayers::layer(WORLD_LAYER),
+                ChunkMeshStatus::Meshed,
+            ));
+        } else {
+            entity
+                .insert(ChunkMeshStatus::NeedsNoMesh)
+                .remove::<Handle<Mesh>>()
+                .remove::<RenderLayers>();
+        }
         return false;
     });
 }
