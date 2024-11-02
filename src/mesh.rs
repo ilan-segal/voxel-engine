@@ -51,7 +51,7 @@ struct MeshTaskData {
 }
 
 #[derive(Component, PartialEq, Eq)]
-pub enum ChunkMeshStatus {
+enum ChunkMeshStatus {
     UnMeshed,
     Meshing,
     Meshed,
@@ -73,7 +73,7 @@ fn update_mesh_status(mut commands: Commands, q_chunk: Query<(Entity, &Chunk), C
 }
 
 #[derive(Resource, Default)]
-pub struct MeshGenTasks(HashMap<ChunkPosition, Task<MeshTaskData>>);
+struct MeshGenTasks(HashMap<ChunkPosition, Task<MeshTaskData>>);
 
 fn end_mesh_tasks_for_unloaded_chunks(
     trigger: Trigger<OnRemove, ChunkPosition>,
@@ -96,10 +96,10 @@ fn begin_mesh_gen_tasks(
         if mesh_status != &ChunkMeshStatus::UnMeshed {
             continue;
         }
-        let task_pool = AsyncComputeTaskPool::get();
         if tasks.0.contains_key(pos) {
             continue;
         }
+        let task_pool = AsyncComputeTaskPool::get();
         let cloned_chunk = chunk_index.get_neighborhood(&pos.0);
         let task = task_pool.spawn(async move {
             MeshTaskData {

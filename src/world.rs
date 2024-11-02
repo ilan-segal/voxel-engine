@@ -1,4 +1,8 @@
-use bevy::prelude::*;
+use bevy::{
+    prelude::*,
+    tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
+    utils::HashMap,
+};
 use noise::NoiseFn;
 use std::{collections::HashSet, sync::Arc};
 
@@ -18,15 +22,67 @@ pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(WorldGenNoise::new(WORLD_SEED))
+            .init_resource::<ChunkLoadTasks>()
             .add_systems(
                 Update,
-                (update_loaded_chunks, update_camera_chunk_position).in_set(WorldSet),
+                (
+                    update_camera_chunk_position,
+                    update_chunks,
+                    begin_chunk_load_tasks,
+                    receive_chunk_load_tasks,
+                )
+                    .in_set(WorldSet),
             );
     }
 }
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WorldSet;
+
+struct ChunkLoadTaskData {
+    entity: Entity,
+    chunk: Chunk,
+}
+
+#[derive(Resource, Default)]
+struct ChunkLoadTasks(HashMap<ChunkPosition, Task<ChunkLoadTaskData>>);
+
+#[derive(Component)]
+struct NeedsChunkData;
+
+fn begin_chunk_load_tasks(
+    mut tasks: ResMut<ChunkLoadTasks>,
+    q_chunk: Query<(Entity, &ChunkPosition), With<NeedsChunkData>>,
+    world_gen_noise: Res<WorldGenNoise>,
+) {
+    for (entity, pos) in q_chunk.iter() {
+        if tasks.0.contains_key(pos) {
+            continue;
+        }
+        let task_pool = AsyncComputeTaskPool::get();
+        let cloned_noise = world_gen_noise.clone();
+        let pos_ivec = pos.0;
+        let task = task_pool.spawn(async move {
+            let chunk = generate_chunk(cloned_noise, pos_ivec);
+            ChunkLoadTaskData { entity, chunk }
+        });
+        tasks.0.insert(*pos, task);
+    }
+}
+
+fn receive_chunk_load_tasks(mut commands: Commands, mut tasks: ResMut<ChunkLoadTasks>) {
+    tasks.0.retain(|_, task| {
+        let Some(data) = block_on(future::poll_once(task)) else {
+            return true;
+        };
+        if let Some(mut entity) = commands.get_entity(data.entity) {
+            entity
+                .insert(data.chunk)
+                .remove::<NeedsChunkData>();
+        };
+        return false;
+    });
+}
 
 fn update_camera_chunk_position(
     mut q_camera: Query<(&mut ChunkPosition, &GlobalTransform), With<Camera3d>>,
@@ -40,11 +96,10 @@ fn update_camera_chunk_position(
     }
 }
 
-fn update_loaded_chunks(
+fn update_chunks(
     mut commands: Commands,
     q_camera_position: Query<&GlobalTransform, (With<Camera3d>, Changed<ChunkPosition>)>,
-    q_chunk_position: Query<(Entity, &ChunkPosition), With<Chunk>>,
-    world_gen_noise: Res<WorldGenNoise>,
+    q_chunk_position: Query<(Entity, &ChunkPosition), Or<(With<Chunk>, With<NeedsChunkData>)>>,
 ) {
     let Ok(pos) = q_camera_position.get_single() else {
         return;
@@ -75,9 +130,8 @@ fn update_loaded_chunks(
     }
     // Finally, load the new chunks
     for pos in should_be_loaded_positions {
-        let chunk = generate_chunk(&world_gen_noise, &pos);
         commands.spawn((
-            chunk,
+            NeedsChunkData,
             ChunkPosition(pos),
             SpatialBundle {
                 transform: Transform {
@@ -92,7 +146,7 @@ fn update_loaded_chunks(
     }
 }
 
-fn generate_chunk(noise: &WorldGenNoise, chunk_pos: &IVec3) -> Chunk {
+fn generate_chunk(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
     const SCALE: f64 = 60.0;
     let mut chunk_data = default::<ChunkData>();
     for z in 0..CHUNK_SIZE {
