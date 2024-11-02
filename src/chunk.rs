@@ -23,6 +23,14 @@ pub struct Chunk {
     pub blocks: Arc<ChunkData>,
 }
 
+impl Chunk {
+    pub fn new(data: ChunkData) -> Self {
+        Self {
+            blocks: Arc::new(data),
+        }
+    }
+}
+
 #[derive(Component, PartialEq, Eq, Default, Hash, Clone, Copy)]
 pub struct ChunkPosition(pub IVec3);
 

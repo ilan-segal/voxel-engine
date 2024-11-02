@@ -4,7 +4,7 @@ use bevy::{
     utils::HashMap,
 };
 use noise::NoiseFn;
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
 
 use crate::{
     block::Block,
@@ -148,7 +148,13 @@ fn update_chunks(
 
 fn generate_chunk(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
     const SCALE: f64 = 60.0;
-    let mut chunk_data = default::<ChunkData>();
+    if chunk_pos.y < 0 {
+        return Chunk::new(ChunkData::filled(Block::Stone));
+    }
+    if chunk_pos.y > 80 {
+        return Chunk::new(ChunkData::filled(Block::Air));
+    }
+    let mut chunk_data = ChunkData::default();
     for z in 0..CHUNK_SIZE {
         for x in 0..CHUNK_SIZE {
             let height = (noise.get([
@@ -175,6 +181,5 @@ fn generate_chunk(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
             }
         }
     }
-    let blocks = Arc::new(chunk_data);
-    Chunk { blocks }
+    Chunk::new(chunk_data)
 }

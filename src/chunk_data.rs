@@ -3,17 +3,22 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use crate::block::Block;
 
 pub const CHUNK_SIZE: usize = 32;
+const CHUNK_ARRAY_SIZE: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
 #[derive(Clone, Copy)]
-pub struct ChunkData([Block; CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE]);
+pub struct ChunkData([Block; CHUNK_ARRAY_SIZE]);
 
 impl Default for ChunkData {
     fn default() -> Self {
-        ChunkData([Block::Air; CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE])
+        Self::filled(Block::default())
     }
 }
 
 impl ChunkData {
+    pub fn filled(block: Block) -> Self {
+        Self([block; CHUNK_ARRAY_SIZE])
+    }
+
     pub fn at(&self, x: usize, y: usize, z: usize) -> Block {
         self.0[Self::get_array_index(x, y, z)]
     }
