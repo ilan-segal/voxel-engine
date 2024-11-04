@@ -53,27 +53,18 @@ fn on_chunk_loaded(
         return;
     };
     let data = chunk.blocks.clone();
-    index
-        .chunk_map
-        .insert(chunk_pos.0, data);
-    index.entity_map.insert(chunk_pos.0, e);
+    index.insert(chunk_pos.0, e, data);
 }
 
-fn on_chunk_unloaded(
-    trigger: Trigger<OnRemove, Chunk>,
-    query: Query<&ChunkPosition, With<Chunk>>,
-    mut index: ResMut<ChunkIndex>,
-) {
-    let Ok(chunk_pos) = query.get(trigger.entity()) else {
-        return;
-    };
-    index.chunk_map.remove(&chunk_pos.0);
+fn on_chunk_unloaded(trigger: Trigger<OnRemove, Chunk>, mut index: ResMut<ChunkIndex>) {
+    index.remove_entity(&trigger.entity());
 }
 
 #[derive(Resource, Default)]
 pub struct ChunkIndex {
-    pub chunk_map: HashMap<IVec3, Arc<ChunkData>>,
+    chunk_map: HashMap<IVec3, Arc<ChunkData>>,
     pub entity_map: HashMap<IVec3, Entity>,
+    pub pos_by_entity: HashMap<Entity, IVec3>,
 }
 
 impl ChunkIndex {
@@ -88,6 +79,19 @@ impl ChunkIndex {
                     self.chunk_map.get(&cur_pos).cloned();
             });
         return ChunkNeighborhood { chunks };
+    }
+
+    fn insert(&mut self, pos: IVec3, entity: Entity, data: Arc<ChunkData>) {
+        self.chunk_map.insert(pos, data);
+        self.entity_map.insert(pos, entity);
+        self.pos_by_entity.insert(entity, pos);
+    }
+
+    fn remove_entity(&mut self, entity: &Entity) {
+        if let Some(pos) = self.pos_by_entity.remove(entity) {
+            self.chunk_map.remove(&pos);
+            self.entity_map.remove(&pos);
+        }
     }
 }
 

@@ -19,10 +19,11 @@ impl Plugin for MeshPlugin {
             .add_systems(Startup, setup)
             .add_systems(
                 Update,
-                (
+                ((
                     (update_mesh_status, begin_mesh_gen_tasks).chain(),
-                    receive_mesh_gen_tasks.after(crate::world::WorldSet),
-                ),
+                    receive_mesh_gen_tasks,
+                )
+                    .after(crate::world::WorldSet),),
             )
             .observe(rerender_neighbors)
             .observe(end_mesh_tasks_for_unloaded_chunks);

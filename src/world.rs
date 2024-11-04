@@ -8,14 +8,14 @@ use std::collections::HashSet;
 
 use crate::{
     block::Block,
-    chunk::{Chunk, ChunkPosition},
+    chunk::{Chunk, ChunkIndex, ChunkPosition},
     chunk_data::{ChunkData, CHUNK_SIZE},
     world_noise::WorldGenNoise,
 };
 
 const WORLD_SEED: u32 = 0xDEADBEEF;
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 20;
-const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 2;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 10;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 10;
 
 pub struct WorldPlugin;
 
@@ -27,12 +27,13 @@ impl Plugin for WorldPlugin {
                 Update,
                 (
                     update_camera_chunk_position,
-                    update_chunks,
                     begin_chunk_load_tasks,
                     receive_chunk_load_tasks,
+                    (update_chunks, update_despawn_priorities, despawn_chunks).chain(),
                 )
                     .in_set(WorldSet),
-            );
+            )
+            .observe(kill_tasks_for_unloaded_chunks);
     }
 }
 
@@ -84,6 +85,19 @@ fn receive_chunk_load_tasks(mut commands: Commands, mut tasks: ResMut<ChunkLoadT
     });
 }
 
+fn kill_tasks_for_unloaded_chunks(
+    trigger: Trigger<OnRemove, Chunk>,
+    index: Res<ChunkIndex>,
+    mut tasks: ResMut<ChunkLoadTasks>,
+) {
+    if let Some(pos) = index
+        .pos_by_entity
+        .get(&trigger.entity())
+    {
+        tasks.0.remove(&ChunkPosition(*pos));
+    }
+}
+
 fn update_camera_chunk_position(
     mut q_camera: Query<(&mut ChunkPosition, &GlobalTransform), With<Camera3d>>,
 ) {
@@ -123,7 +137,9 @@ fn update_chunks(
     for (entity, chunk_pos) in q_chunk_position.iter() {
         if !should_be_loaded_positions.remove(&chunk_pos.0) {
             // The chunk should be unloaded since it's not in our set
-            commands.entity(entity).despawn();
+            commands
+                .entity(entity)
+                .insert(ToDespawn::default());
         }
     }
     // Finally, load the new chunks
@@ -142,6 +158,43 @@ fn update_chunks(
             },
         ));
     }
+}
+
+#[derive(Component, Default)]
+struct ToDespawn {
+    priority: f32,
+}
+
+fn update_despawn_priorities(
+    q_camera: Query<&GlobalTransform, With<Camera3d>>,
+    mut q_chunk: Query<(&GlobalTransform, &mut ToDespawn), Without<Camera3d>>,
+) {
+    let Ok(camera_transform) = q_camera.get_single() else {
+        return;
+    };
+    let camera_pos = camera_transform.translation();
+    q_chunk
+        .par_iter_mut()
+        .for_each(|(chunk_transform, mut despawn_flag)| {
+            let chunk_pos = chunk_transform.translation();
+            let distance = camera_pos.distance(chunk_pos);
+            despawn_flag.priority = distance;
+        })
+}
+
+const CHUNKS_DESPAWNED_PER_FRAME: usize = 10;
+
+fn despawn_chunks(q_chunk: Query<(Entity, &ToDespawn)>, mut commands: Commands) {
+    q_chunk
+        .iter()
+        // Descending order (highest distance first)
+        .sort_by::<&ToDespawn>(|a, b| {
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap()
+        })
+        .take(CHUNKS_DESPAWNED_PER_FRAME)
+        .for_each(|(entity, _)| commands.entity(entity).despawn());
 }
 
 fn generate_chunk(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
