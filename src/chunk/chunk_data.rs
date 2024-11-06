@@ -2,7 +2,8 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::block::Block;
 
-pub const CHUNK_SIZE: usize = 32;
+use super::CHUNK_SIZE;
+
 const CHUNK_ARRAY_SIZE: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
 #[derive(Clone, Copy)]

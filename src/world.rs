@@ -8,8 +8,7 @@ use std::collections::HashSet;
 
 use crate::{
     block::Block,
-    chunk::{Chunk, ChunkIndex, ChunkPosition},
-    chunk_data::{ChunkData, CHUNK_SIZE},
+    chunk::{chunk_data::ChunkData, chunk_position::ChunkPosition, Chunk, ChunkIndex, CHUNK_SIZE},
     world_noise::WorldGenNoise,
 };
 

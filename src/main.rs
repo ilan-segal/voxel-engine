@@ -7,12 +7,11 @@ use bevy::{
     render::view::{Layer, RenderLayers},
     window::CursorGrabMode,
 };
-use chunk::ChunkPosition;
+use chunk::chunk_position::ChunkPosition;
 use std::f32::consts::PI;
 
 mod block;
 mod chunk;
-mod chunk_data;
 mod debug_plugin;
 mod mesh;
 mod world;

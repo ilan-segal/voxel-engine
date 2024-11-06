@@ -2,10 +2,16 @@ use std::sync::Arc;
 
 use crate::{
     block::{Block, BlockSide},
-    chunk_data::{ChunkData, CHUNK_SIZE},
+    chunk::chunk_data::ChunkData,
 };
 use bevy::{prelude::*, utils::HashMap};
+use chunk_position::ChunkPosition;
 use itertools::Itertools;
+
+pub mod chunk_data;
+pub mod chunk_position;
+
+pub const CHUNK_SIZE: usize = 32;
 
 pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {
@@ -28,19 +34,6 @@ impl Chunk {
         Self {
             blocks: Arc::new(data),
         }
-    }
-}
-
-#[derive(Component, PartialEq, Eq, Default, Hash, Clone, Copy)]
-pub struct ChunkPosition(pub IVec3);
-
-impl ChunkPosition {
-    pub fn from_world_position(p: &Vec3) -> Self {
-        ChunkPosition(
-            (*p / (CHUNK_SIZE as f32))
-                .floor()
-                .as_ivec3(),
-        )
     }
 }
 
