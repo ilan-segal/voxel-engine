@@ -11,6 +11,7 @@ use chunk::position::ChunkPosition;
 use std::f32::consts::PI;
 
 mod block;
+mod camera_distance;
 mod chunk;
 mod debug_plugin;
 mod mesh;
@@ -36,6 +37,7 @@ fn main() {
             mesh::MeshPlugin,
             debug_plugin::DebugPlugin,
             chunk::ChunkPlugin,
+            camera_distance::CameraDistancePlugin,
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, (move_camera, toggle_wireframe))

@@ -1,5 +1,6 @@
 use crate::{
     block::Block,
+    camera_distance::CameraDistance,
     chunk::{data::ChunkData, index::ChunkIndex, position::ChunkPosition, Chunk, CHUNK_SIZE},
     world_noise::WorldGenNoise,
 };
@@ -27,7 +28,7 @@ impl Plugin for WorldPlugin {
                     update_camera_chunk_position,
                     begin_chunk_load_tasks,
                     receive_chunk_load_tasks,
-                    (update_chunks, update_despawn_priorities, despawn_chunks).chain(),
+                    (update_chunks, despawn_chunks).chain(),
                 )
                     .in_set(WorldSet),
             )
@@ -137,7 +138,7 @@ fn update_chunks(
             // The chunk should be unloaded since it's not in our set
             commands
                 .entity(entity)
-                .insert(ToDespawn::default());
+                .insert(ToDespawn);
         }
     }
     // Finally, load the new chunks
@@ -158,41 +159,22 @@ fn update_chunks(
     }
 }
 
-#[derive(Component, Default)]
-struct ToDespawn {
-    priority: f32,
-}
-
-fn update_despawn_priorities(
-    q_camera: Query<&GlobalTransform, With<Camera3d>>,
-    mut q_chunk: Query<(&GlobalTransform, &mut ToDespawn), Without<Camera3d>>,
-) {
-    let Ok(camera_transform) = q_camera.get_single() else {
-        return;
-    };
-    let camera_pos = camera_transform.translation();
-    q_chunk
-        .par_iter_mut()
-        .for_each(|(chunk_transform, mut despawn_flag)| {
-            let chunk_pos = chunk_transform.translation();
-            let distance = camera_pos.distance(chunk_pos);
-            despawn_flag.priority = distance;
-        })
-}
+#[derive(Component)]
+struct ToDespawn;
 
 const CHUNKS_DESPAWNED_PER_FRAME: usize = 10;
 
-fn despawn_chunks(q_chunk: Query<(Entity, &ToDespawn)>, mut commands: Commands) {
+fn despawn_chunks(q_chunk: Query<(Entity, &ToDespawn, &CameraDistance)>, mut commands: Commands) {
     q_chunk
         .iter()
         // Descending order (highest distance first)
-        .sort_by::<&ToDespawn>(|a, b| {
-            b.priority
-                .partial_cmp(&a.priority)
+        .sort_by::<&CameraDistance>(|a, b| {
+            b.0
+                .partial_cmp(&a.0)
                 .unwrap()
         })
         .take(CHUNKS_DESPAWNED_PER_FRAME)
-        .for_each(|(entity, _)| commands.entity(entity).despawn());
+        .for_each(|(entity, _, _)| commands.entity(entity).despawn());
 }
 
 fn generate_chunk(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
