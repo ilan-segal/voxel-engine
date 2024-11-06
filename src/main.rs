@@ -7,7 +7,7 @@ use bevy::{
     render::view::{Layer, RenderLayers},
     window::CursorGrabMode,
 };
-use chunk::chunk_position::ChunkPosition;
+use chunk::position::ChunkPosition;
 use std::f32::consts::PI;
 
 mod block;

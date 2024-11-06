@@ -1,3 +1,8 @@
+use crate::{
+    block::Block,
+    chunk::{data::ChunkData, index::ChunkIndex, position::ChunkPosition, Chunk, CHUNK_SIZE},
+    world_noise::WorldGenNoise,
+};
 use bevy::{
     prelude::*,
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
@@ -5,12 +10,6 @@ use bevy::{
 };
 use noise::NoiseFn;
 use std::collections::HashSet;
-
-use crate::{
-    block::Block,
-    chunk::{chunk_data::ChunkData, chunk_position::ChunkPosition, Chunk, ChunkIndex, CHUNK_SIZE},
-    world_noise::WorldGenNoise,
-};
 
 const WORLD_SEED: u32 = 0xDEADBEEF;
 const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 10;

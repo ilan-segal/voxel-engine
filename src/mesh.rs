@@ -1,8 +1,7 @@
 use crate::block::{Block, BlockSide};
-use crate::chunk::{
-    chunk_data::ChunkData, chunk_position::ChunkPosition, layer_to_xyz, Chunk, ChunkIndex,
-    ChunkNeighborhood, CHUNK_SIZE,
-};
+use crate::chunk::index::ChunkIndex;
+use crate::chunk::neighborhood::ChunkNeighborhood;
+use crate::chunk::{data::ChunkData, layer_to_xyz, position::ChunkPosition, Chunk, CHUNK_SIZE};
 use crate::WORLD_LAYER;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};

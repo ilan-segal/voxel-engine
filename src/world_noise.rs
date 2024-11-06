@@ -1,7 +1,6 @@
-use std::{f64::consts::E, sync::Arc};
-
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
+use std::{f64::consts::E, sync::Arc};
 
 #[derive(Resource, Clone)]
 pub struct WorldGenNoise(Arc<WorldGenNoiseInner>);

@@ -1,7 +1,6 @@
+use crate::block::BlockSide;
 use bevy::{ecs::system::lifetimeless::SQuery, prelude::*};
 use iyes_perf_ui::entry::PerfUiEntry;
-
-use crate::block::BlockSide;
 
 #[derive(Component)]
 pub struct PerfUiCameraFacing {
@@ -32,7 +31,10 @@ impl PerfUiEntry for PerfUiCameraFacing {
         &self,
         transform: &mut <Self::SystemParam as bevy::ecs::system::SystemParam>::Item<'_, '_>,
     ) -> Option<Self::Value> {
-        transform.get_single().ok().map(Transform::forward)
+        transform
+            .get_single()
+            .ok()
+            .map(Transform::forward)
     }
 
     fn format_value(&self, value: &Self::Value) -> String {

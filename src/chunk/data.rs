@@ -1,8 +1,6 @@
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-
-use crate::block::Block;
-
 use super::CHUNK_SIZE;
+use crate::block::Block;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 const CHUNK_ARRAY_SIZE: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
