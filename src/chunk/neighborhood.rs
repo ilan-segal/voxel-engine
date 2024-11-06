@@ -1,8 +1,5 @@
-use super::{data::ChunkData, layer_to_xyz};
-use crate::{
-    block::{Block, BlockSide},
-    chunk::CHUNK_SIZE,
-};
+use super::{data::ChunkData, layer_to_xyz, CHUNK_SIZE};
+use crate::block::{Block, BlockSide};
 use std::sync::Arc;
 
 /// Represents a 3x3x3 cube of chunks

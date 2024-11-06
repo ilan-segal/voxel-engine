@@ -1,15 +1,21 @@
-use crate::block::{Block, BlockSide};
-use crate::chunk::index::ChunkIndex;
-use crate::chunk::neighborhood::ChunkNeighborhood;
-use crate::chunk::{data::ChunkData, layer_to_xyz, position::ChunkPosition, Chunk, CHUNK_SIZE};
-use crate::WORLD_LAYER;
-use bevy::prelude::*;
-use bevy::render::mesh::{Indices, PrimitiveTopology};
-use bevy::render::render_asset::RenderAssetUsages;
-use bevy::render::view::RenderLayers;
-use bevy::tasks::futures_lite::future;
-use bevy::tasks::{block_on, AsyncComputeTaskPool, Task};
-use bevy::utils::HashMap;
+use crate::{
+    block::{Block, BlockSide},
+    chunk::{
+        data::ChunkData, index::ChunkIndex, layer_to_xyz, neighborhood::ChunkNeighborhood,
+        position::ChunkPosition, Chunk, CHUNK_SIZE,
+    },
+    WORLD_LAYER,
+};
+use bevy::{
+    prelude::*,
+    render::{
+        mesh::{Indices, PrimitiveTopology},
+        render_asset::RenderAssetUsages,
+        view::RenderLayers,
+    },
+    tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
+    utils::HashMap,
+};
 use itertools::Itertools;
 
 pub struct MeshPlugin;
