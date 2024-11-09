@@ -3,13 +3,14 @@ use bevy::{
         EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin,
         SystemInformationDiagnosticsPlugin,
     },
-    input::{keyboard::KeyboardInput, ButtonState},
+    input::common_conditions::input_just_pressed,
     prelude::*,
 };
 use iyes_perf_ui::{entries::PerfUiBundle, prelude::*};
 use perf_ui_camera_facing::PerfUiCameraFacing;
 use perf_ui_camera_pos::PerfUiCameraPosition;
 
+mod hitbox_frame;
 mod perf_ui_camera_facing;
 mod perf_ui_camera_pos;
 
@@ -22,11 +23,15 @@ impl Plugin for DebugPlugin {
             FrameTimeDiagnosticsPlugin,
             EntityCountDiagnosticsPlugin,
             SystemInformationDiagnosticsPlugin,
+            hitbox_frame::AabbWireframePlugin,
         ))
         .add_perf_ui_simple_entry::<PerfUiCameraPosition>()
         .add_perf_ui_simple_entry::<PerfUiCameraFacing>()
         .add_systems(Startup, setup)
-        .add_systems(Update, (toggle_debug_ui, update_debug_ui_visibility))
+        .add_systems(
+            Update,
+            toggle_debug_ui.run_if(input_just_pressed(KeyCode::F3)),
+        )
         .init_resource::<DebugUiIsVisible>();
     }
 }
@@ -37,6 +42,7 @@ fn setup(mut commands: Commands) {
         PerfUiCameraPosition::default(),
         PerfUiCameraFacing::default(),
         DebugUi,
+        Visibility::Hidden,
     ));
 }
 
@@ -46,32 +52,16 @@ struct DebugUi;
 #[derive(Resource, Default)]
 struct DebugUiIsVisible(bool);
 
-fn update_debug_ui_visibility(
+fn toggle_debug_ui(
     mut query: Query<&mut Visibility, With<DebugUi>>,
-    is_visible: Res<DebugUiIsVisible>,
+    mut is_visible: ResMut<DebugUiIsVisible>,
 ) {
+    is_visible.0 = !is_visible.0;
     for mut visibility in query.iter_mut() {
         *visibility = if is_visible.0 {
             Visibility::Visible
         } else {
             Visibility::Hidden
         };
-    }
-}
-
-fn toggle_debug_ui(
-    mut key_events: EventReader<KeyboardInput>,
-    mut is_visible: ResMut<DebugUiIsVisible>,
-) {
-    for event in key_events.read() {
-        if event.state != ButtonState::Pressed {
-            return;
-        }
-        match event.key_code {
-            KeyCode::F1 => {
-                is_visible.0 = !is_visible.0;
-            }
-            _ => {}
-        }
     }
 }
