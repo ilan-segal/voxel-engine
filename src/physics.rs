@@ -105,40 +105,40 @@ fn collide_with_terrain(
 
     // Messy but it seems solid enough
     // https://gamedev.stackexchange.com/a/199646
-    let x1 = (pos.x - 0.5 * aabb.0.x).floor();
-    let x2 = (pos.x + 0.5 * aabb.0.x).floor();
-    let y1 = (pos.y - 0.5 * aabb.0.y).floor() + 1.0;
-    let y2 = (pos.y + 0.5 * aabb.0.y).floor();
-    let z1 = (pos.z - 0.5 * aabb.0.z).floor();
-    let z2 = (pos.z + 0.5 * aabb.0.z).floor();
+    let x1 = (pos.x - aabb.neg_x).floor();
+    let x2 = (pos.x + aabb.x).floor();
+    let y1 = (pos.y - aabb.neg_y).floor() + 1.0;
+    let y2 = (pos.y + aabb.y).floor();
+    let z1 = (pos.z - aabb.neg_z).floor();
+    let z2 = (pos.z + aabb.z).floor();
 
     // Y-Axis
     if displacement.y < 0. && solid_block_is_in_range(index, x1, x2, y1, y1, z1, z2) {
-        pos.y = (y1 + 0.5 * aabb.0.y).next_up();
+        pos.y = (y1 + aabb.neg_y).next_up();
         collision = true;
     }
     if displacement.y > 0. && solid_block_is_in_range(index, x1, x2, y2, y2, z1, z2) {
-        pos.y = (y2 - 0.5 * aabb.0.y).next_down();
+        pos.y = (y2 - aabb.y).next_down();
         collision = true;
     }
 
     // X-Axis
     if displacement.x < 0. && solid_block_is_in_range(index, x1, x1, y1, y2, z1, z2) {
-        pos.x = (x1 + 0.5 * aabb.0.x + 1.0).next_up();
+        pos.x = (x1 + aabb.neg_x + 1.0).next_up();
         collision = true;
     }
     if displacement.x > 0. && solid_block_is_in_range(index, x2, x2, y1, y2, z1, z2) {
-        pos.x = (x2 - 0.5 * aabb.0.x).next_down();
+        pos.x = (x2 - aabb.x).next_down();
         collision = true;
     }
 
     // Z-Axis
     if displacement.z < 0. && solid_block_is_in_range(index, x1, x2, y1, y2, z1, z1) {
-        pos.z = (z1 + 0.5 * aabb.0.z + 1.0).next_up();
+        pos.z = (z1 + aabb.neg_z + 1.0).next_up();
         collision = true;
     }
     if displacement.z > 0. && solid_block_is_in_range(index, x1, x2, y1, y2, z2, z2) {
-        pos.z = (z2 - 0.5 * aabb.0.z).next_down();
+        pos.z = (z2 - aabb.z).next_down();
         collision = true;
     }
 

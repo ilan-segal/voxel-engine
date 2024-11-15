@@ -95,7 +95,11 @@ fn add_hitbox_frame(
                     PolylineBundle {
                         polyline: assets.cube_frame.clone(),
                         material: assets.material.clone(),
-                        transform: Transform::from_scale(aabb.0),
+                        transform: Transform {
+                            translation: aabb.get_centre_offset(),
+                            scale: aabb.get_dimensions(),
+                            ..Default::default()
+                        },
                         visibility: Visibility::Hidden,
                         ..Default::default()
                     },

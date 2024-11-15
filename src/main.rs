@@ -64,7 +64,7 @@ fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
             ..Default::default()
         },
         RenderLayers::layer(WORLD_LAYER),
-        Aabb(Vec3::new(0.35, 2.0, 0.35)),
+        Aabb::square_prism(0.35, 1.95, 1.7),
         Collidable,
         Gravity::default(),
     ));
@@ -99,7 +99,7 @@ fn move_camera(
     mut q_camera: Query<(&mut Velocity, &mut Transform), With<Camera3d>>,
 ) {
     const CAMERA_VERTICAL_BLOCKS_PER_SECOND: f32 = 10.0;
-    const CAMERA_HORIZONTAL_BLOCKS_PER_SECOND: f32 = 10.0;
+    const CAMERA_HORIZONTAL_BLOCKS_PER_SECOND: f32 = 5.0;
     for (mut v, mut transform) in q_camera.iter_mut() {
         v.0.x = 0.;
         v.0.z = 0.;
