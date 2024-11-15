@@ -1,9 +1,10 @@
 use bevy::{color::palettes::css::RED, input::common_conditions::input_just_pressed, prelude::*};
 use bevy_polyline::{
-    prelude::{Polyline, PolylineBundle, PolylineMaterial},
+    prelude::{PolylineBundle, PolylineMaterial},
     PolylinePlugin,
 };
 
+use crate::cube_frame::CubeFrameMeshHandle;
 use crate::physics::aabb::Aabb;
 
 pub struct AabbWireframePlugin;
@@ -24,54 +25,19 @@ impl Plugin for AabbWireframePlugin {
     }
 }
 
-fn setup(
-    mut commands: Commands,
-    mut polyline_materials: ResMut<Assets<PolylineMaterial>>,
-    mut polylines: ResMut<Assets<Polyline>>,
-) {
+fn setup(mut commands: Commands, mut polyline_materials: ResMut<Assets<PolylineMaterial>>) {
     let material = polyline_materials.add(PolylineMaterial {
         width: 5.0,
         color: RED.into(),
         perspective: true,
         ..default()
     });
-    /*
-    A___________B
-    |`          :\
-    | `         : \
-    Y  `        :  \
-    |   C-----------D
-    |   :       :   :
-    E__ : _X____F   :
-    `   :        \  :
-     Z  :         \ :
-      ` :          \:
-       `G___________H
-    */
-    const A: Vec3 = Vec3::new(0., 1., 0.);
-    const B: Vec3 = Vec3::new(1., 1., 0.);
-    const C: Vec3 = Vec3::new(0., 1., 1.);
-    const D: Vec3 = Vec3::new(1., 1., 1.);
-    const E: Vec3 = Vec3::new(0., 0., 0.);
-    const F: Vec3 = Vec3::new(1., 0., 0.);
-    const G: Vec3 = Vec3::new(0., 0., 1.);
-    const H: Vec3 = Vec3::new(1., 0., 1.);
-    let cube_frame = polylines.add(Polyline {
-        vertices: [A, B, D, C, A, E, F, B, F, H, D, H, G, C, G, E]
-            .iter()
-            .map(|v| *v - Vec3::ONE * 0.5)
-            .collect::<_>(),
-    });
-    commands.insert_resource(HitboxFrameAssets {
-        material,
-        cube_frame,
-    });
+    commands.insert_resource(HitboxFrameAssets { material });
 }
 
 #[derive(Resource)]
 struct HitboxFrameAssets {
     material: Handle<PolylineMaterial>,
-    cube_frame: Handle<Polyline>,
 }
 
 #[derive(Component)]
@@ -84,6 +50,7 @@ fn add_hitbox_frame(
     mut commands: Commands,
     query: Query<(Entity, &Aabb), Without<HasHitboxFrame>>,
     assets: Res<HitboxFrameAssets>,
+    mesh: Res<CubeFrameMeshHandle>,
 ) {
     for (e, aabb) in query.iter() {
         commands
@@ -93,7 +60,7 @@ fn add_hitbox_frame(
                 child_builder.spawn((
                     HitboxFrame,
                     PolylineBundle {
-                        polyline: assets.cube_frame.clone(),
+                        polyline: mesh.0.clone(),
                         material: assets.material.clone(),
                         transform: Transform {
                             translation: aabb.get_centre_offset(),

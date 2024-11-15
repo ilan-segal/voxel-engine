@@ -14,6 +14,7 @@ use std::f32::consts::PI;
 mod block;
 mod camera_distance;
 mod chunk;
+mod cube_frame;
 mod debug_plugin;
 mod mesh;
 mod physics;
@@ -35,6 +36,7 @@ fn main() {
                 ..default()
             }),
             WireframePlugin,
+            cube_frame::FramePlugin,
             world::WorldPlugin,
             mesh::MeshPlugin,
             debug_plugin::DebugPlugin,
