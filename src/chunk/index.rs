@@ -1,4 +1,8 @@
-use super::{data::ChunkData, neighborhood::ChunkNeighborhood, position::ChunkPosition, Chunk};
+use crate::block::Block;
+
+use super::{
+    data::ChunkData, neighborhood::ChunkNeighborhood, position::ChunkPosition, Chunk, CHUNK_SIZE,
+};
 use bevy::{prelude::*, utils::HashMap};
 use itertools::Itertools;
 use std::sync::Arc;
@@ -61,5 +65,24 @@ impl ChunkIndex {
             self.chunk_map.remove(&pos);
             self.entity_map.remove(&pos);
         }
+    }
+
+    pub fn at(&self, x: f32, y: f32, z: f32) -> Block {
+        let chunk_x = (x / CHUNK_SIZE as f32).floor() as i32;
+        let chunk_y = (y / CHUNK_SIZE as f32).floor() as i32;
+        let chunk_z = (z / CHUNK_SIZE as f32).floor() as i32;
+
+        let Some(chunk) = self
+            .chunk_map
+            .get(&IVec3::new(chunk_x, chunk_y, chunk_z))
+        else {
+            return Block::default();
+        };
+
+        let local_x = (x - (chunk_x * CHUNK_SIZE as i32) as f32) as usize;
+        let local_y = (y - (chunk_y * CHUNK_SIZE as i32) as f32) as usize;
+        let local_z = (z - (chunk_z * CHUNK_SIZE as i32) as f32) as usize;
+
+        return chunk.at(local_x, local_y, local_z);
     }
 }

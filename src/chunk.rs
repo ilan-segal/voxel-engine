@@ -1,5 +1,6 @@
 use crate::{block::BlockSide, chunk::data::ChunkData};
 use bevy::prelude::*;
+use position::ChunkPosition;
 use std::sync::Arc;
 
 pub mod data;
@@ -12,7 +13,8 @@ pub const CHUNK_SIZE: usize = 32;
 pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(index::ChunkIndexPlugin);
+        app.add_plugins(index::ChunkIndexPlugin)
+            .add_systems(Update, assign_chunk_position);
     }
 }
 
@@ -40,4 +42,15 @@ pub fn layer_to_xyz(side: &BlockSide, layer: i32, row: i32, col: i32) -> (i32, i
         BlockSide::East => (col, row, layer),
         BlockSide::West => (row, col, CHUNK_SIZE as i32 - 1 - layer),
     }
+}
+
+fn assign_chunk_position(
+    mut commands: Commands,
+    q: Query<(Entity, &Transform), Without<ChunkPosition>>,
+) {
+    q.iter().for_each(|(e, t)| {
+        if let Some(mut entity_commands) = commands.get_entity(e) {
+            entity_commands.insert(ChunkPosition::from_world_position(&t.translation));
+        }
+    });
 }

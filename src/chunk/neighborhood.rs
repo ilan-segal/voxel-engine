@@ -8,7 +8,7 @@ pub struct ChunkNeighborhood {
 }
 
 impl ChunkNeighborhood {
-    fn at(&self, x: i32, y: i32, z: i32) -> Block {
+    pub fn at(&self, x: i32, y: i32, z: i32) -> Block {
         fn get_chunk_pos_coord(in_chunk_coord: i32) -> (usize, usize) {
             if in_chunk_coord < 0 {
                 ((in_chunk_coord + CHUNK_SIZE as i32) as usize, 0)

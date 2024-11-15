@@ -27,12 +27,12 @@ impl Plugin for DebugPlugin {
         ))
         .add_perf_ui_simple_entry::<PerfUiCameraPosition>()
         .add_perf_ui_simple_entry::<PerfUiCameraFacing>()
-        .add_systems(Startup, setup)
+        .init_resource::<DebugUiIsVisible>()
+        .add_systems(Startup, (setup, toggle_debug_ui).chain())
         .add_systems(
             Update,
             toggle_debug_ui.run_if(input_just_pressed(KeyCode::F3)),
-        )
-        .init_resource::<DebugUiIsVisible>();
+        );
     }
 }
 
@@ -42,7 +42,6 @@ fn setup(mut commands: Commands) {
         PerfUiCameraPosition::default(),
         PerfUiCameraFacing::default(),
         DebugUi,
-        Visibility::Hidden,
     ));
 }
 

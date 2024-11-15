@@ -1,4 +1,5 @@
 #![feature(let_chains)]
+#![feature(float_next_up_down)]
 
 use bevy::{
     input::mouse::MouseMotion,
@@ -7,7 +8,7 @@ use bevy::{
     render::view::{Layer, RenderLayers},
     window::CursorGrabMode,
 };
-use chunk::position::ChunkPosition;
+use physics::{aabb::Aabb, collision::Collidable, gravity::Gravity, velocity::Velocity};
 use std::f32::consts::PI;
 
 mod block;
@@ -15,6 +16,7 @@ mod camera_distance;
 mod chunk;
 mod debug_plugin;
 mod mesh;
+mod physics;
 mod world;
 mod world_noise;
 
@@ -38,6 +40,7 @@ fn main() {
             debug_plugin::DebugPlugin,
             chunk::ChunkPlugin,
             camera_distance::CameraDistancePlugin,
+            physics::PhysicsPlugin,
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, (move_camera, toggle_wireframe))
@@ -53,15 +56,17 @@ fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
     window.cursor.visible = false;
     window.cursor.grab_mode = CursorGrabMode::Locked;
 
-    let camera_pos = Transform::from_xyz(0.0, 60.0, 0.0);
+    let camera_pos = Transform::from_xyz(0.0, 80.0, 0.0);
 
     commands.spawn((
         Camera3dBundle {
             transform: camera_pos.looking_to(Vec3::X, Vec3::Y),
             ..Default::default()
         },
-        ChunkPosition::default(),
         RenderLayers::layer(WORLD_LAYER),
+        Aabb(Vec3::new(0.35, 2.0, 0.35)),
+        Collidable,
+        Gravity::default(),
     ));
 
     commands.spawn(DirectionalLightBundle {
@@ -89,21 +94,20 @@ fn toggle_wireframe(
 }
 
 fn move_camera(
-    time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
     mut mouse_events: EventReader<MouseMotion>,
-    mut q_camera: Query<&mut Transform, With<Camera3d>>,
+    mut q_camera: Query<(&mut Velocity, &mut Transform), With<Camera3d>>,
 ) {
-    const CAMERA_VERTICAL_BLOCKS_PER_SECOND: f32 = 30.0;
+    const CAMERA_VERTICAL_BLOCKS_PER_SECOND: f32 = 10.0;
     const CAMERA_HORIZONTAL_BLOCKS_PER_SECOND: f32 = 10.0;
-    for mut transform in q_camera.iter_mut() {
+    for (mut v, mut transform) in q_camera.iter_mut() {
+        v.0.x = 0.;
+        v.0.z = 0.;
         if keys.pressed(KeyCode::Space) {
-            transform.translation.y +=
-                CAMERA_VERTICAL_BLOCKS_PER_SECOND * BLOCK_SIZE * time.delta_seconds();
+            v.0.y = CAMERA_VERTICAL_BLOCKS_PER_SECOND * BLOCK_SIZE;
         }
         if keys.pressed(KeyCode::ShiftLeft) {
-            transform.translation.y -=
-                CAMERA_VERTICAL_BLOCKS_PER_SECOND * BLOCK_SIZE * time.delta_seconds();
+            v.0.y -= CAMERA_VERTICAL_BLOCKS_PER_SECOND * BLOCK_SIZE;
         }
         let mut horizontal_movement = Vec3::ZERO;
         if keys.pressed(KeyCode::KeyW) {
@@ -125,13 +129,12 @@ fn move_camera(
             let mut real_horizontal = (Quat::from_rotation_y(yaw) * horizontal_movement)
                 .normalize()
                 * CAMERA_HORIZONTAL_BLOCKS_PER_SECOND
-                * BLOCK_SIZE
-                * time.delta_seconds();
+                * BLOCK_SIZE;
 
             if keys.pressed(KeyCode::ControlLeft) {
                 real_horizontal *= 10.0;
             }
-            transform.translation += real_horizontal;
+            v.0 += real_horizontal;
         }
 
         const CAMERA_MOUSE_SENSITIVITY_X: f32 = 0.004;
