@@ -1,8 +1,8 @@
 use core::f32;
 
 use aabb::Aabb;
-use bevy::{ecs::query::QueryData, prelude::*};
-use collision::Collidable;
+use bevy::{ecs::query::QueryData, math::VectorSpace, prelude::*};
+use collision::{Collidable, Collision};
 use gravity::Gravity;
 use velocity::Velocity;
 
@@ -17,14 +17,30 @@ pub struct PhysicsPlugin;
 
 impl Plugin for PhysicsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (
-                add_velocity,
-                (apply_gravity, apply_velocity_with_terrain_collision).chain(),
-            ),
-        );
+        app.add_event::<Collision>()
+            .configure_sets(
+                Update,
+                PhysicsSystemSet::Act.before(PhysicsSystemSet::React),
+            )
+            .add_systems(
+                Update,
+                (
+                    add_velocity,
+                    (apply_gravity, apply_velocity_with_terrain_collision)
+                        .chain()
+                        .in_set(PhysicsSystemSet::Act),
+                    stop_velocity_from_collisions.in_set(PhysicsSystemSet::React),
+                ),
+            );
     }
+}
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum PhysicsSystemSet {
+    /// Act according to current physical conditions such as gravity, velocity, and collision.
+    Act,
+    /// Process results of the `Act` phase such as collision events.
+    React,
 }
 
 fn add_velocity(mut commands: Commands, q: Query<Entity, (With<Transform>, Without<Velocity>)>) {
@@ -41,20 +57,41 @@ fn apply_gravity(mut q_object: Query<(&Gravity, &mut Velocity)>, time: Res<Time>
     }
 }
 
+fn stop_velocity_from_collisions(
+    mut q_object: Query<&mut Velocity>,
+    mut collisions: EventReader<Collision>,
+) {
+    for Collision { entity, normal } in collisions.read() {
+        let Ok(mut v) = q_object.get_mut(*entity) else {
+            continue;
+        };
+        if normal.x != 0. {
+            v.0.x = 0.;
+        }
+        if normal.y != 0. {
+            v.0.y = 0.;
+        }
+        if normal.z != 0. {
+            v.0.z = 0.;
+        }
+    }
+}
+
 #[derive(QueryData)]
 #[query_data(mutable)]
 struct MovingObjectQuery {
+    entity: Entity,
     transform: &'static mut Transform,
     v: &'static mut Velocity,
     aabb: &'static Aabb,
     chunk_position: &'static ChunkPosition,
-    collidable: Option<&'static Collidable>,
 }
 
 fn apply_velocity_with_terrain_collision(
-    mut q_object: Query<MovingObjectQuery>,
+    mut q_object: Query<MovingObjectQuery, With<Collidable>>,
     chunk_index: Res<ChunkIndex>,
     time: Res<Time>,
+    mut collisions: EventWriter<Collision>,
 ) {
     for mut object in q_object.iter_mut() {
         let full_displacement = object.v.0 * time.delta_seconds();
@@ -80,14 +117,21 @@ fn apply_velocity_with_terrain_collision(
             &full_displacement.with_x(0.).with_y(0.),
             &chunk_index,
         );
-        if collide_x {
-            object.v.0.x = 0.;
+        let mut collision_normal = object.v.0 * -1.0;
+        if !collide_x {
+            collision_normal.x = 0.;
         }
-        if collide_y {
-            object.v.0.y = 0.;
+        if !collide_y {
+            collision_normal.y = 0.;
         }
-        if collide_z {
-            object.v.0.z = 0.;
+        if !collide_z {
+            collision_normal.z = 0.;
+        }
+        if collision_normal != Vec3::ZERO {
+            collisions.send(Collision {
+                normal: Dir3::new(collision_normal).expect("Already checked for non-zero"),
+                entity: object.entity,
+            });
         }
         object.transform.translation = pos;
     }
