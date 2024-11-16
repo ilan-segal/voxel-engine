@@ -44,7 +44,11 @@ impl Default for PlayerBundle {
             player: Player,
             camera: Camera3dBundle {
                 transform: camera_pos.looking_to(Vec3::X, Vec3::Y),
-                ..Default::default()
+                projection: Projection::Perspective(PerspectiveProjection {
+                    fov: 70_f32.to_radians(),
+                    ..default()
+                }),
+                ..default()
             },
             aabb: Aabb::square_prism(0.35, 1.8, 1.65),
             collidable: Collidable,
