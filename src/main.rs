@@ -4,13 +4,12 @@
 #![feature(iter_map_windows)]
 
 use bevy::{
-    input::mouse::MouseMotion,
     pbr::wireframe::{WireframeConfig, WireframePlugin},
     prelude::*,
     render::view::RenderLayers,
     window::CursorGrabMode,
 };
-use physics::{aabb::Aabb, collision::Collidable, gravity::Gravity, velocity::Velocity};
+use physics::{aabb::Aabb, collision::Collidable, gravity::Gravity};
 use player::Player;
 use render_layer::WORLD_LAYER;
 use std::f32::consts::PI;
@@ -18,6 +17,7 @@ use std::f32::consts::PI;
 mod block;
 mod camera_distance;
 mod chunk;
+mod controls;
 mod cube_frame;
 mod debug_plugin;
 mod mesh;
@@ -51,9 +51,10 @@ fn main() {
             physics::PhysicsPlugin,
             player::PlayerPlugin,
             ui::UiPlugin,
+            controls::ControlsPlugin,
         ))
         .add_systems(Startup, setup)
-        .add_systems(Update, (move_camera, toggle_wireframe))
+        .add_systems(Update, toggle_wireframe)
         .insert_resource(ClearColor(
             Color::linear_rgb(0.25, 0.60, 0.92).with_luminance(0.5),
         ))
@@ -101,69 +102,5 @@ fn toggle_wireframe(
 ) {
     if keyboard.just_pressed(KeyCode::Backquote) {
         wireframe_config.global = !wireframe_config.global;
-    }
-}
-
-fn move_camera(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut mouse_events: EventReader<MouseMotion>,
-    mut q_camera: Query<(&mut Velocity, &mut Transform), With<Camera3d>>,
-) {
-    const CAMERA_VERTICAL_BLOCKS_PER_SECOND: f32 = 10.0;
-    const CAMERA_HORIZONTAL_BLOCKS_PER_SECOND: f32 = 5.0;
-    for (mut v, mut transform) in q_camera.iter_mut() {
-        v.0.x = 0.;
-        v.0.z = 0.;
-        if keys.pressed(KeyCode::Space) {
-            v.0.y = CAMERA_VERTICAL_BLOCKS_PER_SECOND * BLOCK_SIZE;
-        }
-        if keys.pressed(KeyCode::ShiftLeft) {
-            v.0.y -= CAMERA_VERTICAL_BLOCKS_PER_SECOND * BLOCK_SIZE;
-        }
-        let mut horizontal_movement = Vec3::ZERO;
-        if keys.pressed(KeyCode::KeyW) {
-            horizontal_movement.z -= 1.0;
-        }
-        if keys.pressed(KeyCode::KeyS) {
-            horizontal_movement.z += 1.0;
-        }
-        if keys.pressed(KeyCode::KeyA) {
-            horizontal_movement.x -= 1.0;
-        }
-        if keys.pressed(KeyCode::KeyD) {
-            horizontal_movement.x += 1.0;
-        }
-        if horizontal_movement != Vec3::ZERO {
-            let (yaw, _, _) = transform
-                .rotation
-                .to_euler(EulerRot::YXZ);
-            let mut real_horizontal = (Quat::from_rotation_y(yaw) * horizontal_movement)
-                .normalize()
-                * CAMERA_HORIZONTAL_BLOCKS_PER_SECOND
-                * BLOCK_SIZE;
-
-            if keys.pressed(KeyCode::ControlLeft) {
-                real_horizontal *= 10.0;
-            }
-            v.0 += real_horizontal;
-        }
-
-        const CAMERA_MOUSE_SENSITIVITY_X: f32 = 0.004;
-        const CAMERA_MOUSE_SENSITIVITY_Y: f32 = 0.0025;
-        for MouseMotion { delta } in mouse_events.read() {
-            transform.rotate_axis(Dir3::NEG_Y, delta.x * CAMERA_MOUSE_SENSITIVITY_X);
-            let (yaw, mut pitch, _) = transform
-                .rotation
-                .to_euler(EulerRot::YXZ);
-            pitch = (pitch - delta.y * CAMERA_MOUSE_SENSITIVITY_Y).clamp(-PI * 0.5, PI * 0.5);
-            transform.rotation = Quat::from_euler(
-                // YXZ order corresponds to the common
-                // "yaw"/"pitch"/"roll" convention
-                EulerRot::YXZ,
-                yaw,
-                pitch,
-                0.0,
-            );
-        }
     }
 }
