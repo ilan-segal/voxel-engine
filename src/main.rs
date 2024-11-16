@@ -42,16 +42,16 @@ fn main() {
                 ..default()
             }),
             WireframePlugin,
-            cube_frame::FramePlugin,
-            world::WorldPlugin,
-            mesh::MeshPlugin,
-            debug_plugin::DebugPlugin,
-            chunk::ChunkPlugin,
             camera_distance::CameraDistancePlugin,
+            chunk::ChunkPlugin,
+            controls::ControlsPlugin,
+            cube_frame::FramePlugin,
+            debug_plugin::DebugPlugin,
+            mesh::MeshPlugin,
             physics::PhysicsPlugin,
             player::PlayerPlugin,
             ui::UiPlugin,
-            controls::ControlsPlugin,
+            world::WorldPlugin,
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, toggle_wireframe)
