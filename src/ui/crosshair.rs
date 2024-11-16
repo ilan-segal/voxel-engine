@@ -28,7 +28,7 @@ fn spawn_crosshair(
                 style: Style {
                     width: Val::Px(CROSSHAIR_WIDTH),
                     height: Val::Px(CROSSHAIR_WIDTH),
-                    justify_self: JustifySelf::Center,
+                    align_self: AlignSelf::Center,
                     ..default()
                 },
                 ..default()
