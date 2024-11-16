@@ -67,21 +67,26 @@ impl ChunkIndex {
         }
     }
 
+    pub fn at_pos(&self, pos: &IVec3) -> Block {
+        self.at_i(pos.x, pos.y, pos.z)
+    }
+
     pub fn at(&self, x: f32, y: f32, z: f32) -> Block {
-        let chunk_x = (x / CHUNK_SIZE as f32).floor() as i32;
-        let chunk_y = (y / CHUNK_SIZE as f32).floor() as i32;
-        let chunk_z = (z / CHUNK_SIZE as f32).floor() as i32;
+        self.at_i(x.floor() as i32, y.floor() as i32, z.floor() as i32)
+    }
 
-        let Some(chunk) = self
-            .chunk_map
-            .get(&IVec3::new(chunk_x, chunk_y, chunk_z))
-        else {
-            return Block::default();
-        };
+    pub fn at_i(&self, x: i32, y: i32, z: i32) -> Block {
+        let chunk_size = CHUNK_SIZE as i32;
 
-        let local_x = (x - (chunk_x * CHUNK_SIZE as i32) as f32) as usize;
-        let local_y = (y - (chunk_y * CHUNK_SIZE as i32) as f32) as usize;
-        let local_z = (z - (chunk_z * CHUNK_SIZE as i32) as f32) as usize;
+        let chunk_x = x.div_floor(chunk_size);
+        let chunk_y = y.div_floor(chunk_size);
+        let chunk_z = z.div_floor(chunk_size);
+
+        let chunk = self.get_neighborhood(&IVec3::new(chunk_x, chunk_y, chunk_z));
+
+        let local_x = x - chunk_x * chunk_size;
+        let local_y = y - chunk_y * chunk_size;
+        let local_z = z - chunk_z * chunk_size;
 
         return chunk.at(local_x, local_y, local_z);
     }

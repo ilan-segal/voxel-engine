@@ -40,11 +40,11 @@ impl PerfUiEntry for PerfUiCameraFacing {
     fn format_value(&self, value: &Self::Value) -> String {
         let v = value.as_vec3();
         format!(
-            "{:?} ({:.2} / {:.2} / {:.2})",
-            BlockSide::from(*value),
+            "{:.2} / {:.2} / {:.2} ({:?})",
             v.x,
             v.y,
-            v.z
+            v.z,
+            BlockSide::from(*value),
         )
     }
 

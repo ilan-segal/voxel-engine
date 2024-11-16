@@ -5,9 +5,12 @@ pub struct FramePlugin;
 
 impl Plugin for FramePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup);
+        app.add_systems(Startup, setup.in_set(CubeFrameSetup));
     }
 }
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CubeFrameSetup;
 
 #[derive(Resource)]
 pub struct CubeFrameMeshHandle(pub Handle<Polyline>);

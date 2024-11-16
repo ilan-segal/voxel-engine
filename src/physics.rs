@@ -107,14 +107,14 @@ fn collide_with_terrain(
     // https://gamedev.stackexchange.com/a/199646
     let x1 = (pos.x - aabb.neg_x).floor();
     let x2 = (pos.x + aabb.x).floor();
-    let y1 = (pos.y - aabb.neg_y).floor() + 1.0;
+    let y1 = (pos.y - aabb.neg_y).floor();
     let y2 = (pos.y + aabb.y).floor();
     let z1 = (pos.z - aabb.neg_z).floor();
     let z2 = (pos.z + aabb.z).floor();
 
     // Y-Axis
     if displacement.y < 0. && solid_block_is_in_range(index, x1, x2, y1, y1, z1, z2) {
-        pos.y = (y1 + aabb.neg_y).next_up();
+        pos.y = (y1 + aabb.neg_y + 1.0).next_up();
         collision = true;
     }
     if displacement.y > 0. && solid_block_is_in_range(index, x1, x2, y2, y2, z1, z2) {

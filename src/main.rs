@@ -1,14 +1,18 @@
 #![feature(let_chains)]
 #![feature(float_next_up_down)]
+#![feature(int_roundings)]
+#![feature(iter_map_windows)]
 
 use bevy::{
     input::mouse::MouseMotion,
     pbr::wireframe::{WireframeConfig, WireframePlugin},
     prelude::*,
-    render::view::{Layer, RenderLayers},
+    render::view::RenderLayers,
     window::CursorGrabMode,
 };
 use physics::{aabb::Aabb, collision::Collidable, gravity::Gravity, velocity::Velocity};
+use player::Player;
+use render_layer::WORLD_LAYER;
 use std::f32::consts::PI;
 
 mod block;
@@ -18,11 +22,12 @@ mod cube_frame;
 mod debug_plugin;
 mod mesh;
 mod physics;
+mod player;
+mod render_layer;
 mod world;
 mod world_noise;
 
 const BLOCK_SIZE: f32 = 1.0;
-const WORLD_LAYER: Layer = 0;
 
 fn main() {
     App::new()
@@ -43,6 +48,7 @@ fn main() {
             chunk::ChunkPlugin,
             camera_distance::CameraDistancePlugin,
             physics::PhysicsPlugin,
+            player::PlayerPlugin,
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, (move_camera, toggle_wireframe))
@@ -61,6 +67,7 @@ fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
     let camera_pos = Transform::from_xyz(0.0, 80.0, 0.0);
 
     commands.spawn((
+        Player,
         Camera3dBundle {
             transform: camera_pos.looking_to(Vec3::X, Vec3::Y),
             ..Default::default()
