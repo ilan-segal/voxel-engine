@@ -1,7 +1,7 @@
 use core::f32;
 
 use aabb::Aabb;
-use bevy::{ecs::query::QueryData, math::VectorSpace, prelude::*};
+use bevy::{ecs::query::QueryData, prelude::*};
 use collision::{Collidable, Collision};
 use gravity::Gravity;
 use velocity::Velocity;

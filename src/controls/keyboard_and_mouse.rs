@@ -1,17 +1,23 @@
 use std::f32::consts::PI;
 
-use bevy::{input::mouse::MouseMotion, prelude::*};
+use bevy::{ecs::query::QueryData, input::mouse::MouseMotion, prelude::*};
 
 use crate::{
-    physics::{gravity::Gravity, velocity::Velocity},
-    player::Player,
+    physics::{gravity::Gravity, velocity::Velocity, PhysicsSystemSet},
+    player::{falling_state::FallingState, Player},
 };
 
 pub struct KeyboardMousePlugin;
 
 impl Plugin for KeyboardMousePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (rotate_camera_with_mouse, process_keyboard_inputs));
+        app.add_systems(
+            Update,
+            (
+                rotate_camera_with_mouse,
+                process_keyboard_inputs.before(PhysicsSystemSet::Act),
+            ),
+        );
     }
 }
 
@@ -42,17 +48,26 @@ fn rotate_camera_with_mouse(
     }
 }
 
+#[derive(QueryData)]
+#[query_data(mutable)]
+struct KeyboardInputQuery {
+    v: &'static mut Velocity,
+    t: &'static Transform,
+    g: &'static Gravity,
+    falling_state: &'static FallingState,
+}
+
 fn process_keyboard_inputs(
     keys: Res<ButtonInput<KeyCode>>,
-    mut q_velocity: Query<(&mut Velocity, &Transform, &Gravity), With<Player>>,
+    mut q_velocity: Query<KeyboardInputQuery, With<Player>>,
 ) {
-    const WALK_SPEED: f32 = 5.0;
-    const RUN_SPEED: f32 = 10.0;
-    let Some((mut v, t, g)) = q_velocity.get_single_mut().ok() else {
+    const WALK_SPEED: f32 = 4.5;
+    const RUN_SPEED: f32 = WALK_SPEED * 1.5;
+    let Ok(mut object) = q_velocity.get_single_mut() else {
         return;
     };
-    v.0.x = 0.;
-    v.0.z = 0.;
+    object.v.0.x = 0.;
+    object.v.0.z = 0.;
     let mut v_horizontal = Vec3::ZERO;
     if keys.pressed(KeyCode::KeyW) {
         v_horizontal.z -= 1.0;
@@ -67,20 +82,23 @@ fn process_keyboard_inputs(
         v_horizontal.x += 1.0;
     }
     if v_horizontal != Vec3::ZERO {
-        let (yaw, _, _) = t.rotation.to_euler(EulerRot::YXZ);
+        let (yaw, _, _) = object
+            .t
+            .rotation
+            .to_euler(EulerRot::YXZ);
         v_horizontal = (Quat::from_rotation_y(yaw) * v_horizontal).normalize();
         if keys.pressed(KeyCode::ControlLeft) {
             v_horizontal *= RUN_SPEED;
         } else {
             v_horizontal *= WALK_SPEED;
         }
-        v.0 += v_horizontal;
+        object.v.0 += v_horizontal;
     }
 
     const JUMP_HEIGHT: f32 = 1.25;
-    let jump_speed = square_root_v(-2.0 * g.0 * JUMP_HEIGHT);
-    if keys.just_pressed(KeyCode::Space) {
-        v.0 += jump_speed;
+    let jump_speed = square_root_v(-2.0 * object.g.0 * JUMP_HEIGHT);
+    if keys.pressed(KeyCode::Space) && object.falling_state == &FallingState::Grounded {
+        object.v.0 = jump_speed;
     }
 }
 

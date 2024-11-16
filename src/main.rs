@@ -9,8 +9,7 @@ use bevy::{
     render::view::RenderLayers,
     window::CursorGrabMode,
 };
-use physics::{aabb::Aabb, collision::Collidable, gravity::Gravity};
-use player::Player;
+use player::PlayerBundle;
 use render_layer::WORLD_LAYER;
 use std::f32::consts::PI;
 
@@ -67,19 +66,7 @@ fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
     window.cursor.visible = false;
     window.cursor.grab_mode = CursorGrabMode::Locked;
 
-    let camera_pos = Transform::from_xyz(0.0, 80.0, 0.0);
-
-    commands.spawn((
-        Player,
-        Camera3dBundle {
-            transform: camera_pos.looking_to(Vec3::X, Vec3::Y),
-            ..Default::default()
-        },
-        RenderLayers::layer(WORLD_LAYER),
-        Aabb::square_prism(0.35, 1.95, 1.7),
-        Collidable,
-        Gravity::default(),
-    ));
+    commands.spawn((PlayerBundle::default(), RenderLayers::layer(WORLD_LAYER)));
 
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
