@@ -24,6 +24,7 @@ mod mesh;
 mod physics;
 mod player;
 mod render_layer;
+mod ui;
 mod world;
 mod world_noise;
 
@@ -49,6 +50,7 @@ fn main() {
             camera_distance::CameraDistancePlugin,
             physics::PhysicsPlugin,
             player::PlayerPlugin,
+            ui::UiPlugin,
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, (move_camera, toggle_wireframe))
