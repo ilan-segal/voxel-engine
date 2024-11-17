@@ -213,21 +213,5 @@ fn generate_chunk(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
         }
     }
 
-    // the almighty debug sphere
-    const SPHERE_CENTER: Vec3 = Vec3::new(20.0, 20.0, 20.0);
-    const SPHERE_RADIUS: f32 = 4.0;
-    for x in 0..CHUNK_SIZE {
-        for y in 0..CHUNK_SIZE {
-            for z in 0..CHUNK_SIZE {
-                let pos = Vec3::new(x as f32, y as f32, z as f32);
-                let distance_from_center = SPHERE_CENTER.distance(pos);
-                if distance_from_center > SPHERE_RADIUS {
-                    continue;
-                }
-                *chunk_data.at_mut(x, y, z) = Block::Stone;
-            }
-        }
-    }
-
     Chunk::new(chunk_data)
 }

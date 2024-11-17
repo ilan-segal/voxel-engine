@@ -9,6 +9,7 @@ struct WorldGenNoiseInner {
     noise_a: StackedNoise,
     noise_b: StackedNoise,
     regime: NoiseGenerator,
+    sharpener: NoiseGenerator,
 }
 
 impl WorldGenNoise {
@@ -60,6 +61,12 @@ impl WorldGenNoise {
                 amplitude: 1.0,
                 offset: 0.0,
             },
+            sharpener: NoiseGenerator {
+                perlin: Perlin::new(seed << 2),
+                scale: 150.0,
+                amplitude: 1.0,
+                offset: 0.0,
+            },
         };
         Self(Arc::new(inner))
     }
@@ -68,7 +75,8 @@ impl WorldGenNoise {
 impl NoiseFn<i32, 2> for WorldGenNoise {
     fn get(&self, point: [i32; 2]) -> f64 {
         let naive_regime = (self.0.regime.get(point) + 1.0) * 0.5;
-        let regime = sharpen_noise(naive_regime, 20.0);
+        let sharpness = (self.0.sharpener.get(point) + 1.0) * 0.5 * 59.0 + 1.0;
+        let regime = sharpen_noise(naive_regime, sharpness);
         let sample_a = self.0.noise_a.get(point);
         let sample_b = self.0.noise_b.get(point) * 0.5 + 1.0;
         return regime * sample_a + (1.0 - regime) * sample_b;

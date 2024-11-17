@@ -28,6 +28,7 @@ mod world;
 mod world_noise;
 
 const BLOCK_SIZE: f32 = 1.0;
+const SKY_COLOUR: Color = Color::linear_rgb(0.25, 0.60, 0.92);
 
 fn main() {
     App::new()
@@ -54,9 +55,7 @@ fn main() {
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, toggle_wireframe)
-        .insert_resource(ClearColor(
-            Color::linear_rgb(0.25, 0.60, 0.92).with_luminance(0.5),
-        ))
+        .insert_resource(ClearColor(SKY_COLOUR))
         .insert_resource(Msaa::Sample8)
         .run();
 }
