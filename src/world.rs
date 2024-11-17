@@ -186,6 +186,7 @@ fn generate_chunk(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
         return Chunk::new(ChunkData::filled(Block::Air));
     }
     let mut chunk_data = ChunkData::default();
+    const DIRT_DEPTH: usize = 2;
     for z in 0..CHUNK_SIZE {
         for x in 0..CHUNK_SIZE {
             let height = (noise.get([
@@ -199,12 +200,14 @@ fn generate_chunk(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
             else {
                 continue;
             };
-            if chunk_height >= 1 {
-                for y in (0..chunk_height - 1).filter(|h| h < &CHUNK_SIZE) {
+            if chunk_height >= DIRT_DEPTH - 1 {
+                for y in (0..=chunk_height - (DIRT_DEPTH - 1)).filter(|h| h < &CHUNK_SIZE) {
                     *chunk_data.at_mut(x, y, z) = Block::Stone;
                 }
-                if chunk_height - 1 < CHUNK_SIZE {
-                    *chunk_data.at_mut(x, chunk_height - 1, z) = Block::Dirt;
+            }
+            if chunk_height >= DIRT_DEPTH {
+                for y in (chunk_height - DIRT_DEPTH..chunk_height).filter(|h| h < &CHUNK_SIZE) {
+                    *chunk_data.at_mut(x, y, z) = Block::Dirt;
                 }
             }
             if chunk_height < CHUNK_SIZE {
