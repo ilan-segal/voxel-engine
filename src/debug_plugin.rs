@@ -11,6 +11,7 @@ use perf_ui_camera_facing::PerfUiCameraFacing;
 use perf_ui_camera_pos::PerfUiCameraPosition;
 use perf_ui_targeted_block::PerfUiTargetedBlock;
 
+mod chunk_border;
 mod hitbox_frame;
 mod perf_ui_camera_facing;
 mod perf_ui_camera_pos;
@@ -26,6 +27,7 @@ impl Plugin for DebugPlugin {
             EntityCountDiagnosticsPlugin,
             SystemInformationDiagnosticsPlugin,
             hitbox_frame::AabbWireframePlugin,
+            chunk_border::ChunkBorderPlugin,
         ))
         .add_perf_ui_simple_entry::<PerfUiCameraPosition>()
         .add_perf_ui_simple_entry::<PerfUiCameraFacing>()
