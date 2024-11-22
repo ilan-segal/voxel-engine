@@ -16,7 +16,6 @@ use std::f32::consts::PI;
 mod block;
 mod camera_distance;
 mod chunk;
-mod controls;
 mod cube_frame;
 mod debug_plugin;
 mod mesh;
@@ -25,7 +24,6 @@ mod player;
 mod render_layer;
 mod ui;
 mod world;
-mod world_noise;
 
 const BLOCK_SIZE: f32 = 1.0;
 const SKY_COLOUR: Color = Color::linear_rgb(0.25, 0.60, 0.92);
@@ -44,7 +42,6 @@ fn main() {
             WireframePlugin,
             camera_distance::CameraDistancePlugin,
             chunk::ChunkPlugin,
-            controls::ControlsPlugin,
             cube_frame::FramePlugin,
             debug_plugin::DebugPlugin,
             mesh::MeshPlugin,

@@ -14,13 +14,14 @@ use crate::{
 };
 
 pub mod block_target;
+mod controls;
 pub mod falling_state;
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(BlockTargetPlugin)
+        app.add_plugins((BlockTargetPlugin, controls::ControlsPlugin))
             .add_systems(
                 Update,
                 update_grounded_state

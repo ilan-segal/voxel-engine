@@ -2,7 +2,6 @@ use crate::{
     block::Block,
     camera_distance::CameraDistance,
     chunk::{data::ChunkData, index::ChunkIndex, position::ChunkPosition, Chunk, CHUNK_SIZE},
-    world_noise::WorldGenNoise,
 };
 use bevy::{
     prelude::*,
@@ -11,10 +10,13 @@ use bevy::{
 };
 use noise::NoiseFn;
 use std::collections::HashSet;
+use world_noise::WorldGenNoise;
 
 const WORLD_SEED: u32 = 0xDEADBEEF;
 const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 10;
 const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 10;
+
+mod world_noise;
 
 pub struct WorldPlugin;
 
