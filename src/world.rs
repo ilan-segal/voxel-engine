@@ -23,7 +23,8 @@ pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ChunkLoadTasks>()
+        app.add_plugins(seed::SeedPlugin)
+            .init_resource::<ChunkLoadTasks>()
             .add_systems(Startup, init_noise.after(LoadSeed))
             .add_systems(
                 Update,
