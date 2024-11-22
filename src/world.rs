@@ -9,21 +9,22 @@ use bevy::{
     utils::HashMap,
 };
 use noise::NoiseFn;
+use seed::{LoadSeed, WorldSeed};
 use std::collections::HashSet;
 use world_noise::WorldGenNoise;
 
-const WORLD_SEED: u32 = 0xDEADBEEF;
 const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 10;
 const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 10;
 
+mod seed;
 mod world_noise;
 
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(WorldGenNoise::new(WORLD_SEED))
-            .init_resource::<ChunkLoadTasks>()
+        app.init_resource::<ChunkLoadTasks>()
+            .add_systems(Startup, init_noise.after(LoadSeed))
             .add_systems(
                 Update,
                 (
@@ -36,6 +37,10 @@ impl Plugin for WorldPlugin {
             )
             .observe(kill_tasks_for_unloaded_chunks);
     }
+}
+
+fn init_noise(mut commands: Commands, seed: Res<WorldSeed>) {
+    commands.insert_resource(WorldGenNoise::new(seed.0));
 }
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
