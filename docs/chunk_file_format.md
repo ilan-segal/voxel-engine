@@ -7,7 +7,7 @@ Each chunk file is named according to the following format:
 `{dimension_id}_{chunk_x}_{chunk_y}_{chunk_z}.chunkdata`
 
 A breakdown of this format:
-- `dimension_id` is any string of legal characters *except for the underscore (`_`)*. This field is a future-proofing measure in the game features multiple dimensions in a future version.
+- `dimension_id` is any string of characters which can be used in a file name. This field is a future-proofing measure, allowing the game to support multiple dimensions in a future version.
   - **Note:** There is currently only one supported dimension (the "overworld"). This dimension has the identifier `overworld`, **and that is the only legal value of `dimension_id` at this time.** 
 - Each of `chunk_x`, `chunk_y` and `chunk_z` is any combination of digits 0-9, potentially preceded by a dash (`-`) to indicate a negative integer. These fields define to the position of the chunk in the world.
 

@@ -18,6 +18,7 @@ mod camera_distance;
 mod chunk;
 mod cube_frame;
 mod debug_plugin;
+mod file_io;
 mod mesh;
 mod physics;
 mod player;
@@ -44,6 +45,7 @@ fn main() {
             chunk::ChunkPlugin,
             cube_frame::FramePlugin,
             debug_plugin::DebugPlugin,
+            // file_io::FileIOPlugin,
             mesh::MeshPlugin,
             physics::PhysicsPlugin,
             player::PlayerPlugin,

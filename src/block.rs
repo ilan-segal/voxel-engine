@@ -1,12 +1,21 @@
+use serde::{Deserialize, Serialize};
+
 use bevy::prelude::*;
 
-#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug, Deserialize, Serialize, Hash)]
 pub enum Block {
     #[default]
     Air,
     Stone,
     Dirt,
     Grass,
+}
+
+// Required for Block to work as a key in hashmap operations `entry_ref` + `or_insert_with`
+impl From<&Block> for Block {
+    fn from(value: &Block) -> Self {
+        *value
+    }
 }
 
 impl Block {
