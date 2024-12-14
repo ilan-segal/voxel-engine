@@ -1,3 +1,5 @@
+use std::sync::RwLockReadGuard;
+
 use crate::{
     block::Block,
     chunk::{data::ChunkData, CHUNK_SIZE},
@@ -12,8 +14,8 @@ pub enum ChunkFileData {
     Version1 { specs: Vec<BlockSpec> },
 }
 
-impl From<&ChunkData> for ChunkFileData {
-    fn from(value: &ChunkData) -> Self {
+impl<'a> From<RwLockReadGuard<'a, ChunkData>> for ChunkFileData {
+    fn from(value: RwLockReadGuard<'a, ChunkData>) -> Self {
         const SKIPPED_BLOCK: Block = Block::Air;
         let mut block_positions: HashMap<Block, _> = HashMap::new();
         for x in 0..CHUNK_SIZE {

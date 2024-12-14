@@ -1,7 +1,10 @@
 use crate::{
     block::Block,
     camera_distance::CameraDistance,
-    chunk::{data::ChunkData, index::ChunkIndex, position::ChunkPosition, Chunk, CHUNK_SIZE},
+    chunk::{
+        data::ChunkData, index::ChunkIndex, position::ChunkPosition, stage::Stage, Chunk,
+        CHUNK_SIZE,
+    },
 };
 use bevy::{
     prelude::*,
@@ -29,11 +32,12 @@ impl Plugin for WorldPlugin {
             .add_systems(
                 Update,
                 (
-                    update_camera_chunk_position,
                     begin_chunk_load_tasks,
                     receive_chunk_load_tasks,
                     (update_chunks, despawn_chunks).chain(),
+                    generate_terrain,
                 )
+                    .chain()
                     .in_set(WorldSet),
             )
             .observe(kill_tasks_for_unloaded_chunks);
@@ -60,7 +64,7 @@ struct NeedsChunkData;
 
 fn begin_chunk_load_tasks(
     mut tasks: ResMut<ChunkLoadTasks>,
-    q_chunk: Query<(Entity, &ChunkPosition), With<NeedsChunkData>>,
+    q_chunk: Query<(Entity, &ChunkPosition), (Without<Chunk>, With<NeedsChunkData>)>,
     world_gen_noise: Res<WorldGenNoise>,
 ) {
     for (entity, pos) in q_chunk.iter() {
@@ -71,7 +75,7 @@ fn begin_chunk_load_tasks(
         let cloned_noise = world_gen_noise.clone();
         let pos_ivec = pos.0;
         let task = task_pool.spawn(async move {
-            let chunk = generate_chunk(cloned_noise, pos_ivec);
+            let chunk = generate_chunk_noise(cloned_noise, pos_ivec);
             ChunkLoadTaskData { entity, chunk }
         });
         tasks.0.insert(*pos, task);
@@ -102,18 +106,6 @@ fn kill_tasks_for_unloaded_chunks(
         .get(&trigger.entity())
     {
         tasks.0.remove(&ChunkPosition(*pos));
-    }
-}
-
-fn update_camera_chunk_position(
-    mut q_camera: Query<(&mut ChunkPosition, &GlobalTransform), With<Camera3d>>,
-) {
-    let Ok((mut chunk_pos, transform)) = q_camera.get_single_mut() else {
-        return;
-    };
-    let new_chunk_pos = ChunkPosition::from_world_position(&transform.translation());
-    if new_chunk_pos != *chunk_pos {
-        chunk_pos.0 = new_chunk_pos.0;
     }
 }
 
@@ -185,23 +177,44 @@ fn despawn_chunks(q_chunk: Query<(Entity, &ToDespawn, &CameraDistance)>, mut com
         .for_each(|(entity, _, _)| commands.entity(entity).despawn());
 }
 
-fn generate_chunk(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
-    const SCALE: f64 = 60.0;
-    if chunk_pos.y < 0 {
-        return Chunk::new(ChunkData::filled(Block::Stone));
+fn generate_chunk_noise(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
+    const CHUNK_SIZE_I32: i32 = CHUNK_SIZE as i32;
+    let chunk_data = ChunkData {
+        stage: Stage::Noise,
+        noise_2d: std::array::from_fn(|idx| {
+            let x = idx / CHUNK_SIZE;
+            let z = idx % CHUNK_SIZE;
+            return noise.get([
+                x as i32 + chunk_pos.x * CHUNK_SIZE_I32,
+                z as i32 + chunk_pos.z * CHUNK_SIZE_I32,
+            ]) as f32;
+        }),
+        ..default()
+    };
+    Chunk::new(chunk_data)
+}
+
+fn generate_terrain(q_chunk: Query<(&Chunk, &ChunkPosition)>) {
+    for (chunk, pos) in q_chunk.iter() {
+        generate_terrain_for_chunk(chunk, pos);
     }
-    if chunk_pos.y > 80 {
-        return Chunk::new(ChunkData::filled(Block::Air));
-    }
-    let mut chunk_data = ChunkData::default();
+}
+
+fn generate_terrain_for_chunk(chunk: &Chunk, pos: &ChunkPosition) {
+    const SCALE: f32 = 60.0;
     const DIRT_DEPTH: usize = 2;
+    let Ok(mut chunk_data) = chunk.data.write() else {
+        return;
+    };
+    if chunk_data.stage != Stage::Noise {
+        return;
+    }
+    let noise = chunk_data.noise_2d;
+    let chunk_pos = pos.0;
     for z in 0..CHUNK_SIZE {
         for x in 0..CHUNK_SIZE {
-            let height = (noise.get([
-                x as i32 + chunk_pos.x * CHUNK_SIZE as i32,
-                z as i32 + chunk_pos.z * CHUNK_SIZE as i32,
-            ]) * SCALE) as i32
-                + 1;
+            let index = CHUNK_SIZE * x + z;
+            let height = (noise[index] * SCALE) as i32 + 1;
             let Some(chunk_height) = Some(height - (chunk_pos.y * CHUNK_SIZE as i32))
                 .filter(|h| h >= &0)
                 .map(|h| h as usize)
@@ -210,19 +223,18 @@ fn generate_chunk(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
             };
             if chunk_height >= DIRT_DEPTH - 1 {
                 for y in (0..=chunk_height - (DIRT_DEPTH - 1)).filter(|h| h < &CHUNK_SIZE) {
-                    *chunk_data.at_mut(x, y, z) = Block::Stone;
+                    chunk_data.put(x, y, z, Block::Stone);
                 }
             }
             if chunk_height >= DIRT_DEPTH {
                 for y in (chunk_height - DIRT_DEPTH..chunk_height).filter(|h| h < &CHUNK_SIZE) {
-                    *chunk_data.at_mut(x, y, z) = Block::Dirt;
+                    chunk_data.put(x, y, z, Block::Dirt);
                 }
             }
             if chunk_height < CHUNK_SIZE {
-                *chunk_data.at_mut(x, chunk_height, z) = Block::Grass;
+                chunk_data.put(x, chunk_height, z, Block::Grass);
             }
         }
     }
-
-    Chunk::new(chunk_data)
+    chunk_data.stage = Stage::Terrain;
 }

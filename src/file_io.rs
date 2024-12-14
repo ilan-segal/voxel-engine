@@ -70,7 +70,12 @@ fn save_chunk_to_file(pos: ChunkPosition, chunk: Chunk) -> Result<(), String> {
         WORLD_FOLDER, WORLD_DIMENSION_NAME, pos.0.x, pos.0.y, pos.0.z
     );
     let file = File::create(&filename).map_err(|err| format!("{:?}", err))?;
-    let file_data: ChunkFileData = chunk.blocks.as_ref().into();
+    let file_data: ChunkFileData = chunk
+        .data
+        .as_ref()
+        .read()
+        .unwrap()
+        .into();
     serde_json::to_writer(file, &file_data).map_err(|err| format!("{:?}", err))?;
     Ok(())
 }

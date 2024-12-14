@@ -1,10 +1,10 @@
 use super::{data::ChunkData, layer_to_xyz, CHUNK_SIZE};
 use crate::block::{Block, BlockSide};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 /// Represents a 3x3x3 cube of chunks
 pub struct ChunkNeighborhood {
-    pub chunks: [[[Option<Arc<ChunkData>>; 3]; 3]; 3],
+    pub chunks: [[[Option<Arc<RwLock<ChunkData>>>; 3]; 3]; 3],
 }
 
 impl ChunkNeighborhood {
@@ -24,7 +24,7 @@ impl ChunkNeighborhood {
 
         return self.chunks[chunk_x][chunk_y][chunk_z]
             .as_deref()
-            .map(|data| data.at(x, y, z))
+            .map(|data| data.read().unwrap().at(x, y, z))
             .unwrap_or_default();
     }
 
@@ -33,7 +33,7 @@ impl ChunkNeighborhood {
         self.at(x, y, z)
     }
 
-    pub fn middle(&self) -> Arc<ChunkData> {
+    pub fn middle(&self) -> Arc<RwLock<ChunkData>> {
         self.chunks[1][1][1].clone().unwrap()
     }
 

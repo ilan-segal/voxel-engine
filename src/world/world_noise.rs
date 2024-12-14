@@ -83,6 +83,12 @@ impl NoiseFn<i32, 2> for WorldGenNoise {
     }
 }
 
+impl NoiseFn<i32, 3> for WorldGenNoise {
+    fn get(&self, point: [i32; 3]) -> f64 {
+        self.0.noise_a.get(point)
+    }
+}
+
 struct NoiseGenerator {
     perlin: Perlin,
     scale: f64,
@@ -93,9 +99,20 @@ struct NoiseGenerator {
 impl NoiseFn<i32, 2> for NoiseGenerator {
     fn get(&self, point: [i32; 2]) -> f64 {
         let [x, y] = point;
+        return self.get([x, y, 0]);
+    }
+}
+
+impl NoiseFn<i32, 3> for NoiseGenerator {
+    fn get(&self, point: [i32; 3]) -> f64 {
+        let [x, y, z] = point;
         let sample_x = x as f64 / self.scale + self.offset;
         let sample_y = y as f64 / self.scale + self.offset;
-        return self.perlin.get([sample_x, sample_y]) * self.amplitude;
+        let sample_z = z as f64 / self.scale + self.offset;
+        return self
+            .perlin
+            .get([sample_x, sample_y, sample_z])
+            * self.amplitude;
     }
 }
 
@@ -119,6 +136,19 @@ struct StackedNoise(Vec<NoiseGenerator>);
 
 impl NoiseFn<i32, 2> for StackedNoise {
     fn get(&self, point: [i32; 2]) -> f64 {
+        let mut total_sample = 0.;
+        let mut total_amplitude = 0.;
+        for g in &self.0 {
+            total_sample += g.get(point);
+            total_amplitude += g.amplitude;
+        }
+        total_sample /= total_amplitude;
+        return 0.5 + 0.5 * total_sample;
+    }
+}
+
+impl NoiseFn<i32, 3> for StackedNoise {
+    fn get(&self, point: [i32; 3]) -> f64 {
         let mut total_sample = 0.;
         let mut total_amplitude = 0.;
         for g in &self.0 {

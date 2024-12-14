@@ -68,7 +68,7 @@ enum ChunkMeshStatus {
 
 fn update_mesh_status(mut commands: Commands, q_chunk: Query<(Entity, &Chunk), Changed<Chunk>>) {
     for (entity, chunk) in q_chunk.iter() {
-        if chunk.blocks.is_meshable() {
+        if chunk.data.read().unwrap().is_meshable() {
             commands
                 .entity(entity)
                 .insert(ChunkMeshStatus::UnMeshed);
@@ -219,7 +219,7 @@ fn get_mesh_for_chunk(chunk: ChunkNeighborhood) -> Option<Mesh> {
 // TODO: Replace slow implementation with binary mesher
 fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let mut blocks = *chunk.middle();
+    let mut blocks = *chunk.middle().read().unwrap();
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {
             for col in 0..CHUNK_SIZE {

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     block::Block,
-    chunk::data::{ChunkData, CHUNK_ARRAY_SIZE},
+    chunk::{data::ChunkData, CHUNK_ARRAY_SIZE},
 };
 
 #[derive(Serialize, Deserialize)]

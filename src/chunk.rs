@@ -1,20 +1,22 @@
 use crate::{block::BlockSide, chunk::data::ChunkData};
 use bevy::prelude::*;
 use position::ChunkPosition;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 pub mod data;
 pub mod index;
 pub mod neighborhood;
 pub mod position;
+pub mod stage;
 
 pub const CHUNK_SIZE: usize = 32;
+pub const CHUNK_ARRAY_SIZE: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
 pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(index::ChunkIndexPlugin)
-            .add_systems(Update, assign_chunk_position);
+            .add_systems(Update, (update_chunk_position, assign_chunk_position));
     }
 }
 
@@ -22,13 +24,13 @@ impl Plugin for ChunkPlugin {
 #[derive(Component, Clone)]
 pub struct Chunk {
     // x, y, z
-    pub blocks: Arc<ChunkData>,
+    pub data: Arc<RwLock<ChunkData>>,
 }
 
 impl Chunk {
     pub fn new(data: ChunkData) -> Self {
         Self {
-            blocks: Arc::new(data),
+            data: Arc::new(RwLock::new(data)),
         }
     }
 }
@@ -53,4 +55,15 @@ fn assign_chunk_position(
             entity_commands.insert(ChunkPosition::from_world_position(&t.translation));
         }
     });
+}
+
+fn update_chunk_position(
+    mut q_chunk_pos: Query<(&mut ChunkPosition, &GlobalTransform), Changed<GlobalTransform>>,
+) {
+    for (mut chunk_pos, transform) in q_chunk_pos.iter_mut() {
+        let new_chunk_pos = ChunkPosition::from_world_position(&transform.translation());
+        if new_chunk_pos != *chunk_pos {
+            chunk_pos.0 = new_chunk_pos.0;
+        }
+    }
 }
