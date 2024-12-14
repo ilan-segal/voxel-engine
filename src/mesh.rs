@@ -92,13 +92,20 @@ fn update_mesh_from_chunk_update_event(
     mut tasks: ResMut<MeshGenTasks>,
 ) {
     for event in events.read() {
-        let Some(entity) = index.entity_map.get(&event.0 .0) else {
-            continue;
-        };
-        commands
-            .entity(*entity)
-            .insert(ChunkMeshStatus::UnMeshed);
-        tasks.0.remove(&event.0);
+        let chunk_pos = event.0 .0;
+        (-1..=1)
+            .cartesian_product(-1..=1)
+            .cartesian_product(-1..=1)
+            .for_each(|((x, y), z)| {
+                let cur_pos = IVec3::new(x, y, z) + chunk_pos;
+                let Some(entity) = index.entity_map.get(&cur_pos) else {
+                    return;
+                };
+                commands
+                    .entity(*entity)
+                    .insert(ChunkMeshStatus::UnMeshed);
+                tasks.0.remove(&event.0);
+            });
     }
 }
 
@@ -191,7 +198,7 @@ fn receive_mesh_gen_tasks(
             return true;
         };
         if let Some(mesh) = data.mesh {
-            entity.remove::<Handle<Mesh>>().insert((
+            entity.insert((
                 PbrBundle {
                     mesh: meshes.add(mesh),
                     material: materials.white.clone(),
