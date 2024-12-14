@@ -54,6 +54,11 @@ impl ChunkIndex {
         return ChunkNeighborhood { chunks };
     }
 
+    pub fn get_chunk(&self, x: i32, y: i32, z: i32) -> Option<&Arc<RwLock<ChunkData>>> {
+        let vec = IVec3 { x, y, z };
+        return self.chunk_map.get(&vec);
+    }
+
     fn insert(&mut self, pos: IVec3, entity: Entity, data: Arc<RwLock<ChunkData>>) {
         self.chunk_map.insert(pos, data);
         self.entity_map.insert(pos, entity);

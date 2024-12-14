@@ -16,6 +16,7 @@ pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(index::ChunkIndexPlugin)
+            .add_event::<ChunkUpdate>()
             .add_systems(Update, (update_chunk_position, assign_chunk_position));
     }
 }
@@ -65,5 +66,14 @@ fn update_chunk_position(
         if new_chunk_pos != *chunk_pos {
             chunk_pos.0 = new_chunk_pos.0;
         }
+    }
+}
+
+#[derive(Event)]
+pub struct ChunkUpdate(pub ChunkPosition);
+
+impl ChunkUpdate {
+    pub fn new(x: i32, y: i32, z: i32) -> Self {
+        Self(ChunkPosition(IVec3 { x, y, z }))
     }
 }

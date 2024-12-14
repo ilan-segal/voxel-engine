@@ -1,10 +1,15 @@
 use std::f32::consts::PI;
 
-use bevy::{ecs::query::QueryData, input::mouse::MouseMotion, prelude::*};
+use bevy::{
+    ecs::query::QueryData,
+    input::{common_conditions::input_just_pressed, mouse::MouseMotion},
+    prelude::*,
+};
 
 use crate::{
+    block::{Block, SetBlockEvent},
     physics::{gravity::Gravity, velocity::Velocity, PhysicsSystemSet},
-    player::{falling_state::FallingState, Player},
+    player::{block_target::TargetedBlock, falling_state::FallingState, Player},
 };
 
 pub struct KeyboardMousePlugin;
@@ -16,6 +21,7 @@ impl Plugin for KeyboardMousePlugin {
             (
                 rotate_camera_with_mouse,
                 process_keyboard_inputs.before(PhysicsSystemSet::Act),
+                delete_targeted_block.run_if(input_just_pressed(MouseButton::Left)),
             ),
         );
     }
@@ -106,4 +112,16 @@ fn process_keyboard_inputs(
 fn square_root_v(v: Vec3) -> Vec3 {
     let [x, y, z] = v.abs().to_array();
     Vec3::new(x.sqrt(), y.sqrt(), z.sqrt()) * v.signum()
+}
+
+fn delete_targeted_block(
+    targeted_block: Res<TargetedBlock>,
+    mut set_block_events: EventWriter<SetBlockEvent>,
+) {
+    if let Some(pos) = targeted_block.0 {
+        set_block_events.send(SetBlockEvent {
+            block: Block::Air,
+            world_pos: pos.to_array(),
+        });
+    }
 }

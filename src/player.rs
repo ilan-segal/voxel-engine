@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{core_pipeline::tonemapping::DebandDither, prelude::*};
 use block_target::BlockTargetPlugin;
 use falling_state::FallingState;
 
@@ -53,6 +53,7 @@ impl Default for PlayerBundle {
                     fov: 70_f32.to_radians(),
                     ..default()
                 }),
+                deband_dither: DebandDither::Enabled,
                 ..default()
             },
             fog_settings: FogSettings {

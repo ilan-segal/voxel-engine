@@ -16,8 +16,8 @@ use seed::{LoadSeed, WorldSeed};
 use std::collections::HashSet;
 use world_noise::WorldGenNoise;
 
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 10;
-const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 10;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 2;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 2;
 
 mod seed;
 mod world_noise;

@@ -2,7 +2,7 @@ use crate::{
     block::{Block, BlockSide},
     chunk::{
         data::ChunkData, index::ChunkIndex, layer_to_xyz, neighborhood::ChunkNeighborhood,
-        position::ChunkPosition, Chunk, CHUNK_SIZE,
+        position::ChunkPosition, Chunk, ChunkUpdate, CHUNK_SIZE,
     },
     WORLD_LAYER,
 };
@@ -11,7 +11,7 @@ use bevy::{
     render::{
         mesh::{Indices, PrimitiveTopology},
         render_asset::RenderAssetUsages,
-        view::RenderLayers,
+        view::{NoFrustumCulling, RenderLayers},
     },
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
     utils::HashMap,
@@ -27,7 +27,12 @@ impl Plugin for MeshPlugin {
             .add_systems(
                 Update,
                 ((
-                    (update_mesh_status, begin_mesh_gen_tasks).chain(),
+                    (
+                        update_mesh_status,
+                        update_mesh_from_chunk_update_event,
+                        begin_mesh_gen_tasks,
+                    )
+                        .chain(),
                     receive_mesh_gen_tasks,
                 )
                     .after(crate::world::WorldSet),),
@@ -77,6 +82,23 @@ fn update_mesh_status(mut commands: Commands, q_chunk: Query<(Entity, &Chunk), C
                 .entity(entity)
                 .insert(ChunkMeshStatus::NeedsNoMesh);
         }
+    }
+}
+
+fn update_mesh_from_chunk_update_event(
+    mut commands: Commands,
+    index: Res<ChunkIndex>,
+    mut events: EventReader<ChunkUpdate>,
+    mut tasks: ResMut<MeshGenTasks>,
+) {
+    for event in events.read() {
+        let Some(entity) = index.entity_map.get(&event.0 .0) else {
+            continue;
+        };
+        commands
+            .entity(*entity)
+            .insert(ChunkMeshStatus::UnMeshed);
+        tasks.0.remove(&event.0);
     }
 }
 
@@ -169,7 +191,7 @@ fn receive_mesh_gen_tasks(
             return true;
         };
         if let Some(mesh) = data.mesh {
-            entity.insert((
+            entity.remove::<Handle<Mesh>>().insert((
                 PbrBundle {
                     mesh: meshes.add(mesh),
                     material: materials.white.clone(),
@@ -178,6 +200,7 @@ fn receive_mesh_gen_tasks(
                 },
                 RenderLayers::layer(WORLD_LAYER),
                 ChunkMeshStatus::Meshed,
+                NoFrustumCulling,
             ));
         } else {
             entity
@@ -482,7 +505,7 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
     if quads.is_empty() {
         return None;
     }
-    for i in 1..quads.len() {
+    for i in 0..quads.len() {
         quads[i].rotate_against_anisotropy();
     }
     let vertices = quads
@@ -503,7 +526,8 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
         .collect::<Vec<_>>();
     let indices = (0..quads.len())
         .flat_map(|quad_index| {
-            vec![
+            let quad_index = quad_index as u32;
+            [
                 /*
                 3---2
                 |b /|
@@ -521,7 +545,6 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
                 4 * quad_index + 3,
             ]
         })
-        .map(|idx| idx as u32)
         .collect::<Vec<_>>();
     let colours = quads
         .iter()
@@ -538,10 +561,9 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
         })
         .map(|c| c.to_linear().to_f32_array())
         .collect::<Vec<_>>();
-    // Keep the mesh data accessible in future frames to be able to mutate it in toggle_texture.
     let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
-        RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
+        RenderAssetUsages::RENDER_WORLD,
     )
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
