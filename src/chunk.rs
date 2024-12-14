@@ -16,7 +16,15 @@ pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(index::ChunkIndexPlugin)
-            .add_systems(Update, (update_chunk_position, assign_chunk_position));
+            .add_systems(
+                Update,
+                (
+                    update_chunk_position,
+                    assign_chunk_position,
+                    update_chunk_data_copy,
+                    assign_chunk_data_copy,
+                ),
+            );
     }
 }
 
@@ -65,5 +73,39 @@ fn update_chunk_position(
         if new_chunk_pos != *chunk_pos {
             chunk_pos.0 = new_chunk_pos.0;
         }
+    }
+}
+
+/// For change detection
+#[derive(Component)]
+pub struct ChunkMarker(Arc<ChunkData>);
+
+impl From<ChunkData> for ChunkMarker {
+    fn from(value: ChunkData) -> Self {
+        Self(Arc::new(value))
+    }
+}
+
+fn assign_chunk_data_copy(
+    mut commands: Commands,
+    query: Query<(Entity, &Chunk), Without<ChunkMarker>>,
+) {
+    for (e, chunk) in query.iter() {
+        if let Some(mut entity_commands) = commands.get_entity(e) {
+            entity_commands.insert(ChunkMarker::from(chunk.data.read().unwrap().to_owned()));
+        }
+    }
+}
+
+fn update_chunk_data_copy(mut query: Query<(&Chunk, &mut ChunkMarker, &ChunkPosition)>) {
+    for (chunk, mut chunk_copy, pos) in query.iter_mut() {
+        let Ok(data) = chunk.data.read() else {
+            continue;
+        };
+        if data.eq(chunk_copy.0.as_ref()) {
+            continue;
+        }
+        info!("Change detected in chunk at {:?}", pos);
+        chunk_copy.0 = data.to_owned().into();
     }
 }

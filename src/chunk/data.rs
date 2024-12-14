@@ -2,7 +2,7 @@ use super::{stage::Stage, CHUNK_ARRAY_SIZE, CHUNK_SIZE};
 use crate::block::Block;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct ChunkData {
     pub stage: Stage,
     pub blocks: [Block; CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE],

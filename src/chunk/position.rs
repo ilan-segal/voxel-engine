@@ -1,7 +1,7 @@
 use crate::chunk::CHUNK_SIZE;
 use bevy::prelude::*;
 
-#[derive(Component, PartialEq, Eq, Default, Hash, Clone, Copy)]
+#[derive(Component, PartialEq, Eq, Default, Hash, Clone, Copy, Debug)]
 pub struct ChunkPosition(pub IVec3);
 
 impl ChunkPosition {
