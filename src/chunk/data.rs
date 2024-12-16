@@ -7,6 +7,7 @@ pub struct ChunkData {
     pub stage: Stage,
     pub blocks: [Block; CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE],
     pub noise_2d: [f32; CHUNK_SIZE * CHUNK_SIZE],
+    pub perlin_2d: [f32; CHUNK_SIZE * CHUNK_SIZE],
 }
 
 impl Default for ChunkData {
@@ -21,6 +22,7 @@ impl ChunkData {
             blocks: [block; CHUNK_ARRAY_SIZE],
             stage: Stage::Terrain,
             noise_2d: [0.; CHUNK_SIZE * CHUNK_SIZE],
+            perlin_2d: [0.; CHUNK_SIZE * CHUNK_SIZE],
         }
     }
 

@@ -16,8 +16,8 @@ use seed::{LoadSeed, WorldSeed};
 use std::collections::HashSet;
 use world_noise::WorldGenNoise;
 
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 2;
-const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 2;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 5;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 5;
 
 mod seed;
 mod world_noise;
@@ -32,8 +32,7 @@ impl Plugin for WorldPlugin {
             .add_systems(
                 Update,
                 (
-                    begin_chunk_load_tasks,
-                    receive_chunk_load_tasks,
+                    (begin_chunk_load_tasks, receive_chunk_load_tasks),
                     (update_chunks, despawn_chunks).chain(),
                     generate_terrain,
                 )
@@ -180,8 +179,17 @@ fn despawn_chunks(q_chunk: Query<(Entity, &ToDespawn, &CameraDistance)>, mut com
 fn generate_chunk_noise(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
     const CHUNK_SIZE_I32: i32 = CHUNK_SIZE as i32;
     let chunk_data = ChunkData {
+        blocks: [Block::default(); CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE],
         stage: Stage::Noise,
         noise_2d: std::array::from_fn(|idx| {
+            let x = idx / CHUNK_SIZE;
+            let z = idx % CHUNK_SIZE;
+            return noise.get_dense_noise().get([
+                (x as i32 + chunk_pos.x * CHUNK_SIZE_I32) as f64,
+                (z as i32 + chunk_pos.z * CHUNK_SIZE_I32) as f64,
+            ]) as f32;
+        }),
+        perlin_2d: std::array::from_fn(|idx| {
             let x = idx / CHUNK_SIZE;
             let z = idx % CHUNK_SIZE;
             return noise.get([
@@ -189,7 +197,6 @@ fn generate_chunk_noise(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
                 z as i32 + chunk_pos.z * CHUNK_SIZE_I32,
             ]) as f32;
         }),
-        ..default()
     };
     Chunk::new(chunk_data)
 }
@@ -209,7 +216,7 @@ fn generate_terrain_for_chunk(chunk: &Chunk, pos: &ChunkPosition) {
     if chunk_data.stage != Stage::Noise {
         return;
     }
-    let noise = chunk_data.noise_2d;
+    let noise = chunk_data.perlin_2d;
     let chunk_pos = pos.0;
     for z in 0..CHUNK_SIZE {
         for x in 0..CHUNK_SIZE {

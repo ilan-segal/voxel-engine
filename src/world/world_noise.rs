@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use noise::{NoiseFn, Perlin};
+use noise::{NoiseFn, Perlin, Simplex};
 use std::{f64::consts::E, sync::Arc};
 
 #[derive(Resource, Clone)]
@@ -10,11 +10,17 @@ struct WorldGenNoiseInner {
     noise_b: StackedNoise,
     regime: NoiseGenerator,
     sharpener: NoiseGenerator,
+    dense_noise: Simplex,
 }
 
 impl WorldGenNoise {
+    pub fn get_dense_noise(&self) -> &Simplex {
+        &self.0.dense_noise
+    }
+
     pub fn new(seed: u32) -> Self {
         let inner = WorldGenNoiseInner {
+            dense_noise: Simplex::new(seed),
             noise_a: StackedNoise(vec![
                 NoiseGenerator {
                     perlin: Perlin::new(seed),
