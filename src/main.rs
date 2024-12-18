@@ -18,7 +18,6 @@ mod camera_distance;
 mod chunk;
 mod cube_frame;
 mod debug_plugin;
-mod file_io;
 mod mesh;
 mod physics;
 mod player;

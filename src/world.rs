@@ -181,15 +181,18 @@ fn generate_chunk_noise(noise: WorldGenNoise, chunk_pos: IVec3) -> Chunk {
     const CHUNK_SIZE_I32: i32 = CHUNK_SIZE as i32;
     let chunk_data = ChunkData {
         stage: Stage::Noise,
-        noise_2d: std::array::from_fn(|idx| {
-            let x = idx / CHUNK_SIZE;
-            let z = idx % CHUNK_SIZE;
-            return noise.get([
-                x as i32 + chunk_pos.x * CHUNK_SIZE_I32,
-                z as i32 + chunk_pos.z * CHUNK_SIZE_I32,
-            ]) as f32;
-        }),
-        ..default()
+        blocks: std::iter::repeat_n(Block::default(), CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
+            .collect::<_>(),
+        noise_2d: (0..CHUNK_SIZE * CHUNK_SIZE)
+            .map(|idx| {
+                let x = idx / CHUNK_SIZE;
+                let z = idx % CHUNK_SIZE;
+                return noise.get([
+                    x as i32 + chunk_pos.x * CHUNK_SIZE_I32,
+                    z as i32 + chunk_pos.z * CHUNK_SIZE_I32,
+                ]) as f32;
+            })
+            .collect::<_>(),
     };
     Chunk::new(chunk_data)
 }
@@ -203,13 +206,21 @@ fn generate_terrain(q_chunk: Query<(&Chunk, &ChunkPosition)>) {
 fn generate_terrain_for_chunk(chunk: &Chunk, pos: &ChunkPosition) {
     const SCALE: f32 = 60.0;
     const DIRT_DEPTH: usize = 2;
+    let stage = { chunk.data.read().unwrap().stage };
+    if stage != Stage::Noise {
+        return;
+    }
+    let noise = {
+        chunk
+            .data
+            .read()
+            .unwrap()
+            .noise_2d
+            .clone()
+    };
     let Ok(mut chunk_data) = chunk.data.write() else {
         return;
     };
-    if chunk_data.stage != Stage::Noise {
-        return;
-    }
-    let noise = chunk_data.noise_2d;
     let chunk_pos = pos.0;
     for z in 0..CHUNK_SIZE {
         for x in 0..CHUNK_SIZE {

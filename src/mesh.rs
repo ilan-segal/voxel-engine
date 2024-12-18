@@ -249,12 +249,13 @@ fn get_mesh_for_chunk(chunk: ChunkNeighborhood) -> Option<Mesh> {
 // TODO: Replace slow implementation with binary mesher
 fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let mut blocks = *chunk.middle().read().unwrap();
+    let middle = chunk.middle();
+    let mut blocks = middle.read().unwrap().clone();
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {
             for col in 0..CHUNK_SIZE {
                 let block = blocks.get_from_layer_coords(&direction, layer, row, col);
-                if block == Block::Air
+                if block == &Block::Air
                     || chunk.block_is_hidden_from_above(
                         &direction,
                         layer as i32,
@@ -373,7 +374,7 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                 let quad = Quad {
                     vertices,
                     ao_factors,
-                    block,
+                    block: *block,
                 };
                 quads.push(quad);
                 for cur_row in row..=height + row {
@@ -429,7 +430,7 @@ trait LayerIndexable {
         layer: usize,
         row: usize,
         col: usize,
-    ) -> Block;
+    ) -> &Block;
 
     fn clear_at(&mut self, direction: &BlockSide, layer: usize, row: usize, col: usize);
 }
@@ -441,7 +442,7 @@ impl LayerIndexable for ChunkData {
         layer: usize,
         row: usize,
         col: usize,
-    ) -> Block {
+    ) -> &Block {
         let (x, y, z) = layer_to_xyz(direction, layer as i32, row as i32, col as i32);
         self.at(x as usize, y as usize, z as usize)
     }

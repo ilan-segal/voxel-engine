@@ -7,10 +7,10 @@ pub mod data;
 pub mod index;
 pub mod neighborhood;
 pub mod position;
+pub mod spatial;
 pub mod stage;
 
 pub const CHUNK_SIZE: usize = 32;
-pub const CHUNK_ARRAY_SIZE: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
 pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {

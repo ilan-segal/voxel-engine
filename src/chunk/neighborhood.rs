@@ -24,7 +24,7 @@ impl ChunkNeighborhood {
 
         return self.chunks[chunk_x][chunk_y][chunk_z]
             .as_deref()
-            .map(|data| data.read().unwrap().at(x, y, z))
+            .map(|data| *data.read().unwrap().at(x, y, z))
             .unwrap_or_default();
     }
 
