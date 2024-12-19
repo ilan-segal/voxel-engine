@@ -1,4 +1,6 @@
-#[derive(Clone, Copy, PartialEq, Eq)]
+use bevy::prelude::*;
+
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
 pub enum Stage {
     Noise,
     Terrain,

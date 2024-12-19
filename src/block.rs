@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::chunk::{index::ChunkIndex, ChunkUpdate, CHUNK_SIZE};
+use crate::chunk::{data::Blocks, index::ChunkIndex, spatial::SpatiallyMapped, CHUNK_SIZE};
 
 pub struct BlockPlugin;
 
@@ -101,7 +101,7 @@ pub struct SetBlockEvent {
 fn set_block(
     chunk_index: Res<ChunkIndex>,
     mut block_events: EventReader<SetBlockEvent>,
-    mut chunk_events: EventWriter<ChunkUpdate>,
+    mut q_blocks: Query<&mut Blocks>,
 ) {
     for event in block_events.read() {
         let [x, y, z] = event.world_pos;
@@ -109,21 +109,19 @@ fn set_block(
         let chunk_x = x.div_floor(chunk_size);
         let chunk_y = y.div_floor(chunk_size);
         let chunk_z = z.div_floor(chunk_size);
-        let Some(chunk) = chunk_index.get_chunk(chunk_x, chunk_y, chunk_z) else {
-            warn!(
-                "Unable to process event due to non-existent chunk {:?}",
-                event
-            );
-            continue;
-        };
         info!("Deleting block at {:?}", event.world_pos);
         let local_x = (x - chunk_x * chunk_size) as usize;
         let local_y = (y - chunk_y * chunk_size) as usize;
         let local_z = (z - chunk_z * chunk_size) as usize;
-        chunk
-            .write()
-            .expect("Write lock on chunk data")
-            .put(local_x, local_y, local_z, event.block);
-        chunk_events.send(ChunkUpdate::new(chunk_x, chunk_y, chunk_z));
+        let Some(entity) = chunk_index
+            .entity_by_pos
+            .get(&IVec3::new(chunk_x, chunk_y, chunk_z))
+        else {
+            continue;
+        };
+        let Some(mut blocks) = q_blocks.get_mut(*entity).ok() else {
+            continue;
+        };
+        *blocks.at_pos_mut([local_x, local_y, local_z]) = event.block;
     }
 }

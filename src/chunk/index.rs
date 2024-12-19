@@ -1,48 +1,65 @@
 use crate::block::Block;
 
 use super::{
-    data::ChunkData, neighborhood::ChunkNeighborhood, position::ChunkPosition, Chunk, CHUNK_SIZE,
+    data::{Blocks, ChunkBundle, Noise3d, Perlin2d},
+    neighborhood::ChunkNeighborhood,
+    position::ChunkPosition,
+    stage::Stage,
+    CHUNK_SIZE,
 };
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{ecs::query::QueryData, prelude::*, utils::HashMap};
 use itertools::Itertools;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 pub struct ChunkIndexPlugin;
 
 impl Plugin for ChunkIndexPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ChunkIndex>()
-            .observe(on_chunk_loaded)
+            .add_systems(Update, on_chunk_loaded)
             .observe(on_chunk_unloaded);
     }
 }
 
-fn on_chunk_loaded(
-    trigger: Trigger<OnAdd, Chunk>,
-    query: Query<(Entity, &ChunkPosition, &Chunk)>,
-    mut index: ResMut<ChunkIndex>,
-) {
-    let Ok((e, chunk_pos, chunk)) = query.get(trigger.entity()) else {
-        return;
-    };
-    let data = chunk.data.clone();
-    index.insert(chunk_pos.0, e, data);
+#[derive(QueryData)]
+pub struct ChunkBundleQueryData {
+    chunk_pos: &'static ChunkPosition,
+    stage: &'static Stage,
+    blocks: &'static Blocks,
+    perlin_2d: &'static Perlin2d,
+    noise_3d: &'static Noise3d,
 }
 
-fn on_chunk_unloaded(trigger: Trigger<OnRemove, Chunk>, mut index: ResMut<ChunkIndex>) {
+pub fn on_chunk_loaded(
+    query: Query<(Entity, ChunkBundleQueryData), Changed<Blocks>>,
+    mut index: ResMut<ChunkIndex>,
+) {
+    for (e, bundle) in query.iter() {
+        index.insert(
+            bundle.chunk_pos.0,
+            e,
+            bundle.blocks,
+            bundle.stage,
+            bundle.perlin_2d,
+            bundle.noise_3d,
+        );
+    }
+}
+
+fn on_chunk_unloaded(trigger: Trigger<OnRemove, Blocks>, mut index: ResMut<ChunkIndex>) {
     index.remove_entity(&trigger.entity());
 }
 
 #[derive(Resource, Default)]
 pub struct ChunkIndex {
-    chunk_map: HashMap<IVec3, Arc<RwLock<ChunkData>>>,
-    pub entity_map: HashMap<IVec3, Entity>,
+    chunk_map: HashMap<IVec3, Arc<ChunkBundle>>,
+    pub entity_by_pos: HashMap<IVec3, Entity>,
     pub pos_by_entity: HashMap<Entity, IVec3>,
 }
 
 impl ChunkIndex {
     pub fn get_neighborhood(&self, pos: &IVec3) -> ChunkNeighborhood {
-        let mut chunks: [[[Option<Arc<RwLock<ChunkData>>>; 3]; 3]; 3] = Default::default();
+        let mut chunks: [[[Option<Arc<ChunkBundle>>; 3]; 3]; 3] = Default::default();
         (-1..=1)
             .cartesian_product(-1..=1)
             .cartesian_product(-1..=1)
@@ -54,21 +71,30 @@ impl ChunkIndex {
         return ChunkNeighborhood { chunks };
     }
 
-    pub fn get_chunk(&self, x: i32, y: i32, z: i32) -> Option<&Arc<RwLock<ChunkData>>> {
-        let vec = IVec3 { x, y, z };
-        return self.chunk_map.get(&vec);
-    }
-
-    fn insert(&mut self, pos: IVec3, entity: Entity, data: Arc<RwLock<ChunkData>>) {
+    fn insert(
+        &mut self,
+        pos: IVec3,
+        entity: Entity,
+        blocks: &Blocks,
+        stage: &Stage,
+        perlin_2d: &Perlin2d,
+        noise_3d: &Noise3d,
+    ) {
+        let data = Arc::new(ChunkBundle {
+            blocks: (*blocks).clone(),
+            stage: *stage,
+            perlin_2d: (*perlin_2d).clone(),
+            noise_3d: (*noise_3d).clone(),
+        });
         self.chunk_map.insert(pos, data);
-        self.entity_map.insert(pos, entity);
+        self.entity_by_pos.insert(pos, entity);
         self.pos_by_entity.insert(entity, pos);
     }
 
     fn remove_entity(&mut self, entity: &Entity) {
         if let Some(pos) = self.pos_by_entity.remove(entity) {
             self.chunk_map.remove(&pos);
-            self.entity_map.remove(&pos);
+            self.entity_by_pos.remove(&pos);
         }
     }
 
@@ -93,6 +119,9 @@ impl ChunkIndex {
         let local_y = y - chunk_y * chunk_size;
         let local_z = z - chunk_z * chunk_size;
 
-        return chunk.at(local_x, local_y, local_z);
+        return chunk
+            .at(local_x, local_y, local_z)
+            .copied()
+            .unwrap_or_default();
     }
 }

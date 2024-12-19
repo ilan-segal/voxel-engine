@@ -1,8 +1,8 @@
 use crate::{
     block::{Block, BlockSide},
     chunk::{
-        data::ChunkData, index::ChunkIndex, layer_to_xyz, neighborhood::ChunkNeighborhood,
-        position::ChunkPosition, Chunk, ChunkUpdate, CHUNK_SIZE,
+        data::Blocks, index::ChunkIndex, layer_to_xyz, neighborhood::ChunkNeighborhood,
+        position::ChunkPosition, spatial::SpatiallyMapped, CHUNK_SIZE,
     },
     WORLD_LAYER,
 };
@@ -26,7 +26,7 @@ impl Plugin for MeshPlugin {
             .add_systems(Startup, setup)
             .add_systems(
                 Update,
-                ((
+                (
                     (
                         update_mesh_status,
                         update_mesh_from_chunk_update_event,
@@ -35,9 +35,9 @@ impl Plugin for MeshPlugin {
                         .chain(),
                     receive_mesh_gen_tasks,
                 )
-                    .after(crate::world::WorldSet),),
+                    .after(crate::world::WorldSet),
             )
-            .observe(rerender_neighbors)
+            // .observe(rerender_neighbors)
             .observe(end_mesh_tasks_for_unloaded_chunks);
     }
 }
@@ -71,9 +71,9 @@ enum ChunkMeshStatus {
     NeedsNoMesh,
 }
 
-fn update_mesh_status(mut commands: Commands, q_chunk: Query<(Entity, &Chunk), Changed<Chunk>>) {
-    for (entity, chunk) in q_chunk.iter() {
-        if chunk.data.read().unwrap().is_meshable() {
+fn update_mesh_status(mut commands: Commands, q_blocks: Query<(Entity, &Blocks), Changed<Blocks>>) {
+    for (entity, blocks) in q_blocks.iter() {
+        if blocks.is_meshable() {
             commands
                 .entity(entity)
                 .insert(ChunkMeshStatus::UnMeshed);
@@ -88,23 +88,22 @@ fn update_mesh_status(mut commands: Commands, q_chunk: Query<(Entity, &Chunk), C
 fn update_mesh_from_chunk_update_event(
     mut commands: Commands,
     index: Res<ChunkIndex>,
-    mut events: EventReader<ChunkUpdate>,
+    q_chunk_pos: Query<&ChunkPosition, Changed<Blocks>>,
     mut tasks: ResMut<MeshGenTasks>,
 ) {
-    for event in events.read() {
-        let chunk_pos = event.0 .0;
+    for chunk_pos in q_chunk_pos.iter() {
         (-1..=1)
             .cartesian_product(-1..=1)
             .cartesian_product(-1..=1)
             .for_each(|((x, y), z)| {
-                let cur_pos = IVec3::new(x, y, z) + chunk_pos;
-                let Some(entity) = index.entity_map.get(&cur_pos) else {
+                let cur_pos = IVec3::new(x, y, z) + chunk_pos.0;
+                let Some(entity) = index.entity_by_pos.get(&cur_pos) else {
                     return;
                 };
                 commands
                     .entity(*entity)
                     .insert(ChunkMeshStatus::UnMeshed);
-                tasks.0.remove(&event.0);
+                tasks.0.remove(chunk_pos);
             });
     }
 }
@@ -114,7 +113,7 @@ struct MeshGenTasks(HashMap<ChunkPosition, Task<MeshTaskData>>);
 
 fn end_mesh_tasks_for_unloaded_chunks(
     trigger: Trigger<OnRemove, ChunkPosition>,
-    chunks: Query<&ChunkPosition, With<Chunk>>,
+    chunks: Query<&ChunkPosition, With<Blocks>>,
     mut tasks: ResMut<MeshGenTasks>,
 ) {
     let Ok(pos) = chunks.get(trigger.entity()) else {
@@ -125,7 +124,7 @@ fn end_mesh_tasks_for_unloaded_chunks(
 
 fn begin_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
-    q_chunk: Query<(Entity, &ChunkPosition, &ChunkMeshStatus), With<Chunk>>,
+    q_chunk: Query<(Entity, &ChunkPosition, &ChunkMeshStatus), With<Blocks>>,
     chunk_index: Res<ChunkIndex>,
     mut commands: Commands,
 ) {
@@ -138,6 +137,9 @@ fn begin_mesh_gen_tasks(
         }
         let task_pool = AsyncComputeTaskPool::get();
         let cloned_chunk = chunk_index.get_neighborhood(&pos.0);
+        if cloned_chunk.middle().is_none() {
+            continue;
+        }
         let task = task_pool.spawn(async move {
             MeshTaskData {
                 entity,
@@ -151,36 +153,36 @@ fn begin_mesh_gen_tasks(
     }
 }
 
-fn rerender_neighbors(
-    trigger: Trigger<OnAdd, Chunk>,
-    chunk_index: Res<ChunkIndex>,
-    q_chunk: Query<&ChunkPosition>,
-    q_status: Query<&ChunkMeshStatus>,
-    mut commands: Commands,
-    mut tasks: ResMut<MeshGenTasks>,
-) {
-    let Ok(pos) = q_chunk.get(trigger.entity()) else {
-        return;
-    };
-    (-1..=1)
-        .cartesian_product(-1..=1)
-        .cartesian_product(-1..=1)
-        .for_each(|((x, y), z)| {
-            let cur_pos = IVec3::new(x, y, z) + pos.0;
-            let Some(neighbor_entity) = chunk_index.entity_map.get(&cur_pos) else {
-                return;
-            };
-            if let Ok(neighbor_status) = q_status.get(*neighbor_entity)
-                && neighbor_status == &ChunkMeshStatus::NeedsNoMesh
-            {
-                return;
-            }
-            if let Some(mut entity_commands) = commands.get_entity(*neighbor_entity) {
-                entity_commands.insert(ChunkMeshStatus::UnMeshed);
-                tasks.0.remove(&ChunkPosition(cur_pos));
-            };
-        });
-}
+// fn rerender_neighbors(
+//     trigger: Trigger<OnAdd, Blocks>,
+//     chunk_index: Res<ChunkIndex>,
+//     q_chunk: Query<&ChunkPosition>,
+//     q_status: Query<&ChunkMeshStatus>,
+//     mut commands: Commands,
+//     mut tasks: ResMut<MeshGenTasks>,
+// ) {
+//     let Ok(pos) = q_chunk.get(trigger.entity()) else {
+//         return;
+//     };
+//     (-1..=1)
+//         .cartesian_product(-1..=1)
+//         .cartesian_product(-1..=1)
+//         .for_each(|((x, y), z)| {
+//             let cur_pos = IVec3::new(x, y, z) + pos.0;
+//             let Some(neighbor_entity) = chunk_index.entity_by_pos.get(&cur_pos) else {
+//                 return;
+//             };
+//             if let Ok(neighbor_status) = q_status.get(*neighbor_entity)
+//                 && neighbor_status == &ChunkMeshStatus::NeedsNoMesh
+//             {
+//                 return;
+//             }
+//             if let Some(mut entity_commands) = commands.get_entity(*neighbor_entity) {
+//                 entity_commands.insert(ChunkMeshStatus::UnMeshed);
+//                 tasks.0.remove(&ChunkPosition(cur_pos));
+//             };
+//         });
+// }
 
 fn receive_mesh_gen_tasks(
     mut commands: Commands,
@@ -249,8 +251,8 @@ fn get_mesh_for_chunk(chunk: ChunkNeighborhood) -> Option<Mesh> {
 // TODO: Replace slow implementation with binary mesher
 fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let middle = chunk.middle();
-    let mut blocks = middle.read().unwrap().clone();
+    let middle = chunk.middle().expect("Already checked");
+    let mut blocks = middle.blocks.clone();
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {
             for col in 0..CHUNK_SIZE {
@@ -435,7 +437,7 @@ trait LayerIndexable {
     fn clear_at(&mut self, direction: &BlockSide, layer: usize, row: usize, col: usize);
 }
 
-impl LayerIndexable for ChunkData {
+impl LayerIndexable for Blocks {
     fn get_from_layer_coords(
         &self,
         direction: &BlockSide,
@@ -444,12 +446,12 @@ impl LayerIndexable for ChunkData {
         col: usize,
     ) -> &Block {
         let (x, y, z) = layer_to_xyz(direction, layer as i32, row as i32, col as i32);
-        self.at(x as usize, y as usize, z as usize)
+        self.at_pos([x as usize, y as usize, z as usize])
     }
 
     fn clear_at(&mut self, direction: &BlockSide, layer: usize, row: usize, col: usize) {
         let (x, y, z) = layer_to_xyz(direction, layer as i32, row as i32, col as i32);
-        *self.at_mut(x as usize, y as usize, z as usize) = Block::Air;
+        *self.at_pos_mut([x as usize, y as usize, z as usize]) = Block::Air;
     }
 }
 

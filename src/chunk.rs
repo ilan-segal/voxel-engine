@@ -1,7 +1,6 @@
-use crate::{block::BlockSide, chunk::data::ChunkData};
+use crate::block::BlockSide;
 use bevy::prelude::*;
 use position::ChunkPosition;
-use std::sync::{Arc, RwLock};
 
 pub mod data;
 pub mod index;
@@ -16,23 +15,7 @@ pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(index::ChunkIndexPlugin)
-            .add_event::<ChunkUpdate>()
             .add_systems(Update, (update_chunk_position, assign_chunk_position));
-    }
-}
-
-// 32x32x32 chunk of blocks
-#[derive(Component, Clone)]
-pub struct Chunk {
-    // x, y, z
-    pub data: Arc<RwLock<ChunkData>>,
-}
-
-impl Chunk {
-    pub fn new(data: ChunkData) -> Self {
-        Self {
-            data: Arc::new(RwLock::new(data)),
-        }
     }
 }
 
@@ -66,14 +49,5 @@ fn update_chunk_position(
         if new_chunk_pos != *chunk_pos {
             chunk_pos.0 = new_chunk_pos.0;
         }
-    }
-}
-
-#[derive(Event)]
-pub struct ChunkUpdate(pub ChunkPosition);
-
-impl ChunkUpdate {
-    pub fn new(x: i32, y: i32, z: i32) -> Self {
-        Self(ChunkPosition(IVec3 { x, y, z }))
     }
 }
