@@ -68,7 +68,7 @@ fn update_targeted_block(
         .expect("There should be exactly one player camera");
     let camera_pos = transform.translation;
     let camera_direction = transform.forward().as_vec3();
-    const REACH_DISTANCE: f32 = 100.0;
+    const REACH_DISTANCE: f32 = 1000.0;
     let ts = std::iter::once(&0.0)
         .chain(get_plane_distances(camera_pos.x, camera_direction.x, REACH_DISTANCE).iter())
         .chain(get_plane_distances(camera_pos.y, camera_direction.y, REACH_DISTANCE).iter())

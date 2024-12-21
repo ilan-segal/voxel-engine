@@ -10,11 +10,13 @@ struct WorldGenNoiseInner {
     noise_b: StackedNoise,
     regime: NoiseGenerator,
     sharpener: NoiseGenerator,
+    white_noise: WhiteNoise,
 }
 
 impl WorldGenNoise {
     pub fn new(seed: u32) -> Self {
         let inner = WorldGenNoiseInner {
+            white_noise: WhiteNoise::new(seed),
             noise_a: StackedNoise(vec![
                 NoiseGenerator {
                     perlin: Perlin::new(seed),
@@ -70,6 +72,10 @@ impl WorldGenNoise {
         };
         Self(Arc::new(inner))
     }
+
+    pub fn white_noise(&self) -> &impl NoiseFn<i32, 3> {
+        &self.0.white_noise
+    }
 }
 
 impl NoiseFn<i32, 2> for WorldGenNoise {
@@ -87,6 +93,37 @@ impl NoiseFn<i32, 3> for WorldGenNoise {
     fn get(&self, point: [i32; 3]) -> f64 {
         self.0.noise_a.get(point)
     }
+}
+
+struct WhiteNoise {
+    seed: u32,
+}
+
+impl WhiteNoise {
+    fn new(seed: u32) -> Self {
+        Self { seed }
+    }
+}
+
+impl NoiseFn<i32, 3> for WhiteNoise {
+    fn get(&self, [x, y, z]: [i32; 3]) -> f64 {
+        let x = fast_hash(x + 1 * self.seed as i32);
+        let y = fast_hash(y ^ self.seed as i32);
+        let z = fast_hash(z + self.seed as i32);
+        let result = (x ^ y ^ z) as u32;
+        const MAXIMUM: u32 = 0xDEADBEEF;
+        return (result % MAXIMUM) as f64 / (MAXIMUM as f64);
+    }
+}
+
+fn fast_hash(a: i32) -> u32 {
+    let mut a = a.abs() as u32;
+    a = (a ^ 61) ^ (a >> 16);
+    a = a + (a << 3);
+    a = a ^ (a >> 4);
+    a = a.wrapping_mul(0x27d4eb2d);
+    a = a ^ (a >> 15);
+    return a;
 }
 
 struct NoiseGenerator {

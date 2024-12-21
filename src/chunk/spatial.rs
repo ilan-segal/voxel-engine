@@ -7,24 +7,32 @@ pub trait SpatiallyMapped<T, const DIM: usize> {
 
 impl<T> SpatiallyMapped<T, 2> for Vec<T> {
     fn at_pos(&self, [x, y]: [usize; 2]) -> &T {
-        self.get(CHUNK_SIZE * x + y)
+        self.get(coords_to_index_2d(x, y))
             .expect("Index range")
     }
 
     fn at_pos_mut(&mut self, [x, y]: [usize; 2]) -> &mut T {
-        self.get_mut(CHUNK_SIZE * x + y)
+        self.get_mut(coords_to_index_2d(x, y))
             .expect("Index range")
     }
 }
 
+fn coords_to_index_2d(x: usize, y: usize) -> usize {
+    CHUNK_SIZE * x + y
+}
+
 impl<T> SpatiallyMapped<T, 3> for Vec<T> {
     fn at_pos(&self, [x, y, z]: [usize; 3]) -> &T {
-        self.get(CHUNK_SIZE * CHUNK_SIZE * x + CHUNK_SIZE * z + y)
+        self.get(coords_to_index_3d(x, y, z))
             .expect("Index range")
     }
 
     fn at_pos_mut(&mut self, [x, y, z]: [usize; 3]) -> &mut T {
-        self.get_mut(CHUNK_SIZE * CHUNK_SIZE * x + CHUNK_SIZE * z + y)
+        self.get_mut(coords_to_index_3d(x, y, z))
             .expect("Index range")
     }
+}
+
+fn coords_to_index_3d(x: usize, y: usize, z: usize) -> usize {
+    CHUNK_SIZE * CHUNK_SIZE * x + CHUNK_SIZE * z + y
 }

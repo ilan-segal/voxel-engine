@@ -8,9 +8,12 @@ pub struct BlockPlugin;
 impl Plugin for BlockPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<SetBlockEvent>()
-            .add_systems(Update, set_block);
+            .add_systems(Update, set_block.in_set(BlockUpdateSet));
     }
 }
+
+#[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
+pub struct BlockUpdateSet;
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, Debug, Deserialize, Serialize, Hash)]
 pub enum Block {
@@ -19,6 +22,8 @@ pub enum Block {
     Stone,
     Dirt,
     Grass,
+    Wood,
+    Leaves,
 }
 
 // Required for Block to work as a key in hashmap operations `entry_ref` + `or_insert_with`
@@ -34,6 +39,8 @@ impl Block {
             Self::Stone => Some(Color::linear_rgb(0.2, 0.2, 0.2)),
             Self::Grass => Some(Color::linear_rgb(0.2, 0.6, 0.0)),
             Self::Dirt => Some(Color::hsv(35.0, 0.65, 0.65)),
+            Self::Wood => Some(Color::hsv(35.0, 0.65, 0.15)),
+            Self::Leaves => Some(Color::linear_rgb(0.05, 0.15, 0.0)),
             _ => None,
         }
     }

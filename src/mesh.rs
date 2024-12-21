@@ -1,9 +1,10 @@
 use crate::{
-    block::{Block, BlockSide},
+    block::{Block, BlockSide, BlockUpdateSet},
     chunk::{
         data::Blocks, index::ChunkIndex, layer_to_xyz, neighborhood::ChunkNeighborhood,
         position::ChunkPosition, spatial::SpatiallyMapped, CHUNK_SIZE,
     },
+    world::WorldSet,
     WORLD_LAYER,
 };
 use bevy::{
@@ -35,17 +36,22 @@ impl Plugin for MeshPlugin {
                         .chain(),
                     receive_mesh_gen_tasks,
                 )
-                    .after(crate::world::WorldSet),
+                    .after(WorldSet)
+                    .after(BlockUpdateSet)
+                    .in_set(MeshSet),
             )
-            // .observe(rerender_neighbors)
             .observe(end_mesh_tasks_for_unloaded_chunks);
     }
 }
+
+#[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
+pub struct MeshSet;
 
 fn setup(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>) {
     let common_materials = CommonMaterials {
         white: materials.add(StandardMaterial {
             perceptual_roughness: 1.0,
+            reflectance: 0.0,
             base_color: Color::WHITE,
             ..Default::default()
         }),
@@ -152,37 +158,6 @@ fn begin_mesh_gen_tasks(
             .insert(ChunkMeshStatus::Meshing);
     }
 }
-
-// fn rerender_neighbors(
-//     trigger: Trigger<OnAdd, Blocks>,
-//     chunk_index: Res<ChunkIndex>,
-//     q_chunk: Query<&ChunkPosition>,
-//     q_status: Query<&ChunkMeshStatus>,
-//     mut commands: Commands,
-//     mut tasks: ResMut<MeshGenTasks>,
-// ) {
-//     let Ok(pos) = q_chunk.get(trigger.entity()) else {
-//         return;
-//     };
-//     (-1..=1)
-//         .cartesian_product(-1..=1)
-//         .cartesian_product(-1..=1)
-//         .for_each(|((x, y), z)| {
-//             let cur_pos = IVec3::new(x, y, z) + pos.0;
-//             let Some(neighbor_entity) = chunk_index.entity_by_pos.get(&cur_pos) else {
-//                 return;
-//             };
-//             if let Ok(neighbor_status) = q_status.get(*neighbor_entity)
-//                 && neighbor_status == &ChunkMeshStatus::NeedsNoMesh
-//             {
-//                 return;
-//             }
-//             if let Some(mut entity_commands) = commands.get_entity(*neighbor_entity) {
-//                 entity_commands.insert(ChunkMeshStatus::UnMeshed);
-//                 tasks.0.remove(&ChunkPosition(cur_pos));
-//             };
-//         });
-// }
 
 fn receive_mesh_gen_tasks(
     mut commands: Commands,

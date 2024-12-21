@@ -10,6 +10,7 @@ pub mod spatial;
 pub mod stage;
 
 pub const CHUNK_SIZE: usize = 32;
+pub const CHUNK_SIZE_I32: i32 = CHUNK_SIZE as i32;
 
 pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {

@@ -7,8 +7,9 @@ use crate::{
         position::ChunkPosition,
         spatial::SpatiallyMapped,
         stage::Stage,
-        CHUNK_SIZE,
+        CHUNK_SIZE, CHUNK_SIZE_I32,
     },
+    structure::StructureType,
 };
 use bevy::{
     prelude::*,
@@ -20,8 +21,8 @@ use seed::{LoadSeed, WorldSeed};
 use std::collections::HashSet;
 use world_noise::WorldGenNoise;
 
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 2;
-const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 2;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 3;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 3;
 
 mod seed;
 mod world_noise;
@@ -36,12 +37,10 @@ impl Plugin for WorldPlugin {
             .add_systems(
                 Update,
                 (
-                    begin_chunk_load_tasks,
+                    (update_chunks, despawn_chunks, begin_chunk_load_tasks).chain(),
+                    (generate_terrain, generate_structures),
                     receive_chunk_load_tasks,
-                    (update_chunks, despawn_chunks).chain(),
-                    generate_terrain,
                 )
-                    .chain()
                     .in_set(WorldSet),
             )
             .observe(kill_tasks_for_unloaded_chunks);
@@ -178,11 +177,10 @@ fn despawn_chunks(q_chunk: Query<(Entity, &ToDespawn, &CameraDistance)>, mut com
                 .unwrap()
         })
         .take(CHUNKS_DESPAWNED_PER_FRAME)
-        .for_each(|(entity, _, _)| commands.entity(entity).despawn());
+        .for_each(|(entity, _, _)| commands.entity(entity).despawn_recursive());
 }
 
 fn generate_chunk_noise(noise: WorldGenNoise, chunk_pos: IVec3) -> ChunkBundle {
-    const CHUNK_SIZE_I32: i32 = CHUNK_SIZE as i32;
     let blocks =
         std::iter::repeat_n(default(), CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE).collect::<_>();
     let perlin_2d = (0..CHUNK_SIZE * CHUNK_SIZE)
@@ -195,20 +193,34 @@ fn generate_chunk_noise(noise: WorldGenNoise, chunk_pos: IVec3) -> ChunkBundle {
             ]) as f32;
         })
         .collect::<_>();
+    let noise_3d = (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
+        .map(|idx| {
+            let x = idx % (CHUNK_SIZE * CHUNK_SIZE);
+            let y = (idx / CHUNK_SIZE) % CHUNK_SIZE;
+            let z = idx / (CHUNK_SIZE * CHUNK_SIZE);
+            let value = noise.white_noise().get([
+                (x as i32 + chunk_pos.x * CHUNK_SIZE_I32),
+                (y as i32 + chunk_pos.y * CHUNK_SIZE_I32),
+                (z as i32 + chunk_pos.z * CHUNK_SIZE_I32),
+            ]) as f32;
+            // println!("{}", value);
+            return value;
+        })
+        .collect::<_>();
 
     let chunk_data = ChunkBundle {
         stage: Stage::Noise,
         blocks: Blocks(blocks),
         perlin_2d: Perlin2d(perlin_2d),
         // TODO
-        noise_3d: Noise3d(
-            std::iter::repeat_n(default(), CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE).collect::<_>(),
-        ),
+        noise_3d: Noise3d(noise_3d),
     };
     chunk_data
 }
 
-fn generate_terrain(mut q_chunk: Query<(&mut Blocks, &mut Stage, &Perlin2d, &ChunkPosition)>) {
+fn generate_terrain(
+    mut q_chunk: Query<(&mut Blocks, &mut Stage, &Perlin2d, &ChunkPosition), Changed<Stage>>,
+) {
     for (mut blocks, mut stage, perlin, pos) in q_chunk.iter_mut() {
         if *stage != Stage::Noise {
             continue;
@@ -245,5 +257,55 @@ fn generate_terrain_for_chunk(blocks: &mut Blocks, noise: &Perlin2d, pos: &Chunk
                 *blocks.at_pos_mut([x, chunk_height, z]) = Block::Grass;
             }
         }
+    }
+}
+
+fn generate_structures(
+    mut q_chunk: Query<(&mut Blocks, &ChunkPosition, &mut Stage)>,
+    index: Res<ChunkIndex>,
+) {
+    for (mut blocks, pos, mut stage) in q_chunk.iter_mut() {
+        if *stage != Stage::Terrain {
+            continue;
+        }
+        let neighborhood = index.get_neighborhood(&pos.0);
+        if neighborhood.get_lowest_stage() < Stage::Terrain
+            || neighborhood
+                .iter_chunks()
+                .any(|c| c.is_none())
+        {
+            continue;
+        }
+        // TODO: Vary available structure types by looking at local data
+        let structure_types = vec![StructureType::Tree];
+        let structure_blocks = structure_types
+            .iter()
+            .flat_map(|s| s.get_structures(&neighborhood))
+            .flat_map(|(structure, [x0, y0, z0])| {
+                structure
+                    .get_blocks()
+                    .iter()
+                    .map(move |(block, [x1, y1, z1])| (*block, [x0 + x1, y0 + y1, z0 + z1]))
+                    .collect::<Vec<_>>()
+            })
+            .filter(|(_, [x, y, z])| {
+                let x = *x;
+                let y = *y;
+                let z = *z;
+                0 <= x
+                    && x < CHUNK_SIZE as i32
+                    && 0 <= y
+                    && y < CHUNK_SIZE as i32
+                    && 0 <= z
+                    && z < CHUNK_SIZE as i32
+            })
+            .collect::<Vec<_>>();
+        for (block, [x, y, z]) in structure_blocks.iter().copied() {
+            let x = x as usize;
+            let y = y as usize;
+            let z = z as usize;
+            *blocks.at_pos_mut([x, y, z]) = block;
+        }
+        *stage = Stage::Structures;
     }
 }

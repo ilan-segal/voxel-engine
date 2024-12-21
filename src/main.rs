@@ -2,6 +2,7 @@
 #![feature(float_next_up_down)]
 #![feature(int_roundings)]
 #![feature(iter_map_windows)]
+#![feature(trivial_bounds)]
 
 use bevy::{
     pbr::wireframe::{WireframeConfig, WireframePlugin},
@@ -22,6 +23,7 @@ mod mesh;
 mod physics;
 mod player;
 mod render_layer;
+mod structure;
 mod ui;
 mod world;
 

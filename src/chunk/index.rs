@@ -1,11 +1,13 @@
-use crate::block::Block;
-
 use super::{
     data::{Blocks, ChunkBundle, Noise3d, Perlin2d},
     neighborhood::ChunkNeighborhood,
     position::ChunkPosition,
     stage::Stage,
     CHUNK_SIZE,
+};
+use crate::{
+    block::{Block, BlockUpdateSet},
+    mesh::MeshSet,
 };
 use bevy::{ecs::query::QueryData, prelude::*, utils::HashMap};
 use itertools::Itertools;
@@ -16,7 +18,12 @@ pub struct ChunkIndexPlugin;
 impl Plugin for ChunkIndexPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ChunkIndex>()
-            .add_systems(Update, on_chunk_loaded)
+            .add_systems(
+                Update,
+                on_chunk_loaded
+                    .before(MeshSet)
+                    .after(BlockUpdateSet),
+            )
             .observe(on_chunk_unloaded);
     }
 }
@@ -120,7 +127,7 @@ impl ChunkIndex {
         let local_z = z - chunk_z * chunk_size;
 
         return chunk
-            .at(local_x, local_y, local_z)
+            .block_at(local_x, local_y, local_z)
             .copied()
             .unwrap_or_default();
     }
