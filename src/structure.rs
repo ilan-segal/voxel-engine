@@ -1,7 +1,4 @@
-use crate::{
-    block::Block,
-    chunk::{neighborhood::ChunkNeighborhood, CHUNK_SIZE_I32},
-};
+use crate::{block::Block, chunk::CHUNK_SIZE_I32, world::neighborhood::ChunkNeighborhood};
 
 pub enum Structure {
     Tree { trunk_height: u8, leaf_radius: u8 },
@@ -56,10 +53,10 @@ impl StructureType {
                 for x in min..max {
                     for z in min..max {
                         for y in min..max - 1 {
-                            if neighborhood.noise_at(x, y, z).unwrap() > &TREE_PROBABILITY {
+                            if neighborhood.block_at(x, y, z).unwrap() != &Block::Grass {
                                 continue;
                             }
-                            if neighborhood.block_at(x, y, z).unwrap() != &Block::Grass {
+                            if neighborhood.noise_at(x, y, z).unwrap() > &TREE_PROBABILITY {
                                 continue;
                             }
                             trees.push((
@@ -73,14 +70,6 @@ impl StructureType {
                     }
                 }
                 return trees;
-                // TODO: Generate randomly on grass
-                // vec![(
-                //     Structure::Tree {
-                //         trunk_height: 4,
-                //         leaf_radius: 2,
-                //     },
-                //     [16, 16, 16],
-                // )]
             }
         }
     }

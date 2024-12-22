@@ -42,7 +42,6 @@ fn main() {
                 ..default()
             }),
             WireframePlugin,
-            block::BlockPlugin,
             camera_distance::CameraDistancePlugin,
             chunk::ChunkPlugin,
             cube_frame::FramePlugin,

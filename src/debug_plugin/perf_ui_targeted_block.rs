@@ -1,7 +1,7 @@
 use bevy::{ecs::system::lifetimeless::SRes, prelude::*};
 use iyes_perf_ui::entry::PerfUiEntry;
 
-use crate::{block::Block, chunk::index::ChunkIndex, player::block_target::TargetedBlock};
+use crate::{block::Block, player::block_target::TargetedBlock, world::index::ChunkIndex};
 
 #[derive(Component)]
 pub struct PerfUiTargetedBlock {

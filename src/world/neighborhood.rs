@@ -1,9 +1,12 @@
-use super::{data::ChunkBundle, layer_to_xyz, stage::Stage, CHUNK_SIZE};
+use crate::chunk::{layer_to_xyz, CHUNK_SIZE};
 use crate::{
     block::{Block, BlockSide},
     chunk::spatial::SpatiallyMapped,
 };
 use std::sync::Arc;
+
+use super::stage::Stage;
+use super::ChunkBundle;
 
 /// Represents a 3x3x3 cube of chunks
 pub struct ChunkNeighborhood {

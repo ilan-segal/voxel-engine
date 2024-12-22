@@ -7,9 +7,3 @@ pub enum Stage {
     Terrain,
     Structures,
 }
-
-impl Stage {
-    pub fn last() -> Self {
-        Self::Structures
-    }
-}

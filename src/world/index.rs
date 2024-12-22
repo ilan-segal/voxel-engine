@@ -1,17 +1,14 @@
-use super::{
-    data::{Blocks, ChunkBundle, Noise3d, Perlin2d},
-    neighborhood::ChunkNeighborhood,
+use crate::chunk::{
+    data::{Blocks, Noise3d, Perlin2d},
     position::ChunkPosition,
-    stage::Stage,
     CHUNK_SIZE,
 };
-use crate::{
-    block::{Block, BlockUpdateSet},
-    mesh::MeshSet,
-};
+use crate::{block::Block, mesh::MeshSet};
 use bevy::{ecs::query::QueryData, prelude::*, utils::HashMap};
 use itertools::Itertools;
 use std::sync::Arc;
+
+use super::{neighborhood::ChunkNeighborhood, stage::Stage, ChunkBundle, WorldSet};
 
 pub struct ChunkIndexPlugin;
 
@@ -22,7 +19,7 @@ impl Plugin for ChunkIndexPlugin {
                 Update,
                 on_chunk_loaded
                     .before(MeshSet)
-                    .after(BlockUpdateSet),
+                    .before(WorldSet),
             )
             .observe(on_chunk_unloaded);
     }

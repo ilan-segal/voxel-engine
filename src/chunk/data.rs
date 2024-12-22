@@ -1,4 +1,4 @@
-use super::{spatial::SpatiallyMapped, stage::Stage};
+use super::spatial::SpatiallyMapped;
 use crate::block::Block;
 use bevy::prelude::*;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -9,14 +9,6 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 //     pub blocks: Vec<Block>,
 //     pub perlin_2d: Vec<f32>,
 // }
-
-#[derive(Bundle)]
-pub struct ChunkBundle {
-    pub stage: Stage,
-    pub blocks: Blocks,
-    pub perlin_2d: Perlin2d,
-    pub noise_3d: Noise3d,
-}
 
 #[derive(Component, Clone)]
 pub struct Blocks(pub Vec<Block>);

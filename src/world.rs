@@ -2,11 +2,9 @@ use crate::{
     block::Block,
     camera_distance::CameraDistance,
     chunk::{
-        data::{Blocks, ChunkBundle, Noise3d, Perlin2d},
-        index::ChunkIndex,
+        data::{Blocks, Noise3d, Perlin2d},
         position::ChunkPosition,
         spatial::SpatiallyMapped,
-        stage::Stage,
         CHUNK_SIZE, CHUNK_SIZE_I32,
     },
     structure::StructureType,
@@ -16,34 +14,45 @@ use bevy::{
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
     utils::HashMap,
 };
+use index::ChunkIndex;
 use noise::NoiseFn;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use seed::{LoadSeed, WorldSeed};
+use stage::Stage;
 use std::collections::HashSet;
 use world_noise::WorldGenNoise;
 
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 3;
-const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 3;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 5;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 5;
 
+pub mod block_update;
+pub mod index;
+pub mod neighborhood;
 mod seed;
+pub mod stage;
 mod world_noise;
 
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(seed::SeedPlugin)
-            .init_resource::<ChunkLoadTasks>()
-            .add_systems(Startup, init_noise.after(LoadSeed))
-            .add_systems(
-                Update,
-                (
-                    (update_chunks, despawn_chunks, begin_chunk_load_tasks).chain(),
-                    (generate_terrain, generate_structures),
-                    receive_chunk_load_tasks,
-                )
-                    .in_set(WorldSet),
+        app.add_plugins((
+            seed::SeedPlugin,
+            index::ChunkIndexPlugin,
+            block_update::BlockPlugin,
+        ))
+        .init_resource::<ChunkLoadTasks>()
+        .add_systems(Startup, init_noise.after(LoadSeed))
+        .add_systems(
+            Update,
+            (
+                (update_chunks, despawn_chunks, begin_chunk_load_tasks).chain(),
+                (generate_terrain, generate_structures),
+                receive_chunk_load_tasks,
             )
-            .observe(kill_tasks_for_unloaded_chunks);
+                .in_set(WorldSet),
+        )
+        .observe(kill_tasks_for_unloaded_chunks);
     }
 }
 
@@ -53,6 +62,14 @@ fn init_noise(mut commands: Commands, seed: Res<WorldSeed>) {
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WorldSet;
+
+#[derive(Bundle)]
+pub struct ChunkBundle {
+    pub stage: Stage,
+    pub blocks: Blocks,
+    pub perlin_2d: Perlin2d,
+    pub noise_3d: Noise3d,
+}
 
 struct ChunkLoadTaskData {
     entity: Entity,
@@ -184,6 +201,7 @@ fn generate_chunk_noise(noise: WorldGenNoise, chunk_pos: IVec3) -> ChunkBundle {
     let blocks =
         std::iter::repeat_n(default(), CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE).collect::<_>();
     let perlin_2d = (0..CHUNK_SIZE * CHUNK_SIZE)
+        .into_par_iter()
         .map(|idx| {
             let x = idx / CHUNK_SIZE;
             let z = idx % CHUNK_SIZE;
@@ -194,6 +212,7 @@ fn generate_chunk_noise(noise: WorldGenNoise, chunk_pos: IVec3) -> ChunkBundle {
         })
         .collect::<_>();
     let noise_3d = (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
+        .into_par_iter()
         .map(|idx| {
             let x = idx % (CHUNK_SIZE * CHUNK_SIZE);
             let y = (idx / CHUNK_SIZE) % CHUNK_SIZE;
@@ -212,7 +231,6 @@ fn generate_chunk_noise(noise: WorldGenNoise, chunk_pos: IVec3) -> ChunkBundle {
         stage: Stage::Noise,
         blocks: Blocks(blocks),
         perlin_2d: Perlin2d(perlin_2d),
-        // TODO
         noise_3d: Noise3d(noise_3d),
     };
     chunk_data

@@ -1,16 +1,15 @@
-use std::f32::consts::PI;
-
+use crate::{
+    block::Block,
+    physics::{gravity::Gravity, velocity::Velocity, PhysicsSystemSet},
+    player::{block_target::TargetedBlock, falling_state::FallingState, Player},
+    world::block_update::SetBlockEvent,
+};
 use bevy::{
     ecs::query::QueryData,
     input::{common_conditions::input_just_pressed, mouse::MouseMotion},
     prelude::*,
 };
-
-use crate::{
-    block::{Block, SetBlockEvent},
-    physics::{gravity::Gravity, velocity::Velocity, PhysicsSystemSet},
-    player::{block_target::TargetedBlock, falling_state::FallingState, Player},
-};
+use std::f32::consts::PI;
 
 pub struct KeyboardMousePlugin;
 

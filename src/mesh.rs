@@ -1,10 +1,9 @@
 use crate::{
-    block::{Block, BlockSide, BlockUpdateSet},
+    block::{Block, BlockSide},
     chunk::{
-        data::Blocks, index::ChunkIndex, layer_to_xyz, neighborhood::ChunkNeighborhood,
-        position::ChunkPosition, spatial::SpatiallyMapped, CHUNK_SIZE,
+        data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, CHUNK_SIZE,
     },
-    world::WorldSet,
+    world::{index::ChunkIndex, neighborhood::ChunkNeighborhood, WorldSet},
     WORLD_LAYER,
 };
 use bevy::{
@@ -37,7 +36,6 @@ impl Plugin for MeshPlugin {
                     receive_mesh_gen_tasks,
                 )
                     .after(WorldSet)
-                    .after(BlockUpdateSet)
                     .in_set(MeshSet),
             )
             .observe(end_mesh_tasks_for_unloaded_chunks);

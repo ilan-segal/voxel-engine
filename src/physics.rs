@@ -6,7 +6,7 @@ use collision::{Collidable, Collision};
 use gravity::Gravity;
 use velocity::Velocity;
 
-use crate::chunk::{index::ChunkIndex, position::ChunkPosition};
+use crate::{chunk::position::ChunkPosition, world::index::ChunkIndex};
 
 pub mod aabb;
 pub mod collision;

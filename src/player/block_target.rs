@@ -3,9 +3,9 @@ use bevy_polyline::prelude::*;
 use itertools::Itertools;
 
 use crate::{
-    chunk::index::ChunkIndex,
     cube_frame::{CubeFrameMeshHandle, CubeFrameSetup},
     render_layer::WORLD_LAYER,
+    world::index::ChunkIndex,
 };
 
 use super::Player;

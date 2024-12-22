@@ -3,11 +3,8 @@ use bevy::prelude::*;
 use position::ChunkPosition;
 
 pub mod data;
-pub mod index;
-pub mod neighborhood;
 pub mod position;
 pub mod spatial;
-pub mod stage;
 
 pub const CHUNK_SIZE: usize = 32;
 pub const CHUNK_SIZE_I32: i32 = CHUNK_SIZE as i32;
@@ -15,8 +12,7 @@ pub const CHUNK_SIZE_I32: i32 = CHUNK_SIZE as i32;
 pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(index::ChunkIndexPlugin)
-            .add_systems(Update, (update_chunk_position, assign_chunk_position));
+        app.add_systems(Update, (update_chunk_position, assign_chunk_position));
     }
 }
 
