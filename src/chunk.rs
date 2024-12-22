@@ -16,6 +16,9 @@ impl Plugin for ChunkPlugin {
     }
 }
 
+#[derive(Component)]
+pub struct Chunk;
+
 pub fn layer_to_xyz(side: &BlockSide, layer: i32, row: i32, col: i32) -> (i32, i32, i32) {
     match side {
         BlockSide::Up => (row, layer, col),

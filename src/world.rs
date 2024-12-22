@@ -5,7 +5,7 @@ use crate::{
         data::{Blocks, Noise3d, Perlin2d},
         position::ChunkPosition,
         spatial::SpatiallyMapped,
-        CHUNK_SIZE, CHUNK_SIZE_I32,
+        Chunk, CHUNK_SIZE, CHUNK_SIZE_I32,
     },
     structure::StructureType,
 };
@@ -15,6 +15,7 @@ use bevy::{
     utils::HashMap,
 };
 use index::ChunkIndex;
+use neighborhood::ChunkNeighborhood;
 use noise::NoiseFn;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use seed::{LoadSeed, WorldSeed};
@@ -46,9 +47,9 @@ impl Plugin for WorldPlugin {
         .add_systems(
             Update,
             (
-                (update_chunks, despawn_chunks, begin_chunk_load_tasks).chain(),
-                generate_terrain,
-                generate_structures,
+                (update_chunks, despawn_chunks, begin_noise_load_tasks).chain(),
+                begin_terrain_load_tasks,
+                begin_structure_load_tasks,
                 receive_chunk_load_tasks,
             )
                 .in_set(WorldSet),
@@ -74,48 +75,19 @@ pub struct ChunkBundle {
 
 struct ChunkLoadTaskData {
     entity: Entity,
-    chunk: ChunkBundle,
+    added_data: AddedChunkData,
+}
+
+enum AddedChunkData {
+    Noise {
+        perlin_2d: Perlin2d,
+        noise_3d: Noise3d,
+    },
+    Blocks(Blocks, Stage),
 }
 
 #[derive(Resource, Default)]
 struct ChunkLoadTasks(HashMap<ChunkPosition, Task<ChunkLoadTaskData>>);
-
-#[derive(Component)]
-struct NeedsChunkData;
-
-fn begin_chunk_load_tasks(
-    mut tasks: ResMut<ChunkLoadTasks>,
-    q_chunk: Query<(Entity, &ChunkPosition), (Without<Blocks>, With<NeedsChunkData>)>,
-    world_gen_noise: Res<WorldGenNoise>,
-) {
-    for (entity, pos) in q_chunk.iter() {
-        if tasks.0.contains_key(pos) {
-            continue;
-        }
-        let task_pool = AsyncComputeTaskPool::get();
-        let cloned_noise = world_gen_noise.clone();
-        let pos_ivec = pos.0;
-        let task = task_pool.spawn(async move {
-            let chunk = generate_chunk_noise(cloned_noise, pos_ivec);
-            ChunkLoadTaskData { entity, chunk }
-        });
-        tasks.0.insert(*pos, task);
-    }
-}
-
-fn receive_chunk_load_tasks(mut commands: Commands, mut tasks: ResMut<ChunkLoadTasks>) {
-    tasks.0.retain(|_, task| {
-        let Some(data) = block_on(future::poll_once(task)) else {
-            return true;
-        };
-        if let Some(mut entity) = commands.get_entity(data.entity) {
-            entity
-                .insert(data.chunk)
-                .remove::<NeedsChunkData>();
-        };
-        return false;
-    });
-}
 
 fn kill_tasks_for_unloaded_chunks(
     trigger: Trigger<OnRemove, Blocks>,
@@ -165,7 +137,7 @@ fn update_chunks(
     // Finally, load the new chunks
     for pos in should_be_loaded_positions {
         commands.spawn((
-            NeedsChunkData,
+            Chunk,
             ChunkPosition(pos),
             SpatialBundle {
                 transform: Transform {
@@ -198,9 +170,59 @@ fn despawn_chunks(q_chunk: Query<(Entity, &ToDespawn, &CameraDistance)>, mut com
         .for_each(|(entity, _, _)| commands.entity(entity).despawn_recursive());
 }
 
-fn generate_chunk_noise(noise: WorldGenNoise, chunk_pos: IVec3) -> ChunkBundle {
-    let blocks =
-        std::iter::repeat_n(default(), CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE).collect::<_>();
+fn receive_chunk_load_tasks(mut commands: Commands, mut tasks: ResMut<ChunkLoadTasks>) {
+    tasks.0.retain(|_, task| {
+        let Some(data) = block_on(future::poll_once(task)) else {
+            return true;
+        };
+        let Some(mut entity) = commands.get_entity(data.entity) else {
+            return false;
+        };
+        match data.added_data {
+            AddedChunkData::Noise {
+                perlin_2d,
+                noise_3d,
+            } => {
+                entity.insert((perlin_2d, noise_3d, Stage::Noise));
+            }
+            AddedChunkData::Blocks(blocks, stage) => {
+                entity.insert((blocks, stage));
+            }
+        }
+        return false;
+    });
+}
+
+#[derive(Component)]
+struct NeedsChunkData;
+
+fn begin_noise_load_tasks(
+    mut tasks: ResMut<ChunkLoadTasks>,
+    q_chunk: Query<(Entity, &ChunkPosition), (With<Chunk>, Without<Noise3d>, Without<Perlin2d>)>,
+    world_gen_noise: Res<WorldGenNoise>,
+) {
+    for (entity, pos) in q_chunk.iter() {
+        if tasks.0.contains_key(pos) {
+            continue;
+        }
+        let task_pool = AsyncComputeTaskPool::get();
+        let cloned_noise = world_gen_noise.clone();
+        let pos_ivec = pos.0;
+        let task = task_pool.spawn(async move {
+            let (perlin_2d, noise_3d) = generate_chunk_noise(cloned_noise, pos_ivec);
+            ChunkLoadTaskData {
+                entity,
+                added_data: AddedChunkData::Noise {
+                    perlin_2d,
+                    noise_3d,
+                },
+            }
+        });
+        tasks.0.insert(*pos, task);
+    }
+}
+
+fn generate_chunk_noise(noise: WorldGenNoise, chunk_pos: IVec3) -> (Perlin2d, Noise3d) {
     let perlin_2d = (0..CHUNK_SIZE * CHUNK_SIZE)
         .into_par_iter()
         .map(|idx| {
@@ -228,31 +250,39 @@ fn generate_chunk_noise(noise: WorldGenNoise, chunk_pos: IVec3) -> ChunkBundle {
         })
         .collect::<_>();
 
-    let chunk_data = ChunkBundle {
-        stage: Stage::Noise,
-        blocks: Blocks(blocks),
-        perlin_2d: Perlin2d(perlin_2d),
-        noise_3d: Noise3d(noise_3d),
-    };
-    chunk_data
+    (Perlin2d(perlin_2d), Noise3d(noise_3d))
 }
 
-fn generate_terrain(
-    mut q_chunk: Query<(&mut Blocks, &mut Stage, &Perlin2d, &ChunkPosition), Changed<Stage>>,
+fn begin_terrain_load_tasks(
+    mut tasks: ResMut<ChunkLoadTasks>,
+    q_chunk: Query<
+        (Entity, &ChunkPosition, &Perlin2d, &Stage),
+        (With<Chunk>, With<Perlin2d>, Without<Blocks>, Changed<Stage>),
+    >,
 ) {
-    for (mut blocks, mut stage, perlin, pos) in q_chunk.iter_mut() {
-        if *stage != Stage::Noise {
+    for (entity, pos, perlin_2d, stage) in q_chunk.iter() {
+        if tasks.0.contains_key(pos) || stage != &Stage::Noise {
             continue;
         }
-        generate_terrain_for_chunk(blocks.as_mut(), perlin, pos);
-        *stage = Stage::Terrain;
+        let task_pool = AsyncComputeTaskPool::get();
+        let cloned_perlin = perlin_2d.clone();
+        let cloned_pos = pos.clone();
+        let task = task_pool.spawn(async move {
+            let blocks = generate_terrain_for_chunk(cloned_perlin, cloned_pos);
+            ChunkLoadTaskData {
+                entity,
+                added_data: AddedChunkData::Blocks(blocks, Stage::Terrain),
+            }
+        });
+        tasks.0.insert(*pos, task);
     }
 }
 
-fn generate_terrain_for_chunk(blocks: &mut Blocks, noise: &Perlin2d, pos: &ChunkPosition) {
+fn generate_terrain_for_chunk(noise: Perlin2d, pos: ChunkPosition) -> Blocks {
     const SCALE: f32 = 60.0;
     const DIRT_DEPTH: usize = 2;
     let chunk_pos = pos.0;
+    let mut blocks = Blocks::default();
     for z in 0..CHUNK_SIZE {
         for x in 0..CHUNK_SIZE {
             let height = (noise.at_pos([x, z]) * SCALE) as i32 + 1;
@@ -277,14 +307,16 @@ fn generate_terrain_for_chunk(blocks: &mut Blocks, noise: &Perlin2d, pos: &Chunk
             }
         }
     }
+    return blocks;
 }
 
-fn generate_structures(
-    mut q_chunk: Query<(&mut Blocks, &ChunkPosition, &mut Stage)>,
+fn begin_structure_load_tasks(
+    mut tasks: ResMut<ChunkLoadTasks>,
     index: Res<ChunkIndex>,
+    q_chunk: Query<(Entity, &ChunkPosition, &Stage), With<Chunk>>,
 ) {
-    for (mut blocks, pos, mut stage) in q_chunk.iter_mut() {
-        if *stage != Stage::Terrain {
+    for (entity, pos, stage) in q_chunk.iter() {
+        if tasks.0.contains_key(pos) || stage != &Stage::Terrain {
             continue;
         }
         let neighborhood = index.get_neighborhood(&pos.0);
@@ -295,36 +327,53 @@ fn generate_structures(
         {
             continue;
         }
-        // TODO: Vary available structure types by looking at local data
-        let structure_types = vec![StructureType::Tree];
-        let structure_blocks = structure_types
-            .iter()
-            .flat_map(|s| s.get_structures(&neighborhood))
-            .flat_map(|(structure, [x0, y0, z0])| {
-                structure
-                    .get_blocks()
-                    .iter()
-                    .map(move |(block, [x1, y1, z1])| (*block, [x0 + x1, y0 + y1, z0 + z1]))
-                    .collect::<Vec<_>>()
-            })
-            .filter(|(_, [x, y, z])| {
-                let x = *x;
-                let y = *y;
-                let z = *z;
-                0 <= x
-                    && x < CHUNK_SIZE as i32
-                    && 0 <= y
-                    && y < CHUNK_SIZE as i32
-                    && 0 <= z
-                    && z < CHUNK_SIZE as i32
-            })
-            .collect::<Vec<_>>();
-        for (block, [x, y, z]) in structure_blocks.iter().copied() {
-            let x = x as usize;
-            let y = y as usize;
-            let z = z as usize;
-            *blocks.at_pos_mut([x, y, z]) = block;
-        }
-        *stage = Stage::Structures;
+        let task_pool = AsyncComputeTaskPool::get();
+        let task = task_pool.spawn(async move {
+            let blocks = generate_structures(neighborhood);
+            ChunkLoadTaskData {
+                entity,
+                added_data: AddedChunkData::Blocks(blocks, Stage::Structures),
+            }
+        });
+        tasks.0.insert(*pos, task);
     }
+}
+
+fn generate_structures(neighborhood: ChunkNeighborhood) -> Blocks {
+    let mut blocks = neighborhood
+        .middle()
+        .expect("Middle chunk")
+        .blocks
+        .clone();
+    let structure_types = vec![StructureType::Tree];
+    let structure_blocks = structure_types
+        .iter()
+        .flat_map(|s| s.get_structures(&neighborhood))
+        .flat_map(|(structure, [x0, y0, z0])| {
+            structure
+                .get_blocks()
+                .iter()
+                .map(move |(block, [x1, y1, z1])| (*block, [x0 + x1, y0 + y1, z0 + z1]))
+                .collect::<Vec<_>>()
+        })
+        .filter(|(_, [x, y, z])| {
+            let x = *x;
+            let y = *y;
+            let z = *z;
+            0 <= x
+                && x < CHUNK_SIZE as i32
+                && 0 <= y
+                && y < CHUNK_SIZE as i32
+                && 0 <= z
+                && z < CHUNK_SIZE as i32
+        })
+        .collect::<Vec<_>>();
+    // TODO: Vary available structure types by looking at local data
+    for (block, [x, y, z]) in structure_blocks.iter().copied() {
+        let x = x as usize;
+        let y = y as usize;
+        let z = z as usize;
+        *blocks.at_pos_mut([x, y, z]) = block;
+    }
+    return blocks;
 }

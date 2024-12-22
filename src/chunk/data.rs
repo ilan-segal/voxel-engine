@@ -1,4 +1,4 @@
-use super::spatial::SpatiallyMapped;
+use super::{spatial::SpatiallyMapped, CHUNK_SIZE};
 use crate::block::Block;
 use bevy::prelude::*;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -12,6 +12,14 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 #[derive(Component, Clone)]
 pub struct Blocks(pub Vec<Block>);
+
+impl Default for Blocks {
+    fn default() -> Self {
+        let blocks = std::iter::repeat_n(Block::default(), CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
+            .collect::<_>();
+        return Self(blocks);
+    }
+}
 
 impl SpatiallyMapped<Block, 3> for Blocks {
     fn at_pos(&self, pos: [usize; 3]) -> &Block {
