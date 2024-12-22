@@ -3,6 +3,7 @@
 #![feature(int_roundings)]
 #![feature(iter_map_windows)]
 #![feature(trivial_bounds)]
+#![feature(step_trait)]
 
 use bevy::{
     pbr::wireframe::{WireframeConfig, WireframePlugin},
@@ -25,6 +26,7 @@ mod player;
 mod render_layer;
 mod structure;
 mod ui;
+mod utils;
 mod world;
 
 const BLOCK_SIZE: f32 = 1.0;

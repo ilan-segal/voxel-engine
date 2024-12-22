@@ -6,7 +6,7 @@ use collision::{Collidable, Collision};
 use gravity::Gravity;
 use velocity::Velocity;
 
-use crate::{chunk::position::ChunkPosition, world::index::ChunkIndex};
+use crate::{chunk::position::ChunkPosition, utils::VolumetricRange, world::index::ChunkIndex};
 
 pub mod aabb;
 pub mod collision;
@@ -198,16 +198,18 @@ fn solid_block_is_in_range(
     z1: f32,
     z2: f32,
 ) -> bool {
-    for x in x1 as i32..=x2 as i32 {
-        for y in y1 as i32..=y2 as i32 {
-            for z in z1 as i32..=z2 as i32 {
-                if index
-                    .at(x as f32, y as f32, z as f32)
-                    .is_solid()
-                {
-                    return true;
-                }
-            }
+    let x1 = x1 as i32;
+    let y1 = y1 as i32;
+    let z1 = z1 as i32;
+    let x2 = x2 as i32;
+    let y2 = y2 as i32;
+    let z2 = z2 as i32;
+    for (x, y, z) in VolumetricRange::new(x1..x2 + 1, y1..y2 + 1, z1..z2 + 1) {
+        if index
+            .at(x as f32, y as f32, z as f32)
+            .is_solid()
+        {
+            return true;
         }
     }
     return false;
