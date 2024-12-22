@@ -47,7 +47,8 @@ impl Plugin for WorldPlugin {
             Update,
             (
                 (update_chunks, despawn_chunks, begin_chunk_load_tasks).chain(),
-                (generate_terrain, generate_structures),
+                generate_terrain,
+                generate_structures,
                 receive_chunk_load_tasks,
             )
                 .in_set(WorldSet),
