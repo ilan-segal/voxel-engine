@@ -3,7 +3,12 @@ use crate::{
     chunk::{
         data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, CHUNK_SIZE,
     },
-    world::{index::ChunkIndex, neighborhood::ChunkNeighborhood, WorldSet},
+    utils::VolumetricRange,
+    world::{
+        index::{ChunkIndex, ChunkIndexUpdate},
+        neighborhood::ChunkNeighborhood,
+        WorldSet,
+    },
     WORLD_LAYER,
 };
 use bevy::{
@@ -16,7 +21,6 @@ use bevy::{
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
     utils::HashMap,
 };
-use itertools::Itertools;
 
 pub struct MeshPlugin;
 
@@ -27,12 +31,7 @@ impl Plugin for MeshPlugin {
             .add_systems(
                 Update,
                 (
-                    (
-                        update_mesh_status,
-                        update_mesh_from_chunk_update_event,
-                        begin_mesh_gen_tasks,
-                    )
-                        .chain(),
+                    (mark_mesh_as_stale, begin_mesh_gen_tasks).chain(),
                     receive_mesh_gen_tasks,
                 )
                     .after(WorldSet)
@@ -75,40 +74,24 @@ enum ChunkMeshStatus {
     NeedsNoMesh,
 }
 
-fn update_mesh_status(mut commands: Commands, q_blocks: Query<(Entity, &Blocks), Changed<Blocks>>) {
-    for (entity, blocks) in q_blocks.iter() {
-        if blocks.is_meshable() {
-            commands
-                .entity(entity)
-                .insert(ChunkMeshStatus::UnMeshed);
-        } else {
-            commands
-                .entity(entity)
-                .insert(ChunkMeshStatus::NeedsNoMesh);
-        }
-    }
-}
-
-fn update_mesh_from_chunk_update_event(
+fn mark_mesh_as_stale(
     mut commands: Commands,
+    // q_blocks: Query<&Blocks>,
+    mut chunk_updates: EventReader<ChunkIndexUpdate>,
     index: Res<ChunkIndex>,
-    q_chunk_pos: Query<&ChunkPosition, Changed<Blocks>>,
     mut tasks: ResMut<MeshGenTasks>,
 ) {
-    for chunk_pos in q_chunk_pos.iter() {
-        (-1..=1)
-            .cartesian_product(-1..=1)
-            .cartesian_product(-1..=1)
-            .for_each(|((x, y), z)| {
-                let cur_pos = IVec3::new(x, y, z) + chunk_pos.0;
-                let Some(entity) = index.entity_by_pos.get(&cur_pos) else {
-                    return;
-                };
-                commands
-                    .entity(*entity)
-                    .insert(ChunkMeshStatus::UnMeshed);
-                tasks.0.remove(chunk_pos);
-            });
+    for ChunkIndexUpdate(pos) in chunk_updates.read() {
+        for (x, y, z) in VolumetricRange::new(-1..2, -1..2, -1..2) {
+            let cur_pos = IVec3::new(x, y, z) + pos.0;
+            let Some(entity_in_neighborhood) = index.entity_by_pos.get(&cur_pos) else {
+                continue;
+            };
+            commands
+                .entity(*entity_in_neighborhood)
+                .insert(ChunkMeshStatus::UnMeshed);
+            tasks.0.remove(pos);
+        }
     }
 }
 
@@ -128,12 +111,12 @@ fn end_mesh_tasks_for_unloaded_chunks(
 
 fn begin_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
-    q_chunk: Query<(Entity, &ChunkPosition, &ChunkMeshStatus), With<Blocks>>,
+    mut q_chunk: Query<(Entity, &ChunkPosition, &mut ChunkMeshStatus), With<Blocks>>,
     chunk_index: Res<ChunkIndex>,
     mut commands: Commands,
 ) {
-    for (entity, pos, mesh_status) in q_chunk.iter() {
-        if mesh_status != &ChunkMeshStatus::UnMeshed {
+    for (entity, pos, mut mesh_status) in q_chunk.iter_mut() {
+        if *mesh_status != ChunkMeshStatus::UnMeshed {
             continue;
         }
         if tasks.0.contains_key(pos) {
@@ -141,7 +124,12 @@ fn begin_mesh_gen_tasks(
         }
         let task_pool = AsyncComputeTaskPool::get();
         let cloned_chunk = chunk_index.get_neighborhood(&pos.0);
-        if cloned_chunk.middle().is_none() {
+        let Some(middle_chunk) = cloned_chunk.middle() else {
+            warn!("Chunk at {:?} is absent from index", pos);
+            continue;
+        };
+        if !middle_chunk.blocks.is_meshable() {
+            *mesh_status = ChunkMeshStatus::NeedsNoMesh;
             continue;
         }
         let task = task_pool.spawn(async move {
