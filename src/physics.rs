@@ -204,13 +204,7 @@ fn solid_block_is_in_range(
     let x2 = x2 as i32;
     let y2 = y2 as i32;
     let z2 = z2 as i32;
-    for (x, y, z) in VolumetricRange::new(x1..x2 + 1, y1..y2 + 1, z1..z2 + 1) {
-        if index
-            .at(x as f32, y as f32, z as f32)
-            .is_solid()
-        {
-            return true;
-        }
-    }
-    return false;
+    VolumetricRange::new(x1..x2 + 1, y1..y2 + 1, z1..z2 + 1)
+        .map(|(x, y, z)| (x as f32, y as f32, z as f32))
+        .any(|(x, y, z)| index.at(x, y, z).is_solid())
 }
