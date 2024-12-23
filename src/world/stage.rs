@@ -7,3 +7,9 @@ pub enum Stage {
     Terrain,
     Structures,
 }
+
+impl Stage {
+    pub fn final_stage() -> Self {
+        Self::Structures
+    }
+}

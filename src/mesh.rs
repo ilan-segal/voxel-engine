@@ -1,5 +1,6 @@
 use crate::{
     block::{Block, BlockSide},
+    camera_distance::CameraDistance,
     chunk::{
         data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, CHUNK_SIZE,
     },
@@ -7,6 +8,7 @@ use crate::{
     world::{
         index::{ChunkIndex, ChunkIndexUpdate},
         neighborhood::ChunkNeighborhood,
+        stage::Stage,
         WorldSet,
     },
     WORLD_LAYER,
@@ -111,15 +113,27 @@ fn end_mesh_tasks_for_unloaded_chunks(
 
 fn begin_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
-    mut q_chunk: Query<(Entity, &ChunkPosition, &mut ChunkMeshStatus), With<Blocks>>,
+    mut q_chunk: Query<
+        (
+            Entity,
+            &ChunkPosition,
+            &mut ChunkMeshStatus,
+            &Stage,
+            &CameraDistance,
+        ),
+        With<Blocks>,
+    >,
     chunk_index: Res<ChunkIndex>,
     mut commands: Commands,
 ) {
-    for (entity, pos, mut mesh_status) in q_chunk.iter_mut() {
-        if *mesh_status != ChunkMeshStatus::UnMeshed {
-            continue;
-        }
-        if tasks.0.contains_key(pos) {
+    for (entity, pos, mut mesh_status, stage, _) in q_chunk
+        .iter_mut()
+        .sort::<&CameraDistance>()
+    {
+        if *mesh_status != ChunkMeshStatus::UnMeshed
+            || tasks.0.contains_key(pos)
+            || stage != &Stage::final_stage()
+        {
             continue;
         }
         let task_pool = AsyncComputeTaskPool::get();

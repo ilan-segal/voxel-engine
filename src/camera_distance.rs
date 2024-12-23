@@ -8,8 +8,16 @@ impl Plugin for CameraDistancePlugin {
     }
 }
 
-#[derive(Component, Default)]
+#[derive(Component, Default, PartialEq, PartialOrd)]
 pub struct CameraDistance(pub f32);
+
+impl Ord for CameraDistance {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        return self.0.partial_cmp(&other.0).unwrap();
+    }
+}
+
+impl Eq for CameraDistance {}
 
 fn assign_chunk_distance(
     mut commands: Commands,
