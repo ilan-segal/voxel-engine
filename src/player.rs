@@ -3,7 +3,7 @@ use block_target::BlockTargetPlugin;
 use falling_state::FallingState;
 
 use crate::{
-    chunk::CHUNK_SIZE,
+    // chunk::CHUNK_SIZE,
     physics::{
         aabb::Aabb,
         collision::{Collidable, Collision},
@@ -35,7 +35,7 @@ impl Plugin for PlayerPlugin {
 pub struct PlayerBundle {
     player: Player,
     camera: Camera3dBundle,
-    fog_settings: FogSettings,
+    // fog_settings: FogSettings,
     aabb: Aabb,
     collidable: Collidable,
     gravity: Gravity,
@@ -56,15 +56,15 @@ impl Default for PlayerBundle {
                 deband_dither: DebandDither::Enabled,
                 ..default()
             },
-            fog_settings: FogSettings {
-                color: Color::WHITE,
-                falloff: FogFalloff::from_visibility_colors(
-                    CHUNK_SIZE as f32 * 16.0, // distance in world units up to which objects retain visibility (>= 5% contrast)
-                    Color::WHITE, // atmospheric extinction color (after light is lost due to absorption by atmospheric particles)
-                    Color::linear_rgba(0.8, 0.8, 0.92, 0.3), //SKY_COLOUR.with_alpha(0.5), // atmospheric inscattering color (light gained due to scattering from the sun)
-                ),
-                ..default()
-            },
+            // fog_settings: FogSettings {
+            //     color: Color::WHITE,
+            //     falloff: FogFalloff::from_visibility_colors(
+            //         CHUNK_SIZE as f32 * 16.0, // distance in world units up to which objects retain visibility (>= 5% contrast)
+            //         Color::WHITE, // atmospheric extinction color (after light is lost due to absorption by atmospheric particles)
+            //         Color::linear_rgba(0.8, 0.8, 0.92, 0.3), //SKY_COLOUR.with_alpha(0.5), // atmospheric inscattering color (light gained due to scattering from the sun)
+            //     ),
+            //     ..default()
+            // },
             aabb: Aabb::square_prism(0.35, 1.8, 1.65),
             collidable: Collidable,
             gravity: Gravity::default(),

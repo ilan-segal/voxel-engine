@@ -4,6 +4,7 @@ use crate::{
     chunk::{
         data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, CHUNK_SIZE,
     },
+    shader::BlockMaterial,
     utils::VolumetricRange,
     world::{
         index::{ChunkIndex, ChunkIndexUpdate},
@@ -29,7 +30,6 @@ pub struct MeshPlugin;
 impl Plugin for MeshPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MeshGenTasks>()
-            .add_systems(Startup, setup)
             .add_systems(
                 Update,
                 (
@@ -45,23 +45,6 @@ impl Plugin for MeshPlugin {
 
 #[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
 pub struct MeshSet;
-
-fn setup(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>) {
-    let common_materials = CommonMaterials {
-        white: materials.add(StandardMaterial {
-            perceptual_roughness: 1.0,
-            reflectance: 0.0,
-            base_color: Color::WHITE,
-            ..Default::default()
-        }),
-    };
-    commands.insert_resource(common_materials);
-}
-
-#[derive(Resource)]
-struct CommonMaterials {
-    white: Handle<StandardMaterial>,
-}
 
 struct MeshTaskData {
     entity: Entity,
@@ -163,7 +146,8 @@ fn receive_mesh_gen_tasks(
     mut commands: Commands,
     mut tasks: ResMut<MeshGenTasks>,
     mut meshes: ResMut<Assets<Mesh>>,
-    materials: Res<CommonMaterials>,
+    // materials: Res<CommonMaterials>,
+    block_material: Res<BlockMaterial>,
     q_transform: Query<&Transform>,
 ) {
     tasks.0.retain(|_, task| {
@@ -176,9 +160,15 @@ fn receive_mesh_gen_tasks(
         };
         if let Some(mesh) = data.mesh {
             entity.insert((
-                PbrBundle {
+                // PbrBundle {
+                //     mesh: meshes.add(mesh),
+                //     material: materials.white.clone(),
+                //     transform: *q_transform.get(e).unwrap(),
+                //     ..default()
+                // },
+                MaterialMeshBundle {
                     mesh: meshes.add(mesh),
-                    material: materials.white.clone(),
+                    material: block_material.handle.clone(),
                     transform: *q_transform.get(e).unwrap(),
                     ..default()
                 },
@@ -189,8 +179,7 @@ fn receive_mesh_gen_tasks(
         } else {
             entity
                 .insert(ChunkMeshStatus::NeedsNoMesh)
-                .remove::<Handle<Mesh>>()
-                .remove::<RenderLayers>();
+                .remove::<(Handle<Mesh>, RenderLayers)>();
         }
         return false;
     });
@@ -201,6 +190,8 @@ struct Quad {
     vertices: [Vec3; 4],
     ao_factors: [u8; 4],
     block: Block,
+    height_blocks: u8,
+    width_blocks: u8,
 }
 
 impl Quad {
@@ -352,6 +343,8 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                     vertices,
                     ao_factors,
                     block: *block,
+                    height_blocks: height as u8 + 1,
+                    width_blocks: width as u8 + 1,
                 };
                 quads.push(quad);
                 for cur_row in row..=height + row {
@@ -546,6 +539,21 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
         })
         .map(|c| c.to_linear().to_f32_array())
         .collect::<Vec<_>>();
+    let uv = quads
+        .iter()
+        .flat_map(|_| [[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]])
+        .collect::<Vec<_>>();
+    let uv_b = quads
+        .iter()
+        .flat_map(|q| {
+            [
+                [0.0, q.height_blocks as f32],
+                [q.width_blocks as f32, q.height_blocks as f32],
+                [q.width_blocks as f32, 0.0],
+                [0.0, 0.0],
+            ]
+        })
+        .collect::<Vec<_>>();
     let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::RENDER_WORLD,
@@ -553,6 +561,8 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colours)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uv)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_1, uv_b)
     .with_inserted_indices(Indices::U32(indices));
     return Some(mesh);
 }

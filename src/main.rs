@@ -24,6 +24,7 @@ mod mesh;
 mod physics;
 mod player;
 mod render_layer;
+mod shader;
 mod structure;
 mod ui;
 mod utils;
@@ -35,14 +36,17 @@ const SKY_COLOUR: Color = Color::linear_rgb(0.25, 0.60, 0.92);
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "Voxel Engine".into(),
-                    present_mode: bevy::window::PresentMode::AutoNoVsync,
+            DefaultPlugins
+                .set(ImagePlugin::default_nearest())
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Voxel Engine".into(),
+                        present_mode: bevy::window::PresentMode::AutoNoVsync,
+                        ..default()
+                    }),
                     ..default()
                 }),
-                ..default()
-            }),
+            shader::TexturePlugin,
             WireframePlugin,
             camera_distance::CameraDistancePlugin,
             chunk::ChunkPlugin,
@@ -58,7 +62,7 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(Update, toggle_wireframe)
         .insert_resource(ClearColor(SKY_COLOUR))
-        .insert_resource(Msaa::Sample8)
+        .insert_resource(Msaa::Off)
         .run();
 }
 

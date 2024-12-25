@@ -1,6 +1,7 @@
 use bevy::prelude::*;
+use strum_macros::EnumIter;
 
-#[derive(Default, Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug, Hash, EnumIter)]
 pub enum Block {
     #[default]
     Air,
@@ -21,12 +22,12 @@ impl From<&Block> for Block {
 impl Block {
     pub fn get_colour(&self) -> Option<Color> {
         match self {
-            Self::Stone => Some(Color::linear_rgb(0.2, 0.2, 0.2)),
+            // Self::Stone => Some(Color::linear_rgb(0.2, 0.2, 0.2)),
             Self::Grass => Some(Color::linear_rgb(0.2, 0.6, 0.0)),
-            Self::Dirt => Some(Color::hsv(35.0, 0.65, 0.65)),
-            Self::Wood => Some(Color::hsv(35.0, 0.65, 0.15)),
+            // Self::Dirt => Some(Color::hsv(35.0, 0.65, 0.65)),
+            // Self::Wood => Some(Color::hsv(35.0, 0.65, 0.15)),
             Self::Leaves => Some(Color::linear_rgb(0.05, 0.15, 0.0)),
-            _ => None,
+            _ => Some(Color::WHITE),
         }
     }
 
