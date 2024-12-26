@@ -480,13 +480,13 @@ fn create_meshes(quads: Vec<Quad>) -> Vec<(Block, Mesh)> {
         .chunk_by(|q| q.block)
         .into_iter()
         .filter_map(|(block, qs)| {
-            let mesh = create_mesh_from_quads(&block, qs.cloned().collect())?;
+            let mesh = create_mesh_from_quads(qs.cloned().collect())?;
             Some((block, mesh))
         })
         .collect()
 }
 
-fn create_mesh_from_quads(block: &Block, mut quads: Vec<Quad>) -> Option<Mesh> {
+fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
     if quads.is_empty() {
         return None;
     }
