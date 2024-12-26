@@ -23,6 +23,7 @@ use bevy::{
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
     utils::HashMap,
 };
+use itertools::Itertools;
 
 pub struct MeshPlugin;
 
@@ -65,7 +66,7 @@ struct CommonMaterials {
 
 struct MeshTaskData {
     entity: Entity,
-    mesh: Option<Mesh>,
+    mesh: Vec<Mesh>,
 }
 
 #[derive(Component, PartialEq, Eq)]
@@ -149,7 +150,7 @@ fn begin_mesh_gen_tasks(
         let task = task_pool.spawn(async move {
             MeshTaskData {
                 entity,
-                mesh: get_mesh_for_chunk(cloned_chunk),
+                mesh: get_meshes_for_chunk(cloned_chunk),
             }
         });
         tasks.0.insert(*pos, task);
@@ -164,7 +165,6 @@ fn receive_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
     mut meshes: ResMut<Assets<Mesh>>,
     materials: Res<CommonMaterials>,
-    q_transform: Query<&Transform>,
 ) {
     tasks.0.retain(|_, task| {
         let Some(data) = block_on(future::poll_once(task)) else {
@@ -174,29 +174,31 @@ fn receive_mesh_gen_tasks(
         let Some(mut entity) = commands.get_entity(e) else {
             return true;
         };
-        if let Some(mesh) = data.mesh {
-            entity.insert((
-                PbrBundle {
-                    mesh: meshes.add(mesh),
-                    material: materials.white.clone(),
-                    transform: *q_transform.get(e).unwrap(),
-                    ..default()
-                },
-                RenderLayers::layer(WORLD_LAYER),
-                ChunkMeshStatus::Meshed,
-                NoFrustumCulling,
-            ));
-        } else {
+        entity.despawn_descendants();
+        if data.mesh.len() > 0 {
             entity
-                .insert(ChunkMeshStatus::NeedsNoMesh)
-                .remove::<Handle<Mesh>>()
-                .remove::<RenderLayers>();
+                .insert(ChunkMeshStatus::Meshed)
+                .with_children(|builder| {
+                    for mesh in data.mesh {
+                        builder.spawn((
+                            PbrBundle {
+                                mesh: meshes.add(mesh),
+                                material: materials.white.clone(),
+                                ..default()
+                            },
+                            RenderLayers::layer(WORLD_LAYER),
+                            NoFrustumCulling,
+                        ));
+                    }
+                });
+        } else {
+            entity.insert(ChunkMeshStatus::NeedsNoMesh);
         }
         return false;
     });
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Quad {
     vertices: [Vec3; 4],
     ao_factors: [u8; 4],
@@ -212,7 +214,7 @@ impl Quad {
     }
 }
 
-fn get_mesh_for_chunk(chunk: ChunkNeighborhood) -> Option<Mesh> {
+fn get_meshes_for_chunk(chunk: ChunkNeighborhood) -> Vec<Mesh> {
     let mut quads = vec![];
     quads.extend(greedy_mesh(&chunk, BlockSide::Up));
     quads.extend(greedy_mesh(&chunk, BlockSide::Down));
@@ -220,7 +222,7 @@ fn get_mesh_for_chunk(chunk: ChunkNeighborhood) -> Option<Mesh> {
     quads.extend(greedy_mesh(&chunk, BlockSide::South));
     quads.extend(greedy_mesh(&chunk, BlockSide::West));
     quads.extend(greedy_mesh(&chunk, BlockSide::East));
-    return create_mesh_from_quads(quads);
+    return create_meshes(quads);
 }
 
 // TODO: Replace slow implementation with binary mesher
@@ -486,7 +488,17 @@ fn get_quad_corners(
     }
 }
 
-fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
+fn create_meshes(quads: Vec<Quad>) -> Vec<Mesh> {
+    quads
+        .iter()
+        .sorted_by_key(|q| q.block)
+        .chunk_by(|q| q.block)
+        .into_iter()
+        .filter_map(|(block, qs)| create_mesh_from_quads(&block, qs.cloned().collect()))
+        .collect()
+}
+
+fn create_mesh_from_quads(block: &Block, mut quads: Vec<Quad>) -> Option<Mesh> {
     if quads.is_empty() {
         return None;
     }
@@ -531,18 +543,16 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
             ]
         })
         .collect::<Vec<_>>();
+    let colour = block
+        .get_colour()
+        .expect("Meshed block should have colour");
     let colours = quads
         .iter()
-        .flat_map(|q: &Quad| {
-            let colour = q
-                .block
-                .get_colour()
-                .expect("Meshed block should have colour");
-
-            return q.ao_factors.iter().map(move |factor| {
+        .flat_map(|q| {
+            q.ao_factors.iter().map(move |factor| {
                 let lum = 0.6_f32.powi((*factor).into()) * colour.luminance();
                 return colour.with_luminance(lum);
-            });
+            })
         })
         .map(|c| c.to_linear().to_f32_array())
         .collect::<Vec<_>>();

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-#[derive(Default, Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub enum Block {
     #[default]
     Air,
