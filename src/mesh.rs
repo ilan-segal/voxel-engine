@@ -4,6 +4,7 @@ use crate::{
     chunk::{
         data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, CHUNK_SIZE,
     },
+    texture::BlockMaterials,
     utils::VolumetricRange,
     world::{
         index::{ChunkIndex, ChunkIndexUpdate},
@@ -30,7 +31,6 @@ pub struct MeshPlugin;
 impl Plugin for MeshPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MeshGenTasks>()
-            .add_systems(Startup, setup)
             .add_systems(
                 Update,
                 (
@@ -47,26 +47,9 @@ impl Plugin for MeshPlugin {
 #[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
 pub struct MeshSet;
 
-fn setup(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>) {
-    let common_materials = CommonMaterials {
-        white: materials.add(StandardMaterial {
-            perceptual_roughness: 1.0,
-            reflectance: 0.0,
-            base_color: Color::WHITE,
-            ..Default::default()
-        }),
-    };
-    commands.insert_resource(common_materials);
-}
-
-#[derive(Resource)]
-struct CommonMaterials {
-    white: Handle<StandardMaterial>,
-}
-
 struct MeshTaskData {
     entity: Entity,
-    mesh: Vec<Mesh>,
+    mesh: Vec<(Block, Mesh)>,
 }
 
 #[derive(Component, PartialEq, Eq)]
@@ -164,7 +147,7 @@ fn receive_mesh_gen_tasks(
     mut commands: Commands,
     mut tasks: ResMut<MeshGenTasks>,
     mut meshes: ResMut<Assets<Mesh>>,
-    materials: Res<CommonMaterials>,
+    materials: Res<BlockMaterials>,
 ) {
     tasks.0.retain(|_, task| {
         let Some(data) = block_on(future::poll_once(task)) else {
@@ -179,11 +162,11 @@ fn receive_mesh_gen_tasks(
             entity
                 .insert(ChunkMeshStatus::Meshed)
                 .with_children(|builder| {
-                    for mesh in data.mesh {
+                    for (block, mesh) in data.mesh {
                         builder.spawn((
                             PbrBundle {
                                 mesh: meshes.add(mesh),
-                                material: materials.white.clone(),
+                                material: materials.get(&block).unwrap().clone(),
                                 ..default()
                             },
                             RenderLayers::layer(WORLD_LAYER),
@@ -203,6 +186,7 @@ struct Quad {
     vertices: [Vec3; 4],
     ao_factors: [u8; 4],
     block: Block,
+    dimensions: [u8; 2],
 }
 
 impl Quad {
@@ -214,7 +198,7 @@ impl Quad {
     }
 }
 
-fn get_meshes_for_chunk(chunk: ChunkNeighborhood) -> Vec<Mesh> {
+fn get_meshes_for_chunk(chunk: ChunkNeighborhood) -> Vec<(Block, Mesh)> {
     let mut quads = vec![];
     quads.extend(greedy_mesh(&chunk, BlockSide::Up));
     quads.extend(greedy_mesh(&chunk, BlockSide::Down));
@@ -354,6 +338,7 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                     vertices,
                     ao_factors,
                     block: *block,
+                    dimensions: [width as u8 + 1, height as u8 + 1],
                 };
                 quads.push(quad);
                 for cur_row in row..=height + row {
@@ -488,13 +473,16 @@ fn get_quad_corners(
     }
 }
 
-fn create_meshes(quads: Vec<Quad>) -> Vec<Mesh> {
+fn create_meshes(quads: Vec<Quad>) -> Vec<(Block, Mesh)> {
     quads
         .iter()
         .sorted_by_key(|q| q.block)
         .chunk_by(|q| q.block)
         .into_iter()
-        .filter_map(|(block, qs)| create_mesh_from_quads(&block, qs.cloned().collect()))
+        .filter_map(|(block, qs)| {
+            let mesh = create_mesh_from_quads(&block, qs.cloned().collect())?;
+            Some((block, mesh))
+        })
         .collect()
 }
 
@@ -543,18 +531,25 @@ fn create_mesh_from_quads(block: &Block, mut quads: Vec<Quad>) -> Option<Mesh> {
             ]
         })
         .collect::<Vec<_>>();
-    let colour = block
-        .get_colour()
-        .expect("Meshed block should have colour");
+    // let colour = block.get_colour().unwrap_or_default();
     let colours = quads
         .iter()
         .flat_map(|q| {
             q.ao_factors.iter().map(move |factor| {
-                let lum = 0.6_f32.powi((*factor).into()) * colour.luminance();
-                return colour.with_luminance(lum);
+                let lum = 0.6_f32.powi((*factor).into());
+                return Color::WHITE.with_luminance(lum);
             })
         })
         .map(|c| c.to_linear().to_f32_array())
+        .collect::<Vec<_>>();
+    let uv = quads
+        .iter()
+        .flat_map(|q| {
+            let [width, height] = q.dimensions;
+            let width = width as f32;
+            let height = height as f32;
+            return [[0.0, height], [width, height], [width, 0.0], [0.0, 0.0]];
+        })
         .collect::<Vec<_>>();
     let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
@@ -563,6 +558,7 @@ fn create_mesh_from_quads(block: &Block, mut quads: Vec<Quad>) -> Option<Mesh> {
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colours)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uv)
     .with_inserted_indices(Indices::U32(indices));
     return Some(mesh);
 }
