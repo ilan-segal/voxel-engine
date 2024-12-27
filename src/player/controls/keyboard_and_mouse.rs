@@ -1,13 +1,14 @@
 use crate::{
     block::Block,
     physics::{gravity::Gravity, velocity::Velocity, PhysicsSystemSet},
-    player::{block_target::TargetedBlock, falling_state::FallingState, Player},
+    player::{block_target::TargetedBlock, falling_state::FallingState, mode::PlayerMode, Player},
     world::block_update::SetBlockEvent,
 };
 use bevy::{
     ecs::query::QueryData,
     input::{common_conditions::input_just_pressed, mouse::MouseMotion},
     prelude::*,
+    utils::{Entry, HashMap},
 };
 use std::f32::consts::PI;
 
@@ -18,11 +19,15 @@ impl Plugin for KeyboardMousePlugin {
         app.add_systems(
             Update,
             (
+                add_input_tracker,
+                track_new_press,
+                age_presses,
                 rotate_camera_with_mouse,
                 process_keyboard_inputs.before(PhysicsSystemSet::Act),
                 delete_targeted_block.run_if(input_just_pressed(MouseButton::Left)),
             ),
-        );
+        )
+        .observe(toggle_player_mode);
     }
 }
 
@@ -123,4 +128,68 @@ fn delete_targeted_block(
             world_pos: pos.to_array(),
         });
     }
+}
+
+#[derive(Event, Debug)]
+pub struct DoubleTap(KeyCode);
+
+#[derive(Component, Default)]
+pub struct SecondsSinceLastPress(HashMap<KeyCode, f32>);
+
+fn add_input_tracker(
+    q: Query<Entity, (With<Player>, Without<SecondsSinceLastPress>)>,
+    mut commands: Commands,
+) {
+    for entity in q.iter() {
+        commands
+            .entity(entity)
+            .insert(SecondsSinceLastPress::default());
+    }
+}
+
+fn track_new_press(
+    mut q_tracker: Query<(Entity, &mut SecondsSinceLastPress)>,
+    inputs: Res<ButtonInput<KeyCode>>,
+    mut commands: Commands,
+) {
+    for key_code in inputs.get_just_pressed().copied() {
+        for (entity, mut tracker) in q_tracker.iter_mut() {
+            let entry = tracker.0.entry(key_code);
+            if let Entry::Occupied(..) = entry {
+                let event = DoubleTap(key_code);
+                commands.trigger_targets(event, entity);
+            }
+            entry.insert(0.0);
+        }
+    }
+}
+
+const DOUBLE_TAP_DURATION_SECONDS: f32 = 0.5;
+
+fn age_presses(mut q_tracker: Query<&mut SecondsSinceLastPress>, time: Res<Time>) {
+    let dt = time.delta_seconds();
+    for mut q_tracker in q_tracker.iter_mut() {
+        q_tracker.0.retain(|_, duration_s| {
+            *duration_s += dt;
+            return *duration_s <= DOUBLE_TAP_DURATION_SECONDS;
+        });
+    }
+}
+
+const NO_CLIP_TOGGLE: KeyCode = KeyCode::KeyZ;
+
+fn toggle_player_mode(trigger: Trigger<DoubleTap>, mut q_mode: Query<&mut PlayerMode>) {
+    let event = trigger.event();
+    if event.0 != NO_CLIP_TOGGLE {
+        return;
+    }
+    let entity = trigger.entity();
+    let Ok(mut mode) = q_mode.get_mut(entity) else {
+        return;
+    };
+    *mode = match *mode {
+        PlayerMode::Survival => PlayerMode::NoClip,
+        PlayerMode::NoClip => PlayerMode::Survival,
+    };
+    info!("Switched to {:?}", *mode);
 }

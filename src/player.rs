@@ -1,7 +1,3 @@
-use bevy::{core_pipeline::tonemapping::DebandDither, prelude::*};
-use block_target::BlockTargetPlugin;
-use falling_state::FallingState;
-
 use crate::{
     chunk::CHUNK_SIZE,
     physics::{
@@ -12,10 +8,15 @@ use crate::{
         PhysicsSystemSet,
     },
 };
+use bevy::{core_pipeline::tonemapping::DebandDither, prelude::*};
+use block_target::BlockTargetPlugin;
+use falling_state::FallingState;
+use mode::PlayerMode;
 
 pub mod block_target;
 mod controls;
 pub mod falling_state;
+pub mod mode;
 
 pub struct PlayerPlugin;
 
@@ -24,12 +25,18 @@ impl Plugin for PlayerPlugin {
         app.add_plugins((BlockTargetPlugin, controls::ControlsPlugin))
             .add_systems(
                 Update,
-                update_grounded_state
-                    .after(PhysicsSystemSet::Act)
-                    .before(PhysicsSystemSet::React),
+                (
+                    update_grounded_state
+                        .after(PhysicsSystemSet::Act)
+                        .before(PhysicsSystemSet::React),
+                    update_gravity,
+                ),
             );
     }
 }
+
+#[derive(Component)]
+pub struct Player;
 
 #[derive(Bundle)]
 pub struct PlayerBundle {
@@ -40,6 +47,7 @@ pub struct PlayerBundle {
     collidable: Collidable,
     gravity: Gravity,
     falling_state: FallingState,
+    mode: PlayerMode,
 }
 
 impl Default for PlayerBundle {
@@ -69,12 +77,10 @@ impl Default for PlayerBundle {
             collidable: Collidable,
             gravity: Gravity::default(),
             falling_state: FallingState::Falling,
+            mode: PlayerMode::Survival,
         }
     }
 }
-
-#[derive(Component)]
-pub struct Player;
 
 fn update_grounded_state(
     mut q_state: Query<(&mut FallingState, &Velocity), With<Player>>,
@@ -94,5 +100,21 @@ fn update_grounded_state(
         if normal.y > 0.0 {
             *state = FallingState::Grounded;
         }
+    }
+}
+
+fn update_gravity(
+    q_player_mode: Query<(Entity, &PlayerMode), (With<Player>, Changed<PlayerMode>)>,
+    mut commands: Commands,
+) {
+    for (entity, mode) in q_player_mode.iter() {
+        match mode {
+            PlayerMode::Survival => commands
+                .entity(entity)
+                .insert(Gravity::default()),
+            PlayerMode::NoClip => commands
+                .entity(entity)
+                .remove::<Gravity>(),
+        };
     }
 }
