@@ -44,23 +44,55 @@ fn setup(
     asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mut get_material = |path| get_material(path, &asset_server, &mut materials);
+    let mut get_material =
+        |path, colour| get_material_with_colour(path, &asset_server, &mut materials, colour);
 
     let block_materials = BlockMaterials {
-        stone: get_material("textures/blocks/stone.png"),
-        dirt: get_material("textures/blocks/dirt.png"),
-        grass: get_material("textures/blocks/grass.png"),
-        wood: get_material("textures/blocks/oak_log.png"),
-        wood_top: get_material("textures/blocks/oak_log_top.png"),
-        leaves: get_material("textures/blocks/oak_leaves.png"),
+        stone: get_material(
+            "textures/blocks/stone.png",
+            Block::Stone
+                .get_colour()
+                .unwrap_or_default(),
+        ),
+        dirt: get_material(
+            "textures/blocks/dirt.png",
+            Block::Dirt
+                .get_colour()
+                .unwrap_or_default(),
+        ),
+        grass: get_material(
+            "textures/blocks/grass.png",
+            Block::Grass
+                .get_colour()
+                .unwrap_or_default(),
+        ),
+        wood: get_material(
+            "textures/blocks/oak_log.png",
+            Block::Wood
+                .get_colour()
+                .unwrap_or_default(),
+        ),
+        wood_top: get_material(
+            "textures/blocks/oak_log_top.png",
+            Block::Wood
+                .get_colour()
+                .unwrap_or_default(),
+        ),
+        leaves: get_material(
+            "textures/blocks/oak_leaves.png",
+            Block::Leaves
+                .get_colour()
+                .unwrap_or_default(),
+        ),
     };
     commands.insert_resource(block_materials);
 }
 
-fn get_material(
+fn get_material_with_colour(
     path: &'static str,
     asset_server: &Res<AssetServer>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
+    colour: Color,
 ) -> Handle<StandardMaterial> {
     let image = asset_server.load_with_settings(path, |image_loader_settings| {
         *image_loader_settings = ImageLoaderSettings {
@@ -75,7 +107,9 @@ fn get_material(
     });
     let material = StandardMaterial {
         base_color_texture: Some(image),
+        base_color: colour,
         reflectance: 0.0,
+        alpha_mode: AlphaMode::Mask(0.5),
         ..default()
     };
     return materials.add(material);

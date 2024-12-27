@@ -574,11 +574,7 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
         .flat_map(|q| {
             q.ao_factors.iter().map(move |factor| {
                 let lum = 0.6_f32.powi((*factor).into());
-                return q
-                    .block
-                    .get_colour()
-                    .unwrap_or_default()
-                    .with_luminance(lum);
+                return Color::WHITE.with_luminance(lum);
             })
         })
         .map(|c| c.to_linear().to_f32_array())

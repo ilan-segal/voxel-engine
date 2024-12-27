@@ -6,6 +6,7 @@
 #![feature(step_trait)]
 
 use bevy::{
+    core_pipeline::smaa::SmaaSettings,
     pbr::wireframe::{WireframeConfig, WireframePlugin},
     prelude::*,
     render::view::RenderLayers,
@@ -13,7 +14,6 @@ use bevy::{
 };
 use player::PlayerBundle;
 use render_layer::WORLD_LAYER;
-use std::f32::consts::PI;
 
 mod block;
 mod camera_distance;
@@ -69,19 +69,14 @@ fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
     window.cursor.visible = false;
     window.cursor.grab_mode = CursorGrabMode::Locked;
 
-    commands.spawn((PlayerBundle::default(), RenderLayers::layer(WORLD_LAYER)));
-
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
-            illuminance: light_consts::lux::OVERCAST_DAY,
-            color: Color::default(),
-            ..default()
-        },
-        transform: Transform {
-            translation: Vec3::new(0.0, 200.0, 0.0),
-            rotation: Quat::from_rotation_x(-PI / 4.) + Quat::from_rotation_z(-PI / 8.),
-            ..default()
-        },
+    commands.spawn((
+        PlayerBundle::default(),
+        RenderLayers::layer(WORLD_LAYER),
+        SmaaSettings::default(),
+    ));
+    commands.insert_resource(AmbientLight {
+        color: Color::WHITE,
+        brightness: 750.,
         ..default()
     });
 }
