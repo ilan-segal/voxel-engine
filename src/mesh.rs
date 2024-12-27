@@ -186,7 +186,7 @@ struct Quad {
     vertices: [Vec3; 4],
     ao_factors: [u8; 4],
     block: Block,
-    dimensions: [u8; 2],
+    uvs: [[f32; 2]; 4],
 }
 
 impl Quad {
@@ -194,6 +194,7 @@ impl Quad {
         if self.ao_factors[0] + self.ao_factors[2] > self.ao_factors[1] + self.ao_factors[3] {
             self.vertices.rotate_left(1);
             self.ao_factors.rotate_left(1);
+            self.uvs.rotate_left(1);
         }
     }
 }
@@ -334,11 +335,18 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                     top_right_ao_factor,
                     top_left_ao_factor,
                 ];
+                let u = width as f32 + 1.0;
+                let v = height as f32 + 1.0;
+                let uvs = if direction == BlockSide::North || direction == BlockSide::West {
+                    [[v, u], [v, 0.0], [0., 0.], [0., u]]
+                } else {
+                    [[0., v], [u, v], [u, 0.0], [0., 0.]]
+                };
                 let quad = Quad {
                     vertices,
                     ao_factors,
                     block: *block,
-                    dimensions: [width as u8 + 1, height as u8 + 1],
+                    uvs,
                 };
                 quads.push(quad);
                 for cur_row in row..=height + row {
@@ -544,12 +552,7 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
         .collect::<Vec<_>>();
     let uv = quads
         .iter()
-        .flat_map(|q| {
-            let [width, height] = q.dimensions;
-            let width = width as f32;
-            let height = height as f32;
-            return [[0.0, height], [width, height], [width, 0.0], [0.0, 0.0]];
-        })
+        .flat_map(|q| q.uvs)
         .collect::<Vec<_>>();
     let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
