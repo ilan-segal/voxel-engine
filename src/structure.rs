@@ -66,9 +66,11 @@ impl StructureType {
                             <= &TREE_PROBABILITY
                     })
                     .map(|(x, y, z)| {
+                        let local_noise = neighborhood.noise_at(x, y, z).unwrap();
+                        let trunk_height = if local_noise < &0.5 { 4 } else { 5 };
                         (
                             Structure::Tree {
-                                trunk_height: 4,
+                                trunk_height,
                                 leaf_radius: 2,
                             },
                             [x, y + 1, z],
