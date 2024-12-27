@@ -5,7 +5,7 @@ use bevy::{
     },
 };
 
-use crate::block::Block;
+use crate::block::{Block, BlockSide};
 
 pub struct TexturePlugin;
 
@@ -21,17 +21,19 @@ pub struct BlockMaterials {
     dirt: Handle<StandardMaterial>,
     grass: Handle<StandardMaterial>,
     wood: Handle<StandardMaterial>,
+    wood_top: Handle<StandardMaterial>,
     leaves: Handle<StandardMaterial>,
 }
 
 impl BlockMaterials {
-    pub fn get(&self, block: &Block) -> Option<&Handle<StandardMaterial>> {
-        match block {
-            Block::Stone => Some(&self.stone),
-            Block::Dirt => Some(&self.dirt),
-            Block::Grass => Some(&self.grass),
-            Block::Wood => Some(&self.wood),
-            Block::Leaves => Some(&self.leaves),
+    pub fn get(&self, block: &Block, side: &BlockSide) -> Option<&Handle<StandardMaterial>> {
+        match (block, side) {
+            (Block::Stone, _) => Some(&self.stone),
+            (Block::Dirt, _) => Some(&self.dirt),
+            (Block::Grass, _) => Some(&self.grass),
+            (Block::Wood, BlockSide::Down) | (Block::Wood, BlockSide::Up) => Some(&self.wood_top),
+            (Block::Wood, _) => Some(&self.wood),
+            (Block::Leaves, _) => Some(&self.leaves),
             _ => None,
         }
     }
@@ -42,40 +44,25 @@ fn setup(
     asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mut get_material_unchecked =
-        |block| get_material(block, &asset_server, &mut materials).unwrap();
+    let mut get_material = |path| get_material(path, &asset_server, &mut materials);
 
     let block_materials = BlockMaterials {
-        stone: get_material_unchecked(&Block::Stone),
-        dirt: get_material_unchecked(&Block::Dirt),
-        grass: get_material_unchecked(&Block::Grass),
-        wood: get_material_unchecked(&Block::Wood),
-        leaves: get_material_unchecked(&Block::Leaves),
+        stone: get_material("textures/blocks/stone.png"),
+        dirt: get_material("textures/blocks/dirt.png"),
+        grass: get_material("textures/blocks/grass.png"),
+        wood: get_material("textures/blocks/oak_log.png"),
+        wood_top: get_material("textures/blocks/oak_log_top.png"),
+        leaves: get_material("textures/blocks/oak_leaves.png"),
     };
     commands.insert_resource(block_materials);
 }
 
 fn get_material(
-    block: &Block,
+    path: &'static str,
     asset_server: &Res<AssetServer>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
-) -> Option<Handle<StandardMaterial>> {
-    let image = get_image_handle(block, asset_server)?;
-    let material = StandardMaterial {
-        base_color_texture: Some(image),
-        base_color: block
-            .get_colour()
-            .unwrap_or(Color::WHITE),
-        reflectance: 0.0,
-        ..default()
-    };
-    let handle = materials.add(material);
-    Some(handle)
-}
-
-fn get_image_handle(block: &Block, asset_server: &Res<AssetServer>) -> Option<Handle<Image>> {
-    let path = get_texture_path(&block)?;
-    let handle = asset_server.load_with_settings(path, |image_loader_settings| {
+) -> Handle<StandardMaterial> {
+    let image = asset_server.load_with_settings(path, |image_loader_settings| {
         *image_loader_settings = ImageLoaderSettings {
             sampler: ImageSampler::Descriptor(ImageSamplerDescriptor {
                 // rewriting mode to repeat image,
@@ -86,16 +73,10 @@ fn get_image_handle(block: &Block, asset_server: &Res<AssetServer>) -> Option<Ha
             ..default()
         }
     });
-    Some(handle)
-}
-
-fn get_texture_path(block: &Block) -> Option<&'static str> {
-    match block {
-        Block::Air => None,
-        Block::Stone => Some("textures/blocks/stone.png"),
-        Block::Dirt => Some("textures/blocks/dirt.png"),
-        Block::Grass => Some("textures/blocks/grass.png"),
-        Block::Wood => Some("textures/blocks/oak_log.png"),
-        Block::Leaves => Some("textures/blocks/oak_leaves.png"),
-    }
+    let material = StandardMaterial {
+        base_color_texture: Some(image),
+        reflectance: 0.0,
+        ..default()
+    };
+    return materials.add(material);
 }

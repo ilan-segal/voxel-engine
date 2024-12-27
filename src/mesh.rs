@@ -49,7 +49,7 @@ pub struct MeshSet;
 
 struct MeshTaskData {
     entity: Entity,
-    mesh: Vec<(Block, Mesh)>,
+    mesh: Vec<(Block, BlockSide, Mesh)>,
 }
 
 #[derive(Component, PartialEq, Eq)]
@@ -162,11 +162,14 @@ fn receive_mesh_gen_tasks(
             entity
                 .insert(ChunkMeshStatus::Meshed)
                 .with_children(|builder| {
-                    for (block, mesh) in data.mesh {
+                    for (block, side, mesh) in data.mesh {
                         builder.spawn((
                             PbrBundle {
                                 mesh: meshes.add(mesh),
-                                material: materials.get(&block).unwrap().clone(),
+                                material: materials
+                                    .get(&block, &side)
+                                    .unwrap()
+                                    .clone(),
                                 ..default()
                             },
                             RenderLayers::layer(WORLD_LAYER),
@@ -204,7 +207,7 @@ impl Quad {
     }
 }
 
-fn get_meshes_for_chunk(chunk: ChunkNeighborhood) -> Vec<(Block, Mesh)> {
+fn get_meshes_for_chunk(chunk: ChunkNeighborhood) -> Vec<(Block, BlockSide, Mesh)> {
     let mut quads = vec![];
     quads.extend(greedy_mesh(&chunk, BlockSide::Up));
     quads.extend(greedy_mesh(&chunk, BlockSide::Down));
@@ -497,17 +500,27 @@ fn get_quad_corners(
     }
 }
 
-fn create_meshes(quads: Vec<Quad>) -> Vec<(Block, Mesh)> {
+fn create_meshes(quads: Vec<Quad>) -> Vec<(Block, BlockSide, Mesh)> {
     quads
         .iter()
-        .sorted_by_key(|q| q.block)
-        .chunk_by(|q| q.block)
+        .map(|q| (q.block, optimize_side_choice(&q.block, &q.side), q))
+        .sorted_by_key(|(block, side, _)| (*block, *side))
+        .chunk_by(|(block, side, _)| (*block, *side))
         .into_iter()
-        .filter_map(|(block, qs)| {
-            let mesh = create_mesh_from_quads(qs.cloned().collect())?;
-            Some((block, mesh))
+        .filter_map(|((block, side), qs)| {
+            let mesh = create_mesh_from_quads(qs.map(|qs| qs.2).cloned().collect())?;
+            Some((block, side, mesh))
         })
         .collect()
+}
+
+fn optimize_side_choice(block: &Block, side: &BlockSide) -> BlockSide {
+    // Normalize so there are fewer separate meshes
+    match (block, side) {
+        (Block::Wood, BlockSide::Up) | (Block::Wood, BlockSide::Down) => BlockSide::Up,
+        (Block::Wood, _) => BlockSide::East,
+        _ => BlockSide::default(),
+    }
 }
 
 fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
@@ -561,7 +574,11 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
         .flat_map(|q| {
             q.ao_factors.iter().map(move |factor| {
                 let lum = 0.6_f32.powi((*factor).into());
-                return Color::WHITE.with_luminance(lum);
+                return q
+                    .block
+                    .get_colour()
+                    .unwrap_or_default()
+                    .with_luminance(lum);
             })
         })
         .map(|c| c.to_linear().to_f32_array())

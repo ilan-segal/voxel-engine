@@ -46,8 +46,9 @@ impl Block {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Default)]
 pub enum BlockSide {
+    #[default]
     Up,
     Down,
     North,
