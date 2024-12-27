@@ -183,19 +183,24 @@ fn receive_mesh_gen_tasks(
 
 #[derive(Debug, Clone)]
 struct Quad {
+    block: Block,
+    side: BlockSide,
     vertices: [Vec3; 4],
     ao_factors: [u8; 4],
-    block: Block,
     uvs: [[f32; 2]; 4],
 }
 
 impl Quad {
     fn rotate_against_anisotropy(&mut self) {
         if self.ao_factors[0] + self.ao_factors[2] > self.ao_factors[1] + self.ao_factors[3] {
-            self.vertices.rotate_left(1);
-            self.ao_factors.rotate_left(1);
-            self.uvs.rotate_left(1);
+            self.rotate_left(1);
         }
+    }
+
+    fn rotate_left(&mut self, mid: usize) {
+        self.vertices.rotate_left(mid);
+        self.ao_factors.rotate_left(mid);
+        self.uvs.rotate_left(mid);
     }
 }
 
@@ -329,12 +334,21 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                     }
                 }
                 let vertices = get_quad_corners(&direction, layer, row, height, col, width);
-                let ao_factors = [
-                    bottom_left_ao_factor,
-                    bottom_right_ao_factor,
-                    top_right_ao_factor,
-                    top_left_ao_factor,
-                ];
+                let ao_factors = if direction == BlockSide::Down {
+                    [
+                        bottom_right_ao_factor,
+                        bottom_left_ao_factor,
+                        top_left_ao_factor,
+                        top_right_ao_factor,
+                    ]
+                } else {
+                    [
+                        bottom_left_ao_factor,
+                        bottom_right_ao_factor,
+                        top_right_ao_factor,
+                        top_left_ao_factor,
+                    ]
+                };
                 let u = width as f32 + 1.0;
                 let v = height as f32 + 1.0;
                 let uvs = if direction == BlockSide::North || direction == BlockSide::West {
@@ -342,7 +356,9 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                 } else {
                     [[0., v], [u, v], [u, 0.0], [0., 0.]]
                 };
+
                 let quad = Quad {
+                    side: direction,
                     vertices,
                     ao_factors,
                     block: *block,
@@ -449,10 +465,10 @@ fn get_quad_corners(
             Vec3::new(xf + h, yf, zf),
         ],
         BlockSide::Down => [
+            Vec3::new(xf, yf - 1.0, zf + w),
             Vec3::new(xf, yf - 1.0, zf),
             Vec3::new(xf + h, yf - 1.0, zf),
             Vec3::new(xf + h, yf - 1.0, zf + w),
-            Vec3::new(xf, yf - 1.0, zf + w),
         ],
         BlockSide::North => [
             Vec3::new(xf + 1.0, yf - 1.0, zf),
