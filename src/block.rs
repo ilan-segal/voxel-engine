@@ -20,11 +20,11 @@ impl From<&Block> for Block {
 }
 
 impl Block {
-    pub fn get_colour(&self) -> Option<Color> {
+    pub fn get_colour(&self) -> Color {
         match self {
-            Self::Grass => Some(Color::linear_rgb(0.2, 0.6, 0.0)),
-            Self::Leaves => Some(Color::hsv(124.0, 0.9, 0.39)),
-            _ => None,
+            Self::Grass => Color::linear_rgb(0.2, 0.6, 0.0),
+            Self::Leaves => Color::hsv(124.0, 0.9, 0.39),
+            _ => Color::WHITE,
         }
     }
 

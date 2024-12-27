@@ -48,42 +48,12 @@ fn setup(
         |path, colour| get_material_with_colour(path, &asset_server, &mut materials, colour);
 
     let block_materials = BlockMaterials {
-        stone: get_material(
-            "textures/blocks/stone.png",
-            Block::Stone
-                .get_colour()
-                .unwrap_or_default(),
-        ),
-        dirt: get_material(
-            "textures/blocks/dirt.png",
-            Block::Dirt
-                .get_colour()
-                .unwrap_or_default(),
-        ),
-        grass: get_material(
-            "textures/blocks/grass.png",
-            Block::Grass
-                .get_colour()
-                .unwrap_or_default(),
-        ),
-        wood: get_material(
-            "textures/blocks/oak_log.png",
-            Block::Wood
-                .get_colour()
-                .unwrap_or_default(),
-        ),
-        wood_top: get_material(
-            "textures/blocks/oak_log_top.png",
-            Block::Wood
-                .get_colour()
-                .unwrap_or_default(),
-        ),
-        leaves: get_material(
-            "textures/blocks/oak_leaves.png",
-            Block::Leaves
-                .get_colour()
-                .unwrap_or_default(),
-        ),
+        stone: get_material("textures/blocks/stone.png", Block::Stone.get_colour()),
+        dirt: get_material("textures/blocks/dirt.png", Block::Dirt.get_colour()),
+        grass: get_material("textures/blocks/grass.png", Block::Grass.get_colour()),
+        wood: get_material("textures/blocks/oak_log.png", Block::Wood.get_colour()),
+        wood_top: get_material("textures/blocks/oak_log_top.png", Block::Wood.get_colour()),
+        leaves: get_material("textures/blocks/oak_leaves.png", Block::Leaves.get_colour()),
     };
     commands.insert_resource(block_materials);
 }
