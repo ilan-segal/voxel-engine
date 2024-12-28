@@ -167,7 +167,7 @@ fn receive_mesh_gen_tasks(
                             material: materials
                                 .get(&block, &side)
                                 .unwrap()
-                                .clone(),
+                                .clone_weak(),
                             ..default()
                         },
                         RenderLayers::layer(WORLD_LAYER),

@@ -60,8 +60,8 @@ fn add_hitbox_frame(
                 child_builder.spawn((
                     HitboxFrame,
                     PolylineBundle {
-                        polyline: mesh.0.clone(),
-                        material: assets.material.clone(),
+                        polyline: mesh.0.clone_weak(),
+                        material: assets.material.clone_weak(),
                         transform: Transform {
                             translation: aabb.get_centre_offset(),
                             scale: aabb.get_dimensions(),

@@ -38,7 +38,7 @@ fn setup(
     commands.spawn((
         TargetedBlockOutline,
         PolylineBundle {
-            polyline: cube_frame_mesh.0.clone(),
+            polyline: cube_frame_mesh.0.clone_weak(),
             material,
             visibility: Visibility::Hidden,
             ..default()

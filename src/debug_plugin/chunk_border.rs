@@ -39,7 +39,7 @@ fn setup(
     commands.spawn((
         ChunkBorder,
         PolylineBundle {
-            polyline: mesh.0.clone(),
+            polyline: mesh.0.clone_weak(),
             material,
             transform: Transform::from_scale(CHUNK_SIZE as f32 * Vec3::ONE),
             visibility: Visibility::Hidden,
