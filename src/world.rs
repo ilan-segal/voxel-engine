@@ -7,6 +7,7 @@ use crate::{
         spatial::SpatiallyMapped,
         Chunk, CHUNK_SIZE, CHUNK_SIZE_I32,
     },
+    player::Player,
     structure::StructureType,
 };
 use bevy::{
@@ -104,8 +105,8 @@ fn kill_tasks_for_unloaded_chunks(
 
 fn update_chunks(
     mut commands: Commands,
-    q_camera_position: Query<&GlobalTransform, (With<Camera3d>, Changed<ChunkPosition>)>,
-    q_chunk_position: Query<(Entity, &ChunkPosition), Or<(With<Blocks>, With<NeedsChunkData>)>>,
+    q_camera_position: Query<&GlobalTransform, (With<Player>, Changed<ChunkPosition>)>,
+    q_chunk_position: Query<(Entity, &ChunkPosition), With<Chunk>>,
 ) {
     let Ok(pos) = q_camera_position.get_single() else {
         return;
@@ -192,9 +193,6 @@ fn receive_chunk_load_tasks(mut commands: Commands, mut tasks: ResMut<ChunkLoadT
         return false;
     });
 }
-
-#[derive(Component)]
-struct NeedsChunkData;
 
 fn begin_noise_load_tasks(
     mut tasks: ResMut<ChunkLoadTasks>,
