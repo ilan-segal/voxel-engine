@@ -57,12 +57,10 @@ enum ChunkMeshStatus {
     UnMeshed,
     Meshing,
     Meshed,
-    NeedsNoMesh,
 }
 
 fn mark_mesh_as_stale(
     mut commands: Commands,
-    // q_blocks: Query<&Blocks>,
     mut chunk_updates: EventReader<ChunkIndexUpdate>,
     index: Res<ChunkIndex>,
     mut tasks: ResMut<MeshGenTasks>,
@@ -127,7 +125,7 @@ fn begin_mesh_gen_tasks(
             continue;
         };
         if !middle_chunk.blocks.is_meshable() {
-            *mesh_status = ChunkMeshStatus::NeedsNoMesh;
+            *mesh_status = ChunkMeshStatus::Meshed;
             continue;
         }
         let task = task_pool.spawn(async move {
@@ -157,28 +155,26 @@ fn receive_mesh_gen_tasks(
         let Some(mut entity) = commands.get_entity(e) else {
             return true;
         };
-        entity.despawn_descendants();
+        entity
+            .despawn_descendants()
+            .insert(ChunkMeshStatus::Meshed);
         if data.mesh.len() > 0 {
-            entity
-                .insert(ChunkMeshStatus::Meshed)
-                .with_children(|builder| {
-                    for (block, side, mesh) in data.mesh {
-                        builder.spawn((
-                            PbrBundle {
-                                mesh: meshes.add(mesh),
-                                material: materials
-                                    .get(&block, &side)
-                                    .unwrap()
-                                    .clone(),
-                                ..default()
-                            },
-                            RenderLayers::layer(WORLD_LAYER),
-                            NoFrustumCulling,
-                        ));
-                    }
-                });
-        } else {
-            entity.insert(ChunkMeshStatus::NeedsNoMesh);
+            entity.with_children(|builder| {
+                for (block, side, mesh) in data.mesh {
+                    builder.spawn((
+                        PbrBundle {
+                            mesh: meshes.add(mesh),
+                            material: materials
+                                .get(&block, &side)
+                                .unwrap()
+                                .clone(),
+                            ..default()
+                        },
+                        RenderLayers::layer(WORLD_LAYER),
+                        NoFrustumCulling,
+                    ));
+                }
+            });
         }
         return false;
     });
