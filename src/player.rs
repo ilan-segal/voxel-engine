@@ -40,10 +40,13 @@ impl Plugin for PlayerPlugin {
 pub struct Player;
 
 #[derive(Component, Default)]
-pub struct IsSprinting(pub bool);
+pub struct Sprinting(pub bool);
 
 #[derive(Component, Default)]
-pub struct IsJumping(pub bool);
+pub struct Jumping(pub bool);
+
+#[derive(Component, Default)]
+pub struct Sneaking(pub bool);
 
 #[derive(Bundle)]
 pub struct PlayerBundle {
@@ -53,11 +56,13 @@ pub struct PlayerBundle {
     aabb: Aabb,
     collidable: Collidable,
     gravity: Gravity,
+    velocity: Velocity,
     falling_state: FallingState,
     mode: PlayerMode,
     target_velocity: TargetVelocity,
-    is_sprinting: IsSprinting,
-    is_jumping: IsJumping,
+    sprinting: Sprinting,
+    jumping: Jumping,
+    sneaking: Sneaking,
 }
 
 impl Default for PlayerBundle {
@@ -86,11 +91,13 @@ impl Default for PlayerBundle {
             aabb: Aabb::square_prism(0.35, 1.8, 1.65),
             collidable: Collidable,
             gravity: Gravity::default(),
+            velocity: default(),
             falling_state: FallingState::Falling,
             mode: PlayerMode::Survival,
             target_velocity: default(),
-            is_sprinting: default(),
-            is_jumping: default(),
+            sprinting: default(),
+            jumping: default(),
+            sneaking: default(),
         }
     }
 }
@@ -124,10 +131,10 @@ fn update_gravity(
         match mode {
             PlayerMode::Survival => commands
                 .entity(entity)
-                .insert(Gravity::default()),
+                .insert((Gravity::default(), Collidable)),
             PlayerMode::NoClip => commands
                 .entity(entity)
-                .remove::<Gravity>(),
+                .remove::<(Gravity, Collidable)>(),
         };
     }
 }

@@ -25,8 +25,13 @@ impl Plugin for PhysicsPlugin {
             .add_systems(
                 Update,
                 (
-                    add_velocity,
-                    (apply_gravity, apply_velocity_with_terrain_collision)
+                    (
+                        apply_gravity,
+                        (
+                            apply_velocity_with_terrain_collision,
+                            apply_velocity_without_collision,
+                        ),
+                    )
                         .chain()
                         .in_set(PhysicsSystemSet::Act),
                     stop_velocity_from_collisions.in_set(PhysicsSystemSet::React),
@@ -41,14 +46,6 @@ pub enum PhysicsSystemSet {
     Act,
     /// Process results of the `Act` phase such as collision events.
     React,
-}
-
-fn add_velocity(mut commands: Commands, q: Query<Entity, (With<Transform>, Without<Velocity>)>) {
-    q.iter().for_each(|e| {
-        if let Some(mut entity_commands) = commands.get_entity(e) {
-            entity_commands.insert(Velocity::default());
-        }
-    })
 }
 
 fn apply_gravity(mut q_object: Query<(&Gravity, &mut Velocity)>, time: Res<Time>) {
@@ -74,6 +71,16 @@ fn stop_velocity_from_collisions(
         if normal.z != 0. {
             v.0.z = 0.;
         }
+    }
+}
+
+fn apply_velocity_without_collision(
+    mut q: Query<(&Velocity, &mut Transform), Without<Collidable>>,
+    time: Res<Time>,
+) {
+    let dt = time.delta_seconds();
+    for (v, mut p) in q.iter_mut() {
+        p.translation += v.0 * dt;
     }
 }
 

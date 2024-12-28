@@ -1,8 +1,7 @@
-use super::{target_velocity::TargetVelocity, IsSprinting};
+use super::{target_velocity::TargetVelocity, Sprinting};
 use crate::{
     block::Block,
-    physics::{gravity::Gravity, PhysicsSystemSet},
-    player::{block_target::TargetedBlock, mode::PlayerMode, IsJumping, Player},
+    player::{block_target::TargetedBlock, mode::PlayerMode, Jumping, Player, Sneaking},
     world::block_update::SetBlockEvent,
 };
 use bevy::{
@@ -24,7 +23,7 @@ impl Plugin for KeyboardMousePlugin {
                 track_new_press,
                 age_presses,
                 rotate_camera_with_mouse,
-                process_keyboard_inputs.before(PhysicsSystemSet::Act),
+                process_keyboard_inputs,
                 delete_targeted_block.run_if(input_just_pressed(MouseButton::Left)),
             ),
         )
@@ -64,9 +63,9 @@ fn rotate_camera_with_mouse(
 struct KeyboardInputQuery {
     target_v: &'static mut TargetVelocity,
     t: &'static Transform,
-    g: &'static Gravity,
-    is_sprinting: &'static mut IsSprinting,
-    is_jumping: &'static mut IsJumping,
+    is_sprinting: &'static mut Sprinting,
+    is_jumping: &'static mut Jumping,
+    is_sneaking: &'static mut Sneaking,
 }
 
 fn process_keyboard_inputs(
@@ -101,6 +100,7 @@ fn process_keyboard_inputs(
 
     object.is_sprinting.0 = keys.pressed(KeyCode::ControlLeft);
     object.is_jumping.0 = keys.pressed(KeyCode::Space);
+    object.is_sneaking.0 = keys.pressed(KeyCode::ShiftLeft);
 }
 
 fn delete_targeted_block(
