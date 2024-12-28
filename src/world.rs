@@ -23,8 +23,8 @@ use stage::Stage;
 use std::collections::HashSet;
 use world_noise::WorldGenNoise;
 
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 5;
-const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 5;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 10;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 10;
 
 pub mod block_update;
 pub mod index;

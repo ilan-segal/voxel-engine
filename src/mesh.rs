@@ -19,7 +19,7 @@ use bevy::{
     render::{
         mesh::{Indices, PrimitiveTopology},
         render_asset::RenderAssetUsages,
-        view::{NoFrustumCulling, RenderLayers},
+        view::RenderLayers,
     },
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
     utils::HashMap,
@@ -171,7 +171,6 @@ fn receive_mesh_gen_tasks(
                             ..default()
                         },
                         RenderLayers::layer(WORLD_LAYER),
-                        NoFrustumCulling,
                     ));
                 }
             });
