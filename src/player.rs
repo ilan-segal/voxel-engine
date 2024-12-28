@@ -10,6 +10,7 @@ use crate::{
 };
 use bevy::{core_pipeline::tonemapping::DebandDither, prelude::*};
 use block_target::BlockTargetPlugin;
+use controls::target_velocity::TargetVelocity;
 use falling_state::FallingState;
 use mode::PlayerMode;
 
@@ -38,6 +39,12 @@ impl Plugin for PlayerPlugin {
 #[derive(Component)]
 pub struct Player;
 
+#[derive(Component, Default)]
+pub struct IsSprinting(pub bool);
+
+#[derive(Component, Default)]
+pub struct IsJumping(pub bool);
+
 #[derive(Bundle)]
 pub struct PlayerBundle {
     player: Player,
@@ -48,6 +55,9 @@ pub struct PlayerBundle {
     gravity: Gravity,
     falling_state: FallingState,
     mode: PlayerMode,
+    target_velocity: TargetVelocity,
+    is_sprinting: IsSprinting,
+    is_jumping: IsJumping,
 }
 
 impl Default for PlayerBundle {
@@ -78,6 +88,9 @@ impl Default for PlayerBundle {
             gravity: Gravity::default(),
             falling_state: FallingState::Falling,
             mode: PlayerMode::Survival,
+            target_velocity: default(),
+            is_sprinting: default(),
+            is_jumping: default(),
         }
     }
 }

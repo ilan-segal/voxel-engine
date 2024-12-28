@@ -1,7 +1,8 @@
+use super::{target_velocity::TargetVelocity, IsSprinting};
 use crate::{
     block::Block,
-    physics::{gravity::Gravity, velocity::Velocity, PhysicsSystemSet},
-    player::{block_target::TargetedBlock, falling_state::FallingState, mode::PlayerMode, Player},
+    physics::{gravity::Gravity, PhysicsSystemSet},
+    player::{block_target::TargetedBlock, mode::PlayerMode, IsJumping, Player},
     world::block_update::SetBlockEvent,
 };
 use bevy::{
@@ -61,23 +62,21 @@ fn rotate_camera_with_mouse(
 #[derive(QueryData)]
 #[query_data(mutable)]
 struct KeyboardInputQuery {
-    v: &'static mut Velocity,
+    target_v: &'static mut TargetVelocity,
     t: &'static Transform,
     g: &'static Gravity,
-    falling_state: &'static FallingState,
+    is_sprinting: &'static mut IsSprinting,
+    is_jumping: &'static mut IsJumping,
 }
 
 fn process_keyboard_inputs(
     keys: Res<ButtonInput<KeyCode>>,
     mut q_velocity: Query<KeyboardInputQuery, With<Player>>,
 ) {
-    const WALK_SPEED: f32 = 4.5;
-    const RUN_SPEED: f32 = WALK_SPEED * 1.5;
     let Ok(mut object) = q_velocity.get_single_mut() else {
         return;
     };
-    object.v.0.x = 0.;
-    object.v.0.z = 0.;
+    object.target_v.0 = Vec3::ZERO;
     let mut v_horizontal = Vec3::ZERO;
     if keys.pressed(KeyCode::KeyW) {
         v_horizontal.z -= 1.0;
@@ -97,25 +96,11 @@ fn process_keyboard_inputs(
             .rotation
             .to_euler(EulerRot::YXZ);
         v_horizontal = (Quat::from_rotation_y(yaw) * v_horizontal).normalize();
-        if keys.pressed(KeyCode::ControlLeft) {
-            v_horizontal *= RUN_SPEED;
-        } else {
-            v_horizontal *= WALK_SPEED;
-        }
-        object.v.0 += v_horizontal;
+        object.target_v.0 += v_horizontal;
     }
 
-    const JUMP_HEIGHT: f32 = 1.25;
-    let jump_speed = square_root_v(-2.0 * object.g.0 * JUMP_HEIGHT);
-    if keys.pressed(KeyCode::Space) && object.falling_state == &FallingState::Grounded {
-        object.v.0 = jump_speed;
-    }
-}
-
-/// Elementwise sqrt(abs(v)) preserving sign
-fn square_root_v(v: Vec3) -> Vec3 {
-    let [x, y, z] = v.abs().to_array();
-    Vec3::new(x.sqrt(), y.sqrt(), z.sqrt()) * v.signum()
+    object.is_sprinting.0 = keys.pressed(KeyCode::ControlLeft);
+    object.is_jumping.0 = keys.pressed(KeyCode::Space);
 }
 
 fn delete_targeted_block(
