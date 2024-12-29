@@ -31,6 +31,7 @@ pub struct MeshPlugin;
 impl Plugin for MeshPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MeshGenTasks>()
+            .add_systems(Startup, initialize_face_mesh)
             .add_systems(
                 Update,
                 (
@@ -44,12 +45,45 @@ impl Plugin for MeshPlugin {
     }
 }
 
+#[derive(Resource)]
+pub struct FaceMesh(Handle<Mesh>);
+
+fn initialize_face_mesh(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
+    /*
+    2---3
+    |\  |
+    | \ |
+    |  \|
+    0---1
+     */
+    let vertices = vec![[0., 1., 0.], [1., 1., 0.], [0., 0., 0.], [1., 0., 0.]];
+    let indices = vec![0, 1, 2, 3];
+    let uvs = vec![[0., 1.], [1., 1.], [0., 0.], [1., 0.]];
+    let normals = vec![[0., 0., 1.]; 4];
+    let mesh = Mesh::new(
+        PrimitiveTopology::TriangleStrip,
+        RenderAssetUsages::RENDER_WORLD,
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+    .with_inserted_indices(Indices::U32(indices));
+    let handle = meshes.add(mesh);
+    commands.insert_resource(FaceMesh(handle));
+}
+
 #[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
 pub struct MeshSet;
 
 struct MeshTaskData {
     entity: Entity,
-    mesh: Vec<(Block, BlockSide, Mesh)>,
+    mesh: Vec<MeshSpec>,
+}
+
+struct MeshSpec {
+    block: Block,
+    side: BlockSide,
+    translation: Vec3,
 }
 
 #[derive(Component, PartialEq, Eq)]
@@ -144,7 +178,7 @@ fn begin_mesh_gen_tasks(
 fn receive_mesh_gen_tasks(
     mut commands: Commands,
     mut tasks: ResMut<MeshGenTasks>,
-    mut meshes: ResMut<Assets<Mesh>>,
+    face_mesh: Res<FaceMesh>,
     materials: Res<BlockMaterials>,
 ) {
     tasks.0.retain(|_, task| {
@@ -160,14 +194,20 @@ fn receive_mesh_gen_tasks(
             .insert(ChunkMeshStatus::Meshed);
         if data.mesh.len() > 0 {
             entity.with_children(|builder| {
-                for (block, side, mesh) in data.mesh {
+                for MeshSpec {
+                    block,
+                    side,
+                    translation,
+                } in data.mesh
+                {
                     builder.spawn((
                         PbrBundle {
-                            mesh: meshes.add(mesh),
+                            mesh: face_mesh.0.clone_weak(),
                             material: materials
                                 .get(&block, &side)
                                 .unwrap()
                                 .clone_weak(),
+                            transform: get_transform_for_face(&side, &translation),
                             ..default()
                         },
                         RenderLayers::layer(WORLD_LAYER),
@@ -177,6 +217,18 @@ fn receive_mesh_gen_tasks(
         }
         return false;
     });
+}
+
+fn get_transform_for_face(side: &BlockSide, translation: &Vec3) -> Transform {
+    let (forward, up) = match side {
+        BlockSide::Up => (Dir3::Y, Dir3::X),
+        BlockSide::Down => (Dir3::NEG_Y, Dir3::X),
+        BlockSide::North => (Dir3::X, Dir3::Y),
+        BlockSide::South => (Dir3::NEG_X, Dir3::Y),
+        BlockSide::East => (Dir3::Z, Dir3::Y),
+        BlockSide::West => (Dir3::NEG_Z, Dir3::Y),
+    };
+    return Transform::from_translation(*translation).looking_to(forward, up);
 }
 
 #[derive(Debug, Clone)]
@@ -202,20 +254,20 @@ impl Quad {
     }
 }
 
-fn get_meshes_for_chunk(chunk: ChunkNeighborhood) -> Vec<(Block, BlockSide, Mesh)> {
-    let mut quads = vec![];
-    quads.extend(greedy_mesh(&chunk, BlockSide::Up));
-    quads.extend(greedy_mesh(&chunk, BlockSide::Down));
-    quads.extend(greedy_mesh(&chunk, BlockSide::North));
-    quads.extend(greedy_mesh(&chunk, BlockSide::South));
-    quads.extend(greedy_mesh(&chunk, BlockSide::West));
-    quads.extend(greedy_mesh(&chunk, BlockSide::East));
-    return create_meshes(quads);
+fn get_meshes_for_chunk(chunk: ChunkNeighborhood) -> Vec<MeshSpec> {
+    let mut specs = vec![];
+    specs.extend(greedy_mesh(&chunk, BlockSide::Up));
+    // specs.extend(greedy_mesh(&chunk, BlockSide::Down));
+    // specs.extend(greedy_mesh(&chunk, BlockSide::North));
+    // specs.extend(greedy_mesh(&chunk, BlockSide::South));
+    // specs.extend(greedy_mesh(&chunk, BlockSide::West));
+    // specs.extend(greedy_mesh(&chunk, BlockSide::East));
+    return specs;
 }
 
 // TODO: Replace slow implementation with binary mesher
-fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
-    let mut quads: Vec<Quad> = vec![];
+fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<MeshSpec> {
+    let mut quads = vec![];
     let middle = chunk.middle().expect("Already checked");
     let mut blocks = middle.blocks.clone();
     for layer in 0..CHUNK_SIZE {
@@ -243,6 +295,7 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                 let mut height = 0;
                 if bottom_left_ao_factor == top_left_ao_factor
                     && bottom_right_ao_factor == top_right_ao_factor
+                    && false
                 {
                     while height + row < CHUNK_SIZE - 1
                         && block
@@ -288,6 +341,7 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                 let mut width = 0;
                 if bottom_left_ao_factor == bottom_right_ao_factor
                     && top_left_ao_factor == top_right_ao_factor
+                    && false
                 {
                     while col + width < CHUNK_SIZE - 1
                         && (row..=height + row).all(|cur_row| {
@@ -362,7 +416,12 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
                     block: *block,
                     uvs,
                 };
-                quads.push(quad);
+                let spec = MeshSpec {
+                    block: *block,
+                    side: direction,
+                    translation: vertices[0],
+                };
+                quads.push(spec);
                 for cur_row in row..=height + row {
                     for cur_col in col..=col + width {
                         blocks.clear_at(&direction, layer, cur_row, cur_col);
