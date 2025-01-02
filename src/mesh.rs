@@ -34,11 +34,14 @@ impl Plugin for MeshPlugin {
             .add_systems(
                 Update,
                 (
-                    (mark_mesh_as_stale, begin_mesh_gen_tasks).chain(),
-                    receive_mesh_gen_tasks,
-                )
-                    .after(WorldSet)
-                    .in_set(MeshSet),
+                    warn_bad_mesh_status,
+                    (
+                        (update_mesh_status, mark_mesh_as_stale, begin_mesh_gen_tasks).chain(),
+                        receive_mesh_gen_tasks,
+                    )
+                        .after(WorldSet)
+                        .in_set(MeshSet),
+                ),
             )
             .observe(end_mesh_tasks_for_unloaded_chunks);
     }
@@ -52,11 +55,29 @@ struct MeshTaskData {
     mesh: Vec<(Block, BlockSide, Mesh)>,
 }
 
-#[derive(Component, PartialEq, Eq)]
-enum ChunkMeshStatus {
-    UnMeshed,
-    Meshing,
-    Meshed,
+#[derive(Component)]
+struct Meshed;
+
+#[derive(Component)]
+struct NeedsNoMesh;
+
+fn warn_bad_mesh_status(q: Query<Entity, (With<Meshed>, With<NeedsNoMesh>)>) {
+    for e in q.iter() {
+        warn!("Entity has invalid mesh status: {:?}", e);
+    }
+}
+
+fn update_mesh_status(
+    q: Query<(Entity, &Stage), (With<Blocks>, Changed<Stage>)>,
+    mut commands: Commands,
+) {
+    for (e, stage) in q.iter() {
+        if stage == &Stage::final_stage() {
+            commands.entity(e).remove::<(Meshed, NeedsNoMesh)>();
+        } else {
+            commands.entity(e).remove::<Meshed>().insert(NeedsNoMesh);
+        }
+    }
 }
 
 fn mark_mesh_as_stale(
@@ -73,7 +94,7 @@ fn mark_mesh_as_stale(
             };
             commands
                 .entity(*entity_in_neighborhood)
-                .insert(ChunkMeshStatus::UnMeshed);
+                .remove::<(Meshed, NeedsNoMesh)>();
             tasks.0.remove(pos);
         }
     }
@@ -96,26 +117,14 @@ fn end_mesh_tasks_for_unloaded_chunks(
 fn begin_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
     mut q_chunk: Query<
-        (
-            Entity,
-            &ChunkPosition,
-            &mut ChunkMeshStatus,
-            &Stage,
-            &CameraDistance,
-        ),
-        With<Blocks>,
+        (Entity, &ChunkPosition, &CameraDistance),
+        (With<Blocks>, Without<Meshed>, Without<NeedsNoMesh>),
     >,
     chunk_index: Res<ChunkIndex>,
     mut commands: Commands,
 ) {
-    for (entity, pos, mut mesh_status, stage, _) in q_chunk
-        .iter_mut()
-        .sort::<&CameraDistance>()
-    {
-        if *mesh_status != ChunkMeshStatus::UnMeshed
-            || tasks.0.contains_key(pos)
-            || stage != &Stage::final_stage()
-        {
+    for (entity, pos, _) in q_chunk.iter_mut().sort::<&CameraDistance>() {
+        if tasks.0.contains_key(pos) {
             continue;
         }
         let task_pool = AsyncComputeTaskPool::get();
@@ -125,7 +134,7 @@ fn begin_mesh_gen_tasks(
             continue;
         };
         if !middle_chunk.blocks.is_meshable() {
-            *mesh_status = ChunkMeshStatus::Meshed;
+            commands.entity(entity).insert(NeedsNoMesh);
             continue;
         }
         let task = task_pool.spawn(async move {
@@ -135,9 +144,7 @@ fn begin_mesh_gen_tasks(
             }
         });
         tasks.0.insert(*pos, task);
-        commands
-            .entity(entity)
-            .insert(ChunkMeshStatus::Meshing);
+        commands.entity(entity).insert(Meshed);
     }
 }
 
@@ -155,26 +162,22 @@ fn receive_mesh_gen_tasks(
         let Some(mut entity) = commands.get_entity(e) else {
             return true;
         };
-        entity
-            .despawn_descendants()
-            .insert(ChunkMeshStatus::Meshed);
-        if data.mesh.len() > 0 {
-            entity.with_children(|builder| {
-                for (block, side, mesh) in data.mesh {
-                    builder.spawn((
-                        PbrBundle {
-                            mesh: meshes.add(mesh),
-                            material: materials
-                                .get(&block, &side)
-                                .unwrap()
-                                .clone_weak(),
-                            ..default()
-                        },
-                        RenderLayers::layer(WORLD_LAYER),
-                    ));
-                }
-            });
+        entity.despawn_descendants();
+        if data.mesh.is_empty() {
+            return false;
         }
+        entity.with_children(|builder| {
+            for (block, side, mesh) in data.mesh {
+                builder.spawn((
+                    PbrBundle {
+                        mesh: meshes.add(mesh),
+                        material: materials.get(&block, &side).unwrap().clone_weak(),
+                        ..default()
+                    },
+                    RenderLayers::layer(WORLD_LAYER),
+                ));
+            }
+        });
         return false;
     });
 }
@@ -574,10 +577,7 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
         })
         .map(|c| c.to_linear().to_f32_array())
         .collect::<Vec<_>>();
-    let uv = quads
-        .iter()
-        .flat_map(|q| q.uvs)
-        .collect::<Vec<_>>();
+    let uv = quads.iter().flat_map(|q| q.uvs).collect::<Vec<_>>();
     let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::RENDER_WORLD,
