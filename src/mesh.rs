@@ -2,7 +2,8 @@ use crate::{
     block::{Block, BlockSide},
     camera_distance::CameraDistance,
     chunk::{
-        data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, CHUNK_SIZE,
+        data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, Chunk,
+        CHUNK_SIZE,
     },
     texture::BlockMaterials,
     utils::VolumetricRange,
@@ -34,14 +35,11 @@ impl Plugin for MeshPlugin {
             .add_systems(
                 Update,
                 (
-                    warn_bad_mesh_status,
-                    (
-                        (update_mesh_status, mark_mesh_as_stale, begin_mesh_gen_tasks).chain(),
-                        receive_mesh_gen_tasks,
-                    )
-                        .after(WorldSet)
-                        .in_set(MeshSet),
-                ),
+                    (update_mesh_status, mark_mesh_as_stale, begin_mesh_gen_tasks).chain(),
+                    receive_mesh_gen_tasks,
+                )
+                    .after(WorldSet)
+                    .in_set(MeshSet),
             )
             .observe(end_mesh_tasks_for_unloaded_chunks);
     }
@@ -59,23 +57,22 @@ struct MeshTaskData {
 struct Meshed;
 
 #[derive(Component)]
-struct NeedsNoMesh;
-
-fn warn_bad_mesh_status(q: Query<Entity, (With<Meshed>, With<NeedsNoMesh>)>) {
-    for e in q.iter() {
-        warn!("Entity has invalid mesh status: {:?}", e);
-    }
-}
+struct CheckedForMesh;
 
 fn update_mesh_status(
-    q: Query<(Entity, &Stage), (With<Blocks>, Changed<Stage>)>,
+    q: Query<(Entity, &Stage), (With<Chunk>, Without<CheckedForMesh>)>,
     mut commands: Commands,
 ) {
     for (e, stage) in q.iter() {
         if stage == &Stage::final_stage() {
-            commands.entity(e).remove::<(Meshed, NeedsNoMesh)>();
+            commands
+                .entity(e)
+                .remove::<Meshed>()
+                .insert(CheckedForMesh);
         } else {
-            commands.entity(e).remove::<Meshed>().insert(NeedsNoMesh);
+            commands
+                .entity(e)
+                .insert((CheckedForMesh, Meshed));
         }
     }
 }
@@ -94,7 +91,7 @@ fn mark_mesh_as_stale(
             };
             commands
                 .entity(*entity_in_neighborhood)
-                .remove::<(Meshed, NeedsNoMesh)>();
+                .remove::<CheckedForMesh>();
             tasks.0.remove(pos);
         }
     }
@@ -118,12 +115,15 @@ fn begin_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
     mut q_chunk: Query<
         (Entity, &ChunkPosition, &CameraDistance),
-        (With<Blocks>, Without<Meshed>, Without<NeedsNoMesh>),
+        (With<Chunk>, Without<Meshed>, With<CheckedForMesh>),
     >,
     chunk_index: Res<ChunkIndex>,
     mut commands: Commands,
 ) {
-    for (entity, pos, _) in q_chunk.iter_mut().sort::<&CameraDistance>() {
+    for (entity, pos, _) in q_chunk
+        .iter_mut()
+        .sort::<&CameraDistance>()
+    {
         if tasks.0.contains_key(pos) {
             continue;
         }
@@ -133,8 +133,8 @@ fn begin_mesh_gen_tasks(
             warn!("Chunk at {:?} is absent from index", pos);
             continue;
         };
+        commands.entity(entity).insert(Meshed);
         if !middle_chunk.blocks.is_meshable() {
-            commands.entity(entity).insert(NeedsNoMesh);
             continue;
         }
         let task = task_pool.spawn(async move {
@@ -171,7 +171,10 @@ fn receive_mesh_gen_tasks(
                 builder.spawn((
                     PbrBundle {
                         mesh: meshes.add(mesh),
-                        material: materials.get(&block, &side).unwrap().clone_weak(),
+                        material: materials
+                            .get(&block, &side)
+                            .unwrap()
+                            .clone_weak(),
                         ..default()
                     },
                     RenderLayers::layer(WORLD_LAYER),
@@ -577,7 +580,10 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
         })
         .map(|c| c.to_linear().to_f32_array())
         .collect::<Vec<_>>();
-    let uv = quads.iter().flat_map(|q| q.uvs).collect::<Vec<_>>();
+    let uv = quads
+        .iter()
+        .flat_map(|q| q.uvs)
+        .collect::<Vec<_>>();
     let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::RENDER_WORLD,
