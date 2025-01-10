@@ -36,14 +36,16 @@ const SKY_COLOUR: Color = Color::linear_rgb(0.25, 0.60, 0.92);
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "Voxel Engine".into(),
-                    present_mode: bevy::window::PresentMode::AutoNoVsync,
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Voxel Engine".into(),
+                        present_mode: bevy::window::PresentMode::AutoNoVsync,
+                        ..default()
+                    }),
                     ..default()
-                }),
-                ..default()
-            }),
+                })
+                .set(ImagePlugin::default_nearest()),
             WireframePlugin,
             camera_distance::CameraDistancePlugin,
             chunk::ChunkPlugin,

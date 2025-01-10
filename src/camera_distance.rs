@@ -27,7 +27,7 @@ fn assign_chunk_distance(
         let Some(mut entity_commands) = commands.get_entity(e) else {
             continue;
         };
-        entity_commands.insert(CameraDistance::default());
+        entity_commands.try_insert(CameraDistance::default());
     }
 }
 

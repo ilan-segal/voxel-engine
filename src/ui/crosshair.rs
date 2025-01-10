@@ -33,7 +33,7 @@ fn spawn_crosshair(
                 },
                 ..default()
             },
-            UiImage::new(asset_server.load("crosshair.png")),
+            UiImage::new(asset_server.load("ui/crosshair.png")),
         ))
         .id();
     commands

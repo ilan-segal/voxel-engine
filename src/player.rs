@@ -12,11 +12,13 @@ use bevy::{core_pipeline::tonemapping::DebandDither, prelude::*};
 use block_target::BlockTargetPlugin;
 use controls::target_velocity::TargetVelocity;
 use falling_state::FallingState;
+use health::{Health, MaxHealth};
 use mode::PlayerMode;
 
 pub mod block_target;
 mod controls;
 pub mod falling_state;
+pub mod health;
 pub mod mode;
 
 pub struct PlayerPlugin;
@@ -63,11 +65,14 @@ pub struct PlayerBundle {
     sprinting: Sprinting,
     jumping: Jumping,
     sneaking: Sneaking,
+    health: Health,
+    max_health: MaxHealth,
 }
 
 impl Default for PlayerBundle {
     fn default() -> Self {
         let camera_pos = Transform::from_xyz(0.0, 80.0, 0.0);
+        let max_health = 20;
         Self {
             player: Player,
             camera: Camera3dBundle {
@@ -98,6 +103,8 @@ impl Default for PlayerBundle {
             sprinting: default(),
             jumping: default(),
             sneaking: default(),
+            health: Health(max_health),
+            max_health: MaxHealth(max_health),
         }
     }
 }
