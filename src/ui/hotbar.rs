@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::player::hotbar::HotbarSelection;
+
 use super::Ui;
 
 pub struct HotbarUiPlugin;
@@ -7,6 +9,7 @@ pub struct HotbarUiPlugin;
 impl Plugin for HotbarUiPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup.before(super::setup))
+            .add_systems(Update, update_selected_slot)
             .observe(add_slots);
     }
 }
@@ -17,11 +20,16 @@ pub struct HotbarDisplayRoot;
 #[derive(Resource)]
 struct HotbarSprites {
     slot: UiImage,
+    selected_slot: UiImage,
 }
+
+#[derive(Component)]
+struct HotbarIndex(u8);
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let sprites = HotbarSprites {
         slot: UiImage::new(asset_server.load("ui/hud/inventory/slot.png")),
+        selected_slot: UiImage::new(asset_server.load("ui/hud/inventory/selected_slot.png")),
     };
     commands.insert_resource(sprites);
 }
@@ -42,9 +50,10 @@ fn add_slots(
         let width = Val::Px(SLOT_SPRITE_SIZE);
         let height = Val::Px(SLOT_SPRITE_SIZE);
         let margin = UiRect::all(Val::Px(1.0));
-        for _ in 0..HOTBAR_SIZE {
+        for i in 0..HOTBAR_SIZE {
             builder.spawn((
                 Ui,
+                HotbarIndex(i),
                 sprites.slot.clone(),
                 NodeBundle {
                     style: Style {
@@ -58,4 +67,21 @@ fn add_slots(
             ));
         }
     });
+}
+
+fn update_selected_slot(
+    selection: Query<&HotbarSelection, Changed<HotbarSelection>>,
+    mut hotbar_display: Query<(&mut UiImage, &HotbarIndex)>,
+    sprites: Res<HotbarSprites>,
+) {
+    let Ok(HotbarSelection { index }) = selection.get_single() else {
+        return;
+    };
+    for (mut image, hotbar_index) in hotbar_display.iter_mut() {
+        *image = if hotbar_index.0 == *index {
+            sprites.selected_slot.clone()
+        } else {
+            sprites.slot.clone()
+        };
+    }
 }
