@@ -1,12 +1,19 @@
 use super::{target_velocity::TargetVelocity, Sprinting};
 use crate::{
     block::Block,
-    player::{block_target::TargetedBlock, mode::PlayerMode, Jumping, Player, Sneaking},
+    player::{
+        block_target::TargetedBlock, hotbar::HotbarSelection, mode::PlayerMode, Jumping, Player,
+        Sneaking,
+    },
     world::block_update::SetBlockEvent,
 };
 use bevy::{
     ecs::query::QueryData,
-    input::{common_conditions::input_just_pressed, mouse::MouseMotion},
+    input::{
+        common_conditions::input_just_pressed,
+        keyboard::KeyboardInput,
+        mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
+    },
     prelude::*,
     utils::{Entry, HashMap},
 };
@@ -25,6 +32,8 @@ impl Plugin for KeyboardMousePlugin {
                 rotate_camera_with_mouse,
                 process_keyboard_inputs,
                 delete_targeted_block.run_if(input_just_pressed(MouseButton::Left)),
+                change_hotbar_selection_from_keys,
+                change_hotbar_selection_from_scrollbar,
             ),
         )
         .observe(toggle_player_mode);
@@ -177,4 +186,59 @@ fn toggle_player_mode(trigger: Trigger<DoubleTap>, mut q_mode: Query<&mut Player
         PlayerMode::NoClip => PlayerMode::Survival,
     };
     info!("Switched to {:?}", *mode);
+}
+
+fn change_hotbar_selection_from_keys(
+    mut q_hotbar_selection: Query<&mut HotbarSelection>,
+    mut key_presses: EventReader<KeyboardInput>,
+) {
+    let Ok(mut selection) = q_hotbar_selection.get_single_mut() else {
+        warn!("Failed to find editable selection");
+        return;
+    };
+    for key in key_presses.read() {
+        let maybe_index = match key.key_code {
+            KeyCode::Digit1 => Some(0),
+            KeyCode::Digit2 => Some(1),
+            KeyCode::Digit3 => Some(2),
+            KeyCode::Digit4 => Some(3),
+            KeyCode::Digit5 => Some(4),
+            KeyCode::Digit6 => Some(5),
+            KeyCode::Digit7 => Some(6),
+            KeyCode::Digit8 => Some(7),
+            KeyCode::Digit9 => Some(8),
+            KeyCode::Digit0 => Some(9),
+            _ => None,
+        };
+        if let Some(index) = maybe_index {
+            selection.index = index;
+        }
+    }
+}
+
+fn change_hotbar_selection_from_scrollbar(
+    mut q_hotbar_selection: Query<&mut HotbarSelection>,
+    mut key_presses: EventReader<MouseWheel>,
+) {
+    let Ok(mut selection) = q_hotbar_selection.get_single_mut() else {
+        warn!("Failed to find editable selection");
+        return;
+    };
+    for wheel_event in key_presses.read() {
+        let delta = match wheel_event.unit {
+            MouseScrollUnit::Line => wheel_event.y.signum() as i8,
+            _ => 0,
+        };
+        const MAX_SELECTION: u8 = 9;
+        let new_index = if delta == -1 && selection.index == 0 {
+            MAX_SELECTION
+        } else if delta == 1 && selection.index == MAX_SELECTION {
+            0
+        } else {
+            selection
+                .index
+                .wrapping_add_signed(delta)
+        };
+        selection.index = new_index;
+    }
 }
