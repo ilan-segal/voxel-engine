@@ -5,7 +5,7 @@ use crate::player::{
     Player,
 };
 
-use super::{Ui, UiRoot};
+use super::Ui;
 
 pub struct HealthUiPlugin;
 
@@ -24,45 +24,18 @@ struct SpriteHandles {
 }
 
 #[derive(Component)]
-struct HealthDisplayRoot;
+pub struct HealthDisplayRoot;
 
-fn setup(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    q_ui_root: Query<Entity, With<UiRoot>>,
-) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let handles = SpriteHandles {
-        full_heart: UiImage::new(asset_server.load("ui/sprites/heart/full.png")),
-        half_heart: UiImage::new(asset_server.load("ui/sprites/heart/half.png")),
-        container: UiImage::new(asset_server.load("ui/sprites/heart/container.png")),
+        full_heart: UiImage::new(asset_server.load("ui/hud/heart/full.png")),
+        half_heart: UiImage::new(asset_server.load("ui/hud/heart/half.png")),
+        container: UiImage::new(asset_server.load("ui/hud/heart/container.png")),
     };
     commands.insert_resource(handles);
-    let entity = q_ui_root
-        .get_single()
-        .ok()
-        .expect("Should be exactly one UiRoot component");
-    let health_display_node = commands
-        .spawn((
-            Ui,
-            HealthDisplayRoot,
-            NodeBundle {
-                style: Style {
-                    width: Val::Percent(100.0),
-                    position_type: PositionType::Absolute,
-                    // align_self: AlignSelf::Start,
-                    align_content: AlignContent::Start,
-                    ..default()
-                },
-                ..default()
-            },
-        ))
-        .id();
-    commands
-        .entity(entity)
-        .push_children(&[health_display_node]);
 }
 
-const HEART_SPRITE_SIZE: f32 = 30.0;
+const HEART_SPRITE_SIZE: f32 = 25.0;
 
 fn update_health_display(
     mut commands: Commands,
@@ -86,49 +59,44 @@ fn update_health_display(
         .despawn_descendants()
         .with_children(|builder| {
             for i in 1..=num_containers {
-                let left = Val::Px((i - 1) as f32 * HEART_SPRITE_SIZE);
-                let top = Val::Px(0.0);
                 let width = Val::Px(HEART_SPRITE_SIZE);
                 let height = Val::Px(HEART_SPRITE_SIZE);
-                builder.spawn((
-                    Ui,
-                    NodeBundle {
-                        style: Style {
-                            position_type: PositionType::Absolute,
-                            left,
-                            top,
-                            width,
-                            height,
-                            ..default()
-                        },
-                        ..default()
-                    },
-                    sprites.container.clone(),
-                ));
-                let heart_sprite = if health >= &(i * 2) {
-                    Some(sprites.full_heart.clone())
-                } else if health + 1 >= i * 2 {
-                    Some(sprites.half_heart.clone())
-                } else {
-                    None
-                };
-                if let Some(sprite) = heart_sprite {
-                    builder.spawn((
+                builder
+                    .spawn((
                         Ui,
                         NodeBundle {
                             style: Style {
-                                position_type: PositionType::Absolute,
-                                left,
-                                top,
                                 width,
                                 height,
                                 ..default()
                             },
                             ..default()
                         },
-                        sprite,
-                    ));
-                }
+                        sprites.container.clone(),
+                    ))
+                    .with_children(|builder_2| {
+                        let heart_sprite = if health >= &(i * 2) {
+                            Some(sprites.full_heart.clone())
+                        } else if health + 1 >= i * 2 {
+                            Some(sprites.half_heart.clone())
+                        } else {
+                            None
+                        };
+                        if let Some(sprite) = heart_sprite {
+                            builder_2.spawn((
+                                Ui,
+                                NodeBundle {
+                                    style: Style {
+                                        width,
+                                        height,
+                                        ..default()
+                                    },
+                                    ..default()
+                                },
+                                sprite,
+                            ));
+                        }
+                    });
             }
         });
 }
