@@ -1,6 +1,5 @@
 use crate::{
     block::{Block, BlockSide},
-    camera_distance::CameraDistance,
     chunk::{
         data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, Chunk,
         CHUNK_SIZE,
@@ -113,17 +112,11 @@ fn end_mesh_tasks_for_unloaded_chunks(
 
 fn begin_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
-    mut q_chunk: Query<
-        (Entity, &ChunkPosition, &CameraDistance),
-        (With<Chunk>, Without<Meshed>, With<CheckedForMesh>),
-    >,
+    q_chunk: Query<(Entity, &ChunkPosition), (With<Chunk>, Without<Meshed>, With<CheckedForMesh>)>,
     chunk_index: Res<ChunkIndex>,
     mut commands: Commands,
 ) {
-    for (entity, pos, _) in q_chunk
-        .iter_mut()
-        .sort::<&CameraDistance>()
-    {
+    for (entity, pos) in q_chunk.iter() {
         if tasks.0.contains_key(pos) {
             continue;
         }
