@@ -91,23 +91,19 @@ fn mark_mesh_as_stale(
             commands
                 .entity(*entity_in_neighborhood)
                 .remove::<CheckedForMesh>();
-            tasks.0.remove(pos);
+            tasks.0.remove(entity_in_neighborhood);
         }
     }
 }
 
 #[derive(Resource, Default)]
-struct MeshGenTasks(HashMap<ChunkPosition, Task<MeshTaskData>>);
+struct MeshGenTasks(HashMap<Entity, Task<MeshTaskData>>);
 
 fn end_mesh_tasks_for_unloaded_chunks(
-    trigger: Trigger<OnRemove, ChunkPosition>,
-    chunks: Query<&ChunkPosition, With<Blocks>>,
+    trigger: Trigger<OnRemove, Chunk>,
     mut tasks: ResMut<MeshGenTasks>,
 ) {
-    let Ok(pos) = chunks.get(trigger.entity()) else {
-        return;
-    };
-    tasks.0.remove(pos);
+    tasks.0.remove(&trigger.entity());
 }
 
 fn begin_mesh_gen_tasks(
@@ -117,7 +113,7 @@ fn begin_mesh_gen_tasks(
     mut commands: Commands,
 ) {
     for (entity, pos) in q_chunk.iter() {
-        if tasks.0.contains_key(pos) {
+        if tasks.0.contains_key(&entity) {
             continue;
         }
         let task_pool = AsyncComputeTaskPool::get();
@@ -136,7 +132,7 @@ fn begin_mesh_gen_tasks(
                 mesh: get_meshes_for_chunk(cloned_chunk),
             }
         });
-        tasks.0.insert(*pos, task);
+        tasks.0.insert(entity, task);
         commands.entity(entity).insert(Meshed);
     }
 }
