@@ -30,6 +30,7 @@ const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 5;
 pub mod block_update;
 pub mod chunk_neighborhood;
 pub mod index;
+pub mod neighborhood;
 mod seed;
 pub mod stage;
 mod world_noise;
@@ -42,6 +43,9 @@ impl Plugin for WorldPlugin {
             seed::SeedPlugin,
             index::ChunkIndexPlugin,
             block_update::BlockPlugin,
+            neighborhood::NeighborhoodPlugin::<Blocks>::new(),
+            neighborhood::NeighborhoodPlugin::<Stage>::new(),
+            neighborhood::NeighborhoodPlugin::<Noise3d>::new(),
         ))
         .init_resource::<ChunkLoadTasks>()
         .add_systems(Startup, init_noise.after(LoadSeed))
