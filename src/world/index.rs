@@ -8,7 +8,7 @@ use bevy::{ecs::query::QueryData, prelude::*, utils::HashMap};
 use itertools::Itertools;
 use std::sync::Arc;
 
-use super::{neighborhood::ChunkNeighborhood, stage::Stage, ChunkBundle, WorldSet};
+use super::{chunk_neighborhood::ChunkNeighborhood, stage::Stage, ChunkBundle, WorldSet};
 
 pub struct ChunkIndexPlugin;
 

@@ -15,8 +15,8 @@ use bevy::{
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
     utils::HashMap,
 };
+use chunk_neighborhood::ChunkNeighborhood;
 use index::ChunkIndex;
-use neighborhood::ChunkNeighborhood;
 use noise::NoiseFn;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use seed::{LoadSeed, WorldSeed};
@@ -28,8 +28,8 @@ const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 5;
 const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 5;
 
 pub mod block_update;
+pub mod chunk_neighborhood;
 pub mod index;
-pub mod neighborhood;
 mod seed;
 pub mod stage;
 mod world_noise;

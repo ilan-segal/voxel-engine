@@ -1,6 +1,6 @@
 use crate::{
     block::Block, chunk::CHUNK_SIZE_I32, utils::VolumetricRange,
-    world::neighborhood::ChunkNeighborhood,
+    world::chunk_neighborhood::ChunkNeighborhood,
 };
 
 pub enum Structure {

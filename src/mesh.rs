@@ -7,8 +7,8 @@ use crate::{
     texture::BlockMaterials,
     utils::VolumetricRange,
     world::{
+        chunk_neighborhood::ChunkNeighborhood,
         index::{ChunkIndex, ChunkIndexUpdate},
-        neighborhood::ChunkNeighborhood,
         stage::Stage,
         WorldSet,
     },
