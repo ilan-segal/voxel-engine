@@ -1,75 +1,62 @@
-use crate::chunk::{
-    data::{Blocks, Noise3d, Perlin2d},
-    position::ChunkPosition,
-    CHUNK_SIZE,
-};
-use crate::{block::Block, mesh::MeshSet};
-use bevy::{ecs::query::QueryData, prelude::*, utils::HashMap};
+use crate::block::Block;
+use crate::chunk::Chunk;
+use crate::chunk::{data::Blocks, position::ChunkPosition, CHUNK_SIZE};
+use bevy::{prelude::*, utils::HashMap};
 use itertools::Itertools;
 use std::sync::Arc;
 
-use super::{neighborhood::ChunkNeighborhood, stage::Stage, ChunkBundle, WorldSet};
+use super::neighborhood::BlockNeighborhood;
+use super::neighborhood::NeighborhoodComponentCopy;
 
 pub struct ChunkIndexPlugin;
 
 impl Plugin for ChunkIndexPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ChunkIndex>()
-            .add_event::<ChunkIndexUpdate>()
-            .add_systems(
-                Update,
-                on_blocks_changed
-                    .before(MeshSet)
-                    .before(WorldSet),
-            )
+            .observe(on_blocks_changed)
+            .observe(on_blocks_loaded)
             .observe(on_chunk_unloaded);
     }
 }
 
-#[derive(Event)]
-pub struct ChunkIndexUpdate(pub ChunkPosition);
-
-#[derive(QueryData)]
-pub struct ChunkBundleQueryData {
-    chunk_pos: &'static ChunkPosition,
-    stage: &'static Stage,
-    blocks: &'static Blocks,
-    perlin_2d: &'static Perlin2d,
-    noise_3d: &'static Noise3d,
-}
-
 pub fn on_blocks_changed(
-    query: Query<(Entity, ChunkBundleQueryData), Changed<Blocks>>,
+    trigger: Trigger<OnAdd, NeighborhoodComponentCopy<Blocks>>,
+    query: Query<(&ChunkPosition, &NeighborhoodComponentCopy<Blocks>)>,
     mut index: ResMut<ChunkIndex>,
-    mut update_events: EventWriter<ChunkIndexUpdate>,
 ) {
-    for (e, bundle) in query.iter() {
-        index.insert(
-            bundle.chunk_pos.0,
-            e,
-            bundle.blocks,
-            bundle.stage,
-            bundle.perlin_2d,
-            bundle.noise_3d,
-        );
-        update_events.send(ChunkIndexUpdate(*bundle.chunk_pos));
-    }
+    let e = trigger.entity();
+    let Ok((pos, blocks)) = query.get(e) else {
+        return;
+    };
+    index.insert(pos.0, e, blocks.0.clone());
 }
 
-fn on_chunk_unloaded(trigger: Trigger<OnRemove, Blocks>, mut index: ResMut<ChunkIndex>) {
+pub fn on_blocks_loaded(
+    trigger: Trigger<OnAdd, ChunkPosition>,
+    query: Query<&ChunkPosition, With<Chunk>>,
+    mut index: ResMut<ChunkIndex>,
+) {
+    let e = trigger.entity();
+    let Ok(pos) = query.get(e) else {
+        return;
+    };
+    index.insert_entity(pos.0, e);
+}
+
+fn on_chunk_unloaded(trigger: Trigger<OnRemove, Chunk>, mut index: ResMut<ChunkIndex>) {
     index.remove_entity(&trigger.entity());
 }
 
 #[derive(Resource, Default)]
 pub struct ChunkIndex {
-    chunk_map: HashMap<IVec3, Arc<ChunkBundle>>,
+    chunk_map: HashMap<IVec3, Arc<Blocks>>,
     pub entity_by_pos: HashMap<IVec3, Entity>,
     pub pos_by_entity: HashMap<Entity, IVec3>,
 }
 
 impl ChunkIndex {
-    pub fn get_neighborhood(&self, pos: &IVec3) -> ChunkNeighborhood {
-        let mut chunks: [[[Option<Arc<ChunkBundle>>; 3]; 3]; 3] = Default::default();
+    fn get_neighborhood(&self, pos: &IVec3) -> BlockNeighborhood {
+        let mut chunks: [[[Option<Arc<Blocks>>; 3]; 3]; 3] = Default::default();
         (-1..=1)
             .cartesian_product(-1..=1)
             .cartesian_product(-1..=1)
@@ -78,25 +65,16 @@ impl ChunkIndex {
                 chunks[(x + 1) as usize][(y + 1) as usize][(z + 1) as usize] =
                     self.chunk_map.get(&cur_pos).cloned();
             });
-        return ChunkNeighborhood { chunks };
+        return BlockNeighborhood { chunks };
     }
 
-    fn insert(
-        &mut self,
-        pos: IVec3,
-        entity: Entity,
-        blocks: &Blocks,
-        stage: &Stage,
-        perlin_2d: &Perlin2d,
-        noise_3d: &Noise3d,
-    ) {
-        let data = Arc::new(ChunkBundle {
-            blocks: (*blocks).clone(),
-            stage: *stage,
-            perlin_2d: (*perlin_2d).clone(),
-            noise_3d: (*noise_3d).clone(),
-        });
-        self.chunk_map.insert(pos, data);
+    fn insert(&mut self, pos: IVec3, entity: Entity, blocks: Arc<Blocks>) {
+        self.chunk_map.insert(pos, blocks);
+        self.entity_by_pos.insert(pos, entity);
+        self.pos_by_entity.insert(entity, pos);
+    }
+
+    fn insert_entity(&mut self, pos: IVec3, entity: Entity) {
         self.entity_by_pos.insert(pos, entity);
         self.pos_by_entity.insert(entity, pos);
     }

@@ -16,7 +16,7 @@ use bevy::{
     utils::HashMap,
 };
 use index::ChunkIndex;
-use neighborhood::ChunkNeighborhood;
+use neighborhood::GenericNeighborhood;
 use noise::NoiseFn;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use seed::{LoadSeed, WorldSeed};
@@ -24,8 +24,8 @@ use stage::Stage;
 use std::collections::HashSet;
 use world_noise::WorldGenNoise;
 
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 5;
-const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 5;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 3;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 3;
 
 pub mod block_update;
 pub mod index;
@@ -42,6 +42,9 @@ impl Plugin for WorldPlugin {
             seed::SeedPlugin,
             index::ChunkIndexPlugin,
             block_update::BlockPlugin,
+            neighborhood::NeighborhoodPlugin::<Blocks>::new(),
+            neighborhood::NeighborhoodPlugin::<Stage>::new(),
+            neighborhood::NeighborhoodPlugin::<Noise3d>::new(),
         ))
         .init_resource::<ChunkLoadTasks>()
         .add_systems(Startup, init_noise.after(LoadSeed))
@@ -65,14 +68,6 @@ fn init_noise(mut commands: Commands, seed: Res<WorldSeed>) {
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WorldSet;
-
-#[derive(Bundle)]
-pub struct ChunkBundle {
-    pub stage: Stage,
-    pub blocks: Blocks,
-    pub perlin_2d: Perlin2d,
-    pub noise_3d: Noise3d,
-}
 
 struct ChunkLoadTaskData {
     entity: Entity,
@@ -310,24 +305,30 @@ fn generate_terrain_for_chunk(noise: Perlin2d, pos: ChunkPosition) -> Blocks {
 
 fn begin_structure_load_tasks(
     mut tasks: ResMut<ChunkLoadTasks>,
-    index: Res<ChunkIndex>,
-    q_chunk: Query<(Entity, &ChunkPosition, &Stage), With<Chunk>>,
+    q_chunk: Query<
+        (
+            Entity,
+            &ChunkPosition,
+            &GenericNeighborhood<Blocks>,
+            &GenericNeighborhood<Noise3d>,
+            &GenericNeighborhood<Stage>,
+        ),
+        (With<Chunk>, Changed<GenericNeighborhood<Stage>>),
+    >,
 ) {
-    for (entity, pos, stage) in q_chunk.iter() {
-        if tasks.0.contains_key(pos) || stage != &Stage::Terrain {
-            continue;
-        }
-        let neighborhood = index.get_neighborhood(&pos.0);
-        if neighborhood.get_lowest_stage() < Stage::Terrain
-            || neighborhood
-                .iter_chunks()
-                .any(|c| c.is_none())
+    for (entity, pos, blocks, noise_3d, stage) in q_chunk.iter() {
+        if !blocks.is_populated()
+            || !stage.is_populated()
+            || !noise_3d.is_populated()
+            || stage.get_lowest_stage() < Stage::Terrain
         {
             continue;
         }
         let task_pool = AsyncComputeTaskPool::get();
+        let cloned_blocks = blocks.clone();
+        let cloned_noise = noise_3d.clone();
         let task = task_pool.spawn(async move {
-            let blocks = generate_structures(neighborhood);
+            let blocks = generate_structures(cloned_blocks, cloned_noise);
             ChunkLoadTaskData {
                 entity,
                 added_data: AddedChunkData::Blocks(blocks, Stage::Structures),
@@ -337,16 +338,14 @@ fn begin_structure_load_tasks(
     }
 }
 
-fn generate_structures(neighborhood: ChunkNeighborhood) -> Blocks {
-    let mut blocks = neighborhood
-        .middle()
-        .expect("Middle chunk")
-        .blocks
-        .clone();
+fn generate_structures(
+    blocks_neighborhood: GenericNeighborhood<Blocks>,
+    noise_3d: GenericNeighborhood<Noise3d>,
+) -> Blocks {
     let structure_types = vec![StructureType::Tree];
     let structure_blocks = structure_types
         .iter()
-        .flat_map(|s| s.get_structures(&neighborhood))
+        .flat_map(|s| s.get_structures(&blocks_neighborhood, &noise_3d))
         .flat_map(|(structure, [x0, y0, z0])| {
             structure
                 .get_blocks()
@@ -367,6 +366,14 @@ fn generate_structures(neighborhood: ChunkNeighborhood) -> Blocks {
         })
         .collect::<Vec<_>>();
     // TODO: Vary available structure types by looking at local data
+    let mut blocks = Blocks(
+        blocks_neighborhood
+            .middle()
+            .clone()
+            .expect("Middle chunk")
+            .0
+            .clone(),
+    );
     for (block, [x, y, z]) in structure_blocks.iter().copied() {
         let x = x as usize;
         let y = y as usize;

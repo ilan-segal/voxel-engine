@@ -21,7 +21,9 @@ impl Default for Blocks {
     }
 }
 
-impl SpatiallyMapped<Block, 3> for Blocks {
+impl SpatiallyMapped<3> for Blocks {
+    type Item = Block;
+
     fn at_pos(&self, pos: [usize; 3]) -> &Block {
         self.0.at_pos(pos)
     }
@@ -42,7 +44,9 @@ impl Blocks {
 #[derive(Component, Clone)]
 pub struct Perlin2d(pub Vec<f32>);
 
-impl SpatiallyMapped<f32, 2> for Perlin2d {
+impl SpatiallyMapped<2> for Perlin2d {
+    type Item = f32;
+
     fn at_pos(&self, pos: [usize; 2]) -> &f32 {
         self.0.at_pos(pos)
     }
@@ -55,7 +59,9 @@ impl SpatiallyMapped<f32, 2> for Perlin2d {
 #[derive(Component, Clone)]
 pub struct Noise3d(pub Vec<f32>);
 
-impl SpatiallyMapped<f32, 3> for Noise3d {
+impl SpatiallyMapped<3> for Noise3d {
+    type Item = f32;
+
     fn at_pos(&self, pos: [usize; 3]) -> &f32 {
         self.0.at_pos(pos)
     }

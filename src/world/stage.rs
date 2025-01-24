@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-#[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Debug)]
 pub enum Stage {
     #[default]
     Noise,
