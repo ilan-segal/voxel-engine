@@ -1,8 +1,5 @@
-use crate::chunk::{layer_to_xyz, CHUNK_SIZE};
-use crate::{
-    block::{Block, BlockSide},
-    chunk::spatial::SpatiallyMapped,
-};
+use crate::chunk::CHUNK_SIZE;
+use crate::{block::Block, chunk::spatial::SpatiallyMapped};
 use std::sync::Arc;
 
 use super::stage::Stage;
@@ -30,38 +27,8 @@ impl ChunkNeighborhood {
             .map(|bundle| bundle.noise_3d.at_pos([x, y, z]))
     }
 
-    pub fn at_layer(&self, side: &BlockSide, layer: i32, row: i32, col: i32) -> Option<&Block> {
-        let (x, y, z) = layer_to_xyz(side, layer, row, col);
-        self.block_at(x, y, z)
-    }
-
     pub fn middle(&self) -> Option<Arc<ChunkBundle>> {
         self.chunks[1][1][1].clone()
-    }
-
-    pub fn block_is_hidden_from_above(
-        &self,
-        side: &BlockSide,
-        layer: i32,
-        row: i32,
-        col: i32,
-    ) -> bool {
-        let cur_block = self
-            .at_layer(side, layer, row, col)
-            .copied()
-            .unwrap_or_default();
-        match self.at_layer(side, layer + 1, row, col) {
-            Some(block) if block == &cur_block => true,
-            None | Some(&Block::Air) | Some(&Block::Leaves) => false,
-            _ => true,
-        }
-    }
-
-    pub fn count_block(&self, side: &BlockSide, layer: i32, row: i32, col: i32) -> u8 {
-        match self.at_layer(side, layer, row, col) {
-            None | Some(&Block::Air) => 0,
-            _ => 1,
-        }
     }
 
     pub fn get_lowest_stage(&self) -> Stage {

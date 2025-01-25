@@ -1,5 +1,11 @@
 use super::index::ChunkIndex;
-use crate::{chunk::position::ChunkPosition, utils::VolumetricRange};
+use crate::{
+    block::{Block, BlockSide},
+    chunk::{
+        data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, CHUNK_SIZE,
+    },
+    utils::VolumetricRange,
+};
 use bevy::prelude::*;
 use std::{marker::PhantomData, sync::Arc};
 
@@ -68,8 +74,8 @@ fn update_copy_to_match_component<T: Component + Clone>(
     }
 }
 
-#[derive(Component)]
-pub struct Neighborhood<T>([Option<Arc<T>>; 3 * 3 * 3]);
+#[derive(Component, Clone)]
+pub struct Neighborhood<T>(pub [Option<Arc<T>>; 3 * 3 * 3]);
 
 impl<T> Default for Neighborhood<T> {
     fn default() -> Self {
@@ -80,19 +86,79 @@ impl<T> Default for Neighborhood<T> {
 impl<T> Neighborhood<T> {
     /// 0,0,0 is center
     pub fn get(&self, x: i32, y: i32, z: i32) -> &Option<Arc<T>> {
-        &self.0[Self::get_index(x, y, z)]
+        &self.0[Self::get_chunk_index(x, y, z)]
     }
 
     /// 0,0,0 is center
     pub fn get_mut(&mut self, x: i32, y: i32, z: i32) -> &mut Option<Arc<T>> {
         self.0
-            .get_mut(Self::get_index(x, y, z))
+            .get_mut(Self::get_chunk_index(x, y, z))
             .expect("index range")
     }
 
-    fn get_index(x: i32, y: i32, z: i32) -> usize {
+    pub fn middle(&self) -> &Option<Arc<T>> {
+        self.get(0, 0, 0)
+    }
+
+    fn get_chunk_index(x: i32, y: i32, z: i32) -> usize {
         (9 * (x + 1) + 3 * (y + 1) + (z + 1)) as usize
     }
+}
+
+impl Neighborhood<Blocks> {
+    pub fn block_at(&self, x: i32, y: i32, z: i32) -> Option<&Block> {
+        let (x, chunk_x, y, chunk_y, z, chunk_z) = to_local_coordinates(x, y, z);
+
+        self.get(chunk_x, chunk_y, chunk_z)
+            .as_ref()
+            .map(|blocks| blocks.at_pos([x, y, z]))
+    }
+
+    pub fn at_layer(&self, side: &BlockSide, layer: i32, row: i32, col: i32) -> Option<&Block> {
+        let (x, y, z) = layer_to_xyz(side, layer, row, col);
+        self.block_at(x, y, z)
+    }
+
+    pub fn block_is_hidden_from_above(
+        &self,
+        side: &BlockSide,
+        layer: i32,
+        row: i32,
+        col: i32,
+    ) -> bool {
+        let cur_block = self
+            .at_layer(side, layer, row, col)
+            .copied()
+            .unwrap_or_default();
+        match self.at_layer(side, layer + 1, row, col) {
+            Some(block) if block == &cur_block => true,
+            None | Some(&Block::Air) | Some(&Block::Leaves) => false,
+            _ => true,
+        }
+    }
+
+    pub fn count_block(&self, side: &BlockSide, layer: i32, row: i32, col: i32) -> u8 {
+        match self.at_layer(side, layer, row, col) {
+            None | Some(&Block::Air) => 0,
+            _ => 1,
+        }
+    }
+}
+
+fn to_local_coordinates(x: i32, y: i32, z: i32) -> (usize, i32, usize, i32, usize, i32) {
+    fn get_chunk_pos_coord(in_chunk_coord: i32) -> (usize, i32) {
+        if in_chunk_coord < 0 {
+            ((in_chunk_coord + CHUNK_SIZE as i32) as usize, -1)
+        } else if in_chunk_coord < CHUNK_SIZE as i32 {
+            (in_chunk_coord as usize, 0)
+        } else {
+            ((in_chunk_coord - CHUNK_SIZE as i32) as usize, 1)
+        }
+    }
+    let (x, chunk_x) = get_chunk_pos_coord(x);
+    let (y, chunk_y) = get_chunk_pos_coord(y);
+    let (z, chunk_z) = get_chunk_pos_coord(z);
+    (x, chunk_x, y, chunk_y, z, chunk_z)
 }
 
 fn add_neighborhood<T: Component + Send + Sync + 'static>(

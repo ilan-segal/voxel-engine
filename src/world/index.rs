@@ -15,7 +15,6 @@ pub struct ChunkIndexPlugin;
 impl Plugin for ChunkIndexPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ChunkIndex>()
-            .add_event::<ChunkIndexUpdate>()
             .add_systems(
                 Update,
                 on_blocks_changed
@@ -25,9 +24,6 @@ impl Plugin for ChunkIndexPlugin {
             .observe(on_chunk_unloaded);
     }
 }
-
-#[derive(Event)]
-pub struct ChunkIndexUpdate(pub ChunkPosition);
 
 #[derive(QueryData)]
 pub struct ChunkBundleQueryData {
@@ -41,7 +37,6 @@ pub struct ChunkBundleQueryData {
 pub fn on_blocks_changed(
     query: Query<(Entity, ChunkBundleQueryData), Changed<Blocks>>,
     mut index: ResMut<ChunkIndex>,
-    mut update_events: EventWriter<ChunkIndexUpdate>,
 ) {
     for (e, bundle) in query.iter() {
         index.insert(
@@ -52,7 +47,6 @@ pub fn on_blocks_changed(
             bundle.perlin_2d,
             bundle.noise_3d,
         );
-        update_events.send(ChunkIndexUpdate(*bundle.chunk_pos));
     }
 }
 

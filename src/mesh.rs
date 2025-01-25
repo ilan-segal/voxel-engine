@@ -5,13 +5,7 @@ use crate::{
         CHUNK_SIZE,
     },
     texture::BlockMaterials,
-    utils::VolumetricRange,
-    world::{
-        chunk_neighborhood::ChunkNeighborhood,
-        index::{ChunkIndex, ChunkIndexUpdate},
-        stage::Stage,
-        WorldSet,
-    },
+    world::{neighborhood::Neighborhood, stage::Stage, WorldSet},
     WORLD_LAYER,
 };
 use bevy::{
@@ -78,21 +72,14 @@ fn update_mesh_status(
 
 fn mark_mesh_as_stale(
     mut commands: Commands,
-    mut chunk_updates: EventReader<ChunkIndexUpdate>,
-    index: Res<ChunkIndex>,
+    q_changed_neighborhood: Query<Entity, Changed<Neighborhood<Blocks>>>,
     mut tasks: ResMut<MeshGenTasks>,
 ) {
-    for ChunkIndexUpdate(pos) in chunk_updates.read() {
-        for (x, y, z) in VolumetricRange::new(-1..2, -1..2, -1..2) {
-            let cur_pos = IVec3::new(x, y, z) + pos.0;
-            let Some(entity_in_neighborhood) = index.entity_by_pos.get(&cur_pos) else {
-                continue;
-            };
-            commands
-                .entity(*entity_in_neighborhood)
-                .remove::<CheckedForMesh>();
-            tasks.0.remove(entity_in_neighborhood);
-        }
+    for entity in q_changed_neighborhood.iter() {
+        commands
+            .entity(entity)
+            .remove::<CheckedForMesh>();
+        tasks.0.remove(&entity);
     }
 }
 
@@ -108,28 +95,30 @@ fn end_mesh_tasks_for_unloaded_chunks(
 
 fn begin_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
-    q_chunk: Query<(Entity, &ChunkPosition), (With<Chunk>, Without<Meshed>, With<CheckedForMesh>)>,
-    chunk_index: Res<ChunkIndex>,
+    q_chunk: Query<
+        (Entity, &ChunkPosition, &Neighborhood<Blocks>),
+        (With<Chunk>, Without<Meshed>, With<CheckedForMesh>),
+    >,
     mut commands: Commands,
 ) {
-    for (entity, pos) in q_chunk.iter() {
+    for (entity, pos, neighborhood) in q_chunk.iter() {
         if tasks.0.contains_key(&entity) {
             continue;
         }
         let task_pool = AsyncComputeTaskPool::get();
-        let cloned_chunk = chunk_index.get_neighborhood(&pos.0);
-        let Some(middle_chunk) = cloned_chunk.middle() else {
+        let Some(middle_chunk) = neighborhood.middle() else {
             warn!("Chunk at {:?} is absent from index", pos);
             continue;
         };
         commands.entity(entity).insert(Meshed);
-        if !middle_chunk.blocks.is_meshable() {
+        if !middle_chunk.is_meshable() {
             continue;
         }
+        let cloned_neighborhood = neighborhood.clone();
         let task = task_pool.spawn(async move {
             MeshTaskData {
                 entity,
-                mesh: get_meshes_for_chunk(cloned_chunk),
+                mesh: get_meshes_for_chunk(cloned_neighborhood),
             }
         });
         tasks.0.insert(entity, task);
@@ -197,7 +186,7 @@ impl Quad {
     }
 }
 
-fn get_meshes_for_chunk(chunk: ChunkNeighborhood) -> Vec<(Block, BlockSide, Mesh)> {
+fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Vec<(Block, BlockSide, Mesh)> {
     let mut quads = vec![];
     quads.extend(greedy_mesh(&chunk, BlockSide::Up));
     quads.extend(greedy_mesh(&chunk, BlockSide::Down));
@@ -209,10 +198,13 @@ fn get_meshes_for_chunk(chunk: ChunkNeighborhood) -> Vec<(Block, BlockSide, Mesh
 }
 
 // TODO: Replace slow implementation with binary mesher
-fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
+fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let middle = chunk.middle().expect("Already checked");
-    let mut blocks = middle.blocks.clone();
+    let middle = chunk
+        .middle()
+        .clone()
+        .expect("Already checked");
+    let mut blocks = middle.as_ref().clone();
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {
             for col in 0..CHUNK_SIZE {
@@ -370,7 +362,7 @@ fn greedy_mesh(chunk: &ChunkNeighborhood, direction: BlockSide) -> Vec<Quad> {
 }
 
 fn get_ao_factor(
-    chunk: &ChunkNeighborhood,
+    chunk: &Neighborhood<Blocks>,
     side: &BlockSide,
     layer: usize,
     row: usize,
