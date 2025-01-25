@@ -173,6 +173,7 @@ fn receive_mesh_gen_tasks(
     mut tasks: ResMut<MeshGenTasks>,
     mut meshes: ResMut<Assets<Mesh>>,
     materials: Res<BlockMaterials>,
+    q_render_layers: Query<&RenderLayers>,
 ) {
     tasks.0.retain(|_, task| {
         let Some(data) = block_on(future::poll_once(task)) else {
@@ -186,6 +187,11 @@ fn receive_mesh_gen_tasks(
         if data.mesh.is_empty() {
             return false;
         }
+        let render_layer = q_render_layers
+            .get(e)
+            .ok()
+            .cloned()
+            .unwrap_or(RenderLayers::layer(WORLD_LAYER));
         entity.with_children(|builder| {
             for (block, side, mesh) in data.mesh {
                 builder.spawn((
@@ -197,7 +203,7 @@ fn receive_mesh_gen_tasks(
                             .clone_weak(),
                         ..default()
                     },
-                    RenderLayers::layer(WORLD_LAYER),
+                    render_layer.clone(),
                 ));
             }
         });
