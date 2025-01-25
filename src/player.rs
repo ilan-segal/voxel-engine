@@ -7,8 +7,9 @@ use crate::{
         velocity::Velocity,
         PhysicsSystemSet,
     },
+    render_layer::WORLD_LAYER,
 };
-use bevy::{core_pipeline::tonemapping::DebandDither, prelude::*};
+use bevy::{core_pipeline::tonemapping::DebandDither, prelude::*, render::view::RenderLayers};
 use block_target::BlockTargetPlugin;
 use controls::target_velocity::TargetVelocity;
 use falling_state::FallingState;
@@ -70,6 +71,7 @@ pub struct PlayerBundle {
     health: Health,
     max_health: MaxHealth,
     hotbar_selection: HotbarSelection,
+    render_layers: RenderLayers,
 }
 
 impl Default for PlayerBundle {
@@ -109,6 +111,7 @@ impl Default for PlayerBundle {
             health: Health(max_health),
             max_health: MaxHealth(max_health),
             hotbar_selection: default(),
+            render_layers: RenderLayers::layer(WORLD_LAYER),
         }
     }
 }

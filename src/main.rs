@@ -9,7 +9,6 @@ use bevy::{
     core_pipeline::smaa::SmaaSettings,
     pbr::wireframe::{WireframeConfig, WireframePlugin},
     prelude::*,
-    render::view::RenderLayers,
     window::CursorGrabMode,
 };
 use player::PlayerBundle;
@@ -71,11 +70,7 @@ fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
     window.cursor.visible = false;
     window.cursor.grab_mode = CursorGrabMode::Locked;
 
-    commands.spawn((
-        PlayerBundle::default(),
-        RenderLayers::layer(WORLD_LAYER),
-        SmaaSettings::default(),
-    ));
+    commands.spawn((PlayerBundle::default(), SmaaSettings::default()));
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
         brightness: 750.,
