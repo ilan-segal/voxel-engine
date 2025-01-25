@@ -1,6 +1,7 @@
 use crate::chunk::{
     data::{Blocks, Noise3d, Perlin2d},
     position::ChunkPosition,
+    spatial::SpatiallyMapped,
     CHUNK_SIZE,
 };
 use crate::{block::Block, mesh::MeshSet};
@@ -8,7 +9,10 @@ use bevy::{ecs::query::QueryData, prelude::*, utils::HashMap};
 use itertools::Itertools;
 use std::sync::Arc;
 
-use super::{chunk_neighborhood::ChunkNeighborhood, stage::Stage, ChunkBundle, WorldSet};
+use super::{
+    chunk_neighborhood::ChunkNeighborhood, neighborhood::ComponentCopy, stage::Stage, ChunkBundle,
+    WorldSet,
+};
 
 pub struct ChunkIndexPlugin;
 
@@ -17,7 +21,7 @@ impl Plugin for ChunkIndexPlugin {
         app.init_resource::<ChunkIndex>()
             .add_systems(
                 Update,
-                on_blocks_changed
+                (on_blocks_changed, on_blocks_changed_2)
                     .before(MeshSet)
                     .before(WorldSet),
             )
@@ -50,6 +54,17 @@ pub fn on_blocks_changed(
     }
 }
 
+pub fn on_blocks_changed_2(
+    q: Query<(&ChunkPosition, &ComponentCopy<Blocks>), Changed<ComponentCopy<Blocks>>>,
+    mut index: ResMut<ChunkIndex>,
+) {
+    for (pos, blocks) in q.iter() {
+        index
+            .blocks_by_pos
+            .insert(pos.0, blocks.0.clone());
+    }
+}
+
 fn on_chunk_unloaded(trigger: Trigger<OnRemove, Blocks>, mut index: ResMut<ChunkIndex>) {
     index.remove_entity(&trigger.entity());
 }
@@ -57,6 +72,7 @@ fn on_chunk_unloaded(trigger: Trigger<OnRemove, Blocks>, mut index: ResMut<Chunk
 #[derive(Resource, Default)]
 pub struct ChunkIndex {
     chunk_map: HashMap<IVec3, Arc<ChunkBundle>>,
+    blocks_by_pos: HashMap<IVec3, Arc<Blocks>>,
     pub entity_by_pos: HashMap<IVec3, Entity>,
     pub pos_by_entity: HashMap<Entity, IVec3>,
 }
@@ -99,6 +115,7 @@ impl ChunkIndex {
         if let Some(pos) = self.pos_by_entity.remove(entity) {
             self.chunk_map.remove(&pos);
             self.entity_by_pos.remove(&pos);
+            self.blocks_by_pos.remove(&pos);
         }
     }
 
@@ -116,16 +133,19 @@ impl ChunkIndex {
         let chunk_x = x.div_floor(chunk_size);
         let chunk_y = y.div_floor(chunk_size);
         let chunk_z = z.div_floor(chunk_size);
+        let local_y = (y - chunk_y * chunk_size) as usize;
+        let local_x = (x - chunk_x * chunk_size) as usize;
+        let local_z = (z - chunk_z * chunk_size) as usize;
 
-        let chunk = self.get_neighborhood(&IVec3::new(chunk_x, chunk_y, chunk_z));
-
-        let local_x = x - chunk_x * chunk_size;
-        let local_y = y - chunk_y * chunk_size;
-        let local_z = z - chunk_z * chunk_size;
-
-        return chunk
-            .block_at(local_x, local_y, local_z)
-            .copied()
+        let chunk_pos = IVec3::new(chunk_x, chunk_y, chunk_z);
+        return self
+            .blocks_by_pos
+            .get(&chunk_pos)
+            .map(|chunk| {
+                chunk
+                    .at_pos([local_x, local_y, local_z])
+                    .clone()
+            })
             .unwrap_or_default();
     }
 }

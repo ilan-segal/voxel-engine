@@ -28,13 +28,17 @@ impl<T: Component + Clone> Plugin for NeighborhoodPlugin<T> {
                     update_neighborhood::<T>,
                     update_copy_to_match_component::<T>,
                 )
-                    .chain(),
+                    .chain()
+                    .in_set(NeighborhoodSet),
             );
     }
 }
 
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct NeighborhoodSet;
+
 #[derive(Component)]
-struct ComponentCopy<T>(Arc<T>);
+pub struct ComponentCopy<T>(pub Arc<T>);
 
 fn add_copy<T: Component + Clone>(
     q: Query<(Entity, &T), Without<ComponentCopy<T>>>,
@@ -85,19 +89,19 @@ impl<T> Default for Neighborhood<T> {
 
 impl<T> Neighborhood<T> {
     /// 0,0,0 is center
-    pub fn get(&self, x: i32, y: i32, z: i32) -> &Option<Arc<T>> {
+    pub fn get_chunk(&self, x: i32, y: i32, z: i32) -> &Option<Arc<T>> {
         &self.0[Self::get_chunk_index(x, y, z)]
     }
 
     /// 0,0,0 is center
-    pub fn get_mut(&mut self, x: i32, y: i32, z: i32) -> &mut Option<Arc<T>> {
+    pub fn get_chunk_mut(&mut self, x: i32, y: i32, z: i32) -> &mut Option<Arc<T>> {
         self.0
             .get_mut(Self::get_chunk_index(x, y, z))
             .expect("index range")
     }
 
-    pub fn middle(&self) -> &Option<Arc<T>> {
-        self.get(0, 0, 0)
+    pub fn middle_chunk(&self) -> &Option<Arc<T>> {
+        self.get_chunk(0, 0, 0)
     }
 
     fn get_chunk_index(x: i32, y: i32, z: i32) -> usize {
@@ -105,20 +109,22 @@ impl<T> Neighborhood<T> {
     }
 }
 
-impl Neighborhood<Blocks> {
-    pub fn block_at(&self, x: i32, y: i32, z: i32) -> Option<&Block> {
+impl<T: SpatiallyMapped<3>> Neighborhood<T> {
+    pub fn at(&self, x: i32, y: i32, z: i32) -> Option<&T::Item> {
         let (x, chunk_x, y, chunk_y, z, chunk_z) = to_local_coordinates(x, y, z);
 
-        self.get(chunk_x, chunk_y, chunk_z)
+        self.get_chunk(chunk_x, chunk_y, chunk_z)
             .as_ref()
             .map(|blocks| blocks.at_pos([x, y, z]))
     }
 
-    pub fn at_layer(&self, side: &BlockSide, layer: i32, row: i32, col: i32) -> Option<&Block> {
+    pub fn at_layer(&self, side: &BlockSide, layer: i32, row: i32, col: i32) -> Option<&T::Item> {
         let (x, y, z) = layer_to_xyz(side, layer, row, col);
-        self.block_at(x, y, z)
+        self.at(x, y, z)
     }
+}
 
+impl Neighborhood<Blocks> {
     pub fn block_is_hidden_from_above(
         &self,
         side: &BlockSide,
@@ -168,7 +174,7 @@ fn add_neighborhood<T: Component + Send + Sync + 'static>(
 ) {
     for (entity, component, pos) in q.iter() {
         let mut neighborhood = Neighborhood::<T>::default();
-        *neighborhood.get_mut(0, 0, 0) = Some(component.0.clone());
+        *neighborhood.get_chunk_mut(0, 0, 0) = Some(component.0.clone());
         for (x, y, z) in VolumetricRange::new(-1..2, -1..2, -1..2) {
             let offset = IVec3::new(x, y, z);
             if offset == IVec3::ZERO {
@@ -181,7 +187,7 @@ fn add_neighborhood<T: Component + Send + Sync + 'static>(
             let Ok((_, neighbor_component, _)) = q.get(*neighbor_id) else {
                 continue;
             };
-            *neighborhood.get_mut(x, y, z) = Some(neighbor_component.0.clone());
+            *neighborhood.get_chunk_mut(x, y, z) = Some(neighbor_component.0.clone());
         }
         if let Some(mut c) = commands.get_entity(entity) {
             c.insert(neighborhood);
@@ -217,7 +223,7 @@ fn update_neighborhood<T: Component + Send + Sync + 'static>(
                 continue;
             };
             let IVec3 { x, y, z } = -offset;
-            *cur_neighborhood.get_mut(x, y, z) = Some(component.0.clone());
+            *cur_neighborhood.get_chunk_mut(x, y, z) = Some(component.0.clone());
         }
     }
 }

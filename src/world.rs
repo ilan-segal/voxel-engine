@@ -8,10 +8,12 @@ use crate::{
         Chunk, CHUNK_SIZE, CHUNK_SIZE_I32,
     },
     player::Player,
+    render_layer::WORLD_LAYER,
     structure::StructureType,
 };
 use bevy::{
     prelude::*,
+    render::view::RenderLayers,
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
     utils::HashMap,
 };
@@ -153,6 +155,7 @@ fn update_chunks(
                 visibility: Visibility::Visible,
                 ..default()
             },
+            RenderLayers::layer(WORLD_LAYER),
         ));
     }
 }

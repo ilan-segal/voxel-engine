@@ -21,7 +21,9 @@ impl Default for Blocks {
     }
 }
 
-impl SpatiallyMapped<Block, 3> for Blocks {
+impl SpatiallyMapped<3> for Blocks {
+    type Item = Block;
+
     fn at_pos(&self, pos: [usize; 3]) -> &Block {
         self.0.at_pos(pos)
     }
@@ -42,7 +44,9 @@ impl Blocks {
 #[derive(Component, Clone)]
 pub struct Perlin2d(pub Vec<f32>);
 
-impl SpatiallyMapped<f32, 2> for Perlin2d {
+impl SpatiallyMapped<2> for Perlin2d {
+    type Item = f32;
+
     fn at_pos(&self, pos: [usize; 2]) -> &f32 {
         self.0.at_pos(pos)
     }
@@ -55,7 +59,9 @@ impl SpatiallyMapped<f32, 2> for Perlin2d {
 #[derive(Component, Clone)]
 pub struct Noise3d(pub Vec<f32>);
 
-impl SpatiallyMapped<f32, 3> for Noise3d {
+impl SpatiallyMapped<3> for Noise3d {
+    type Item = f32;
+
     fn at_pos(&self, pos: [usize; 3]) -> &f32 {
         self.0.at_pos(pos)
     }
@@ -64,31 +70,3 @@ impl SpatiallyMapped<f32, 3> for Noise3d {
         self.0.at_pos_mut(pos)
     }
 }
-
-// impl ChunkData {
-//     pub fn at(&self, x: usize, y: usize, z: usize) -> &Block {
-//         self.blocks.at_pos([x, y, z])
-//     }
-
-//     pub fn at_mut(&mut self, x: usize, y: usize, z: usize) -> &mut Block {
-//         let index = Self::get_array_index(x, y, z);
-//         self.blocks
-//             .get_mut(index)
-//             .expect("index bounds")
-//     }
-
-//     pub fn put(&mut self, x: usize, y: usize, z: usize, block: Block) {
-//         let index = Self::get_array_index(x, y, z);
-//         self.blocks[index] = block;
-//     }
-
-//     pub fn is_meshable(&self) -> bool {
-//         self.blocks
-//             .par_iter()
-//             .any(|v| v.is_meshable())
-//     }
-
-//     pub fn get_array_index(x: usize, y: usize, z: usize) -> usize {
-//         CHUNK_SIZE * CHUNK_SIZE * x + CHUNK_SIZE * z + y
-//     }
-// }

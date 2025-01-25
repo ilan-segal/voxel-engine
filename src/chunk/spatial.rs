@@ -1,11 +1,14 @@
 use super::CHUNK_SIZE;
 
-pub trait SpatiallyMapped<T, const DIM: usize> {
-    fn at_pos(&self, pos: [usize; DIM]) -> &T;
-    fn at_pos_mut(&mut self, pos: [usize; DIM]) -> &mut T;
+pub trait SpatiallyMapped<const DIM: usize> {
+    type Item;
+
+    fn at_pos(&self, pos: [usize; DIM]) -> &Self::Item;
+    fn at_pos_mut(&mut self, pos: [usize; DIM]) -> &mut Self::Item;
 }
 
-impl<T> SpatiallyMapped<T, 2> for Vec<T> {
+impl<T> SpatiallyMapped<2> for Vec<T> {
+    type Item = T;
     fn at_pos(&self, [x, y]: [usize; 2]) -> &T {
         self.get(coords_to_index_2d(x, y))
             .expect("Index range")
@@ -21,7 +24,8 @@ fn coords_to_index_2d(x: usize, y: usize) -> usize {
     CHUNK_SIZE * x + y
 }
 
-impl<T> SpatiallyMapped<T, 3> for Vec<T> {
+impl<T> SpatiallyMapped<3> for Vec<T> {
+    type Item = T;
     fn at_pos(&self, [x, y, z]: [usize; 3]) -> &T {
         self.get(coords_to_index_3d(x, y, z))
             .expect("Index range")

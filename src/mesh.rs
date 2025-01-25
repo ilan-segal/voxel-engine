@@ -5,7 +5,11 @@ use crate::{
         CHUNK_SIZE,
     },
     texture::BlockMaterials,
-    world::{neighborhood::Neighborhood, stage::Stage, WorldSet},
+    world::{
+        neighborhood::{ComponentCopy, Neighborhood},
+        stage::Stage,
+        WorldSet,
+    },
     WORLD_LAYER,
 };
 use bevy::{
@@ -28,7 +32,15 @@ impl Plugin for MeshPlugin {
             .add_systems(
                 Update,
                 (
-                    (update_mesh_status, mark_mesh_as_stale, begin_mesh_gen_tasks).chain(),
+                    (
+                        update_mesh_status,
+                        mark_mesh_as_stale,
+                        (
+                            begin_mesh_gen_tasks,
+                            begin_mesh_gen_tasks_for_positionless_chunks,
+                        ),
+                    )
+                        .chain(),
                     receive_mesh_gen_tasks,
                 )
                     .after(WorldSet)
@@ -106,7 +118,7 @@ fn begin_mesh_gen_tasks(
             continue;
         }
         let task_pool = AsyncComputeTaskPool::get();
-        let Some(middle_chunk) = neighborhood.middle() else {
+        let Some(middle_chunk) = neighborhood.middle_chunk() else {
             warn!("Chunk at {:?} is absent from index", pos);
             continue;
         };
@@ -119,6 +131,36 @@ fn begin_mesh_gen_tasks(
             MeshTaskData {
                 entity,
                 mesh: get_meshes_for_chunk(cloned_neighborhood),
+            }
+        });
+        tasks.0.insert(entity, task);
+    }
+}
+
+fn begin_mesh_gen_tasks_for_positionless_chunks(
+    mut tasks: ResMut<MeshGenTasks>,
+    q_chunk: Query<
+        (Entity, &ComponentCopy<Blocks>),
+        (
+            With<Chunk>,
+            Without<Meshed>,
+            With<CheckedForMesh>,
+            Without<ChunkPosition>,
+        ),
+    >,
+    mut commands: Commands,
+) {
+    for (entity, blocks) in q_chunk.iter() {
+        if tasks.0.contains_key(&entity) {
+            continue;
+        }
+        let mut neighborhood = Neighborhood::default();
+        *neighborhood.get_chunk_mut(0, 0, 0) = Some(blocks.0.clone());
+        let task_pool = AsyncComputeTaskPool::get();
+        let task = task_pool.spawn(async move {
+            MeshTaskData {
+                entity,
+                mesh: get_meshes_for_chunk(neighborhood),
             }
         });
         tasks.0.insert(entity, task);
@@ -201,7 +243,7 @@ fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Vec<(Block, BlockSide, M
 fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
     let middle = chunk
-        .middle()
+        .middle_chunk()
         .clone()
         .expect("Already checked");
     let mut blocks = middle.as_ref().clone();
