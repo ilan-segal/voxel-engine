@@ -1,9 +1,7 @@
+use super::index::ChunkIndex;
+use crate::{chunk::position::ChunkPosition, utils::VolumetricRange};
 use bevy::prelude::*;
 use std::{marker::PhantomData, sync::Arc};
-
-use crate::{chunk::position::ChunkPosition, utils::VolumetricRange};
-
-use super::index::ChunkIndex;
 
 pub struct NeighborhoodPlugin<T>(PhantomData<T>);
 
@@ -15,14 +13,17 @@ impl<T> NeighborhoodPlugin<T> {
 
 impl<T: Component + Clone> Plugin for NeighborhoodPlugin<T> {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (
-                add_copy::<T>,
-                update_copy_to_match_component::<T>,
-                add_neighborhood::<T>,
-            ),
-        );
+        app.add_event::<CopyUpdateEvent<T>>()
+            .add_systems(
+                Update,
+                (
+                    add_copy::<T>,
+                    add_neighborhood::<T>,
+                    update_neighborhood::<T>,
+                    update_copy_to_match_component::<T>,
+                )
+                    .chain(),
+            );
     }
 }
 
@@ -41,12 +42,29 @@ fn add_copy<T: Component + Clone>(
     }
 }
 
+#[derive(Event)]
+struct CopyUpdateEvent<T> {
+    entity: Entity,
+    _phantom_data: PhantomData<T>,
+}
+
+impl<T> From<Entity> for CopyUpdateEvent<T> {
+    fn from(value: Entity) -> Self {
+        Self {
+            entity: value,
+            _phantom_data: PhantomData,
+        }
+    }
+}
+
 fn update_copy_to_match_component<T: Component + Clone>(
-    mut q: Query<(&T, &mut ComponentCopy<T>), Changed<T>>,
+    mut q: Query<(Entity, &T, &mut ComponentCopy<T>), Changed<T>>,
+    mut event_writer: EventWriter<CopyUpdateEvent<T>>,
 ) {
-    for (component, mut copy) in q.iter_mut() {
+    for (e, component, mut copy) in q.iter_mut() {
         let value = Arc::new(component.clone());
         copy.0 = value;
+        event_writer.send(e.into());
     }
 }
 
@@ -97,11 +115,43 @@ fn add_neighborhood<T: Component + Send + Sync + 'static>(
             let Ok((_, neighbor_component, _)) = q.get(*neighbor_id) else {
                 continue;
             };
-            let IVec3 { x, y, z } = -offset;
             *neighborhood.get_mut(x, y, z) = Some(neighbor_component.0.clone());
         }
-        commands
-            .entity(entity)
-            .insert(neighborhood);
+        if let Some(mut c) = commands.get_entity(entity) {
+            c.insert(neighborhood);
+        }
+    }
+}
+
+fn update_neighborhood<T: Component + Send + Sync + 'static>(
+    index: Res<ChunkIndex>,
+    q_changed_component: Query<(&ComponentCopy<T>, &ChunkPosition)>,
+    mut component_update_events: EventReader<CopyUpdateEvent<T>>,
+    mut q_neighborhood: Query<&mut Neighborhood<T>>,
+) {
+    for event in component_update_events.read() {
+        let entity = event.entity;
+        let Ok((component, pos)) = q_changed_component.get(entity) else {
+            warn!("Couldn't get entity for updating neighborhoods!");
+            continue;
+        };
+        for (x, y, z) in VolumetricRange::new(-1..2, -1..2, -1..2) {
+            let offset = IVec3::new(x, y, z);
+            let cur_pos = pos.0 + offset;
+            let Some(cur_id) = index.entity_by_pos.get(&cur_pos) else {
+                if cur_pos == pos.0 {
+                    warn!("Could not find middle chunk for getting id!");
+                }
+                continue;
+            };
+            let Ok(mut cur_neighborhood) = q_neighborhood.get_mut(*cur_id) else {
+                if cur_pos == pos.0 {
+                    warn!("Could not find middle chunk for mutating neighborhood!");
+                }
+                continue;
+            };
+            let IVec3 { x, y, z } = -offset;
+            *cur_neighborhood.get_mut(x, y, z) = Some(component.0.clone());
+        }
     }
 }
