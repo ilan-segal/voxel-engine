@@ -2,7 +2,7 @@ use super::{target_velocity::TargetVelocity, Sprinting};
 use crate::{
     block::Block,
     player::{
-        block_target::TargetedBlock, hotbar::HotbarSelection, mode::PlayerMode, Jumping, Player,
+        block_target::TargetedBlock, inventory::HotbarSelection, mode::PlayerMode, Jumping, Player,
         Sneaking,
     },
     world::block_update::SetBlockEvent,

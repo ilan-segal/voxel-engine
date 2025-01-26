@@ -14,14 +14,14 @@ use block_target::BlockTargetPlugin;
 use controls::target_velocity::TargetVelocity;
 use falling_state::FallingState;
 use health::{Health, MaxHealth};
-use hotbar::HotbarSelection;
+use inventory::{HotbarSelection, Inventory};
 use mode::PlayerMode;
 
 pub mod block_target;
 mod controls;
 pub mod falling_state;
 pub mod health;
-pub mod hotbar;
+pub mod inventory;
 pub mod mode;
 
 pub struct PlayerPlugin;
@@ -70,6 +70,7 @@ pub struct PlayerBundle {
     sneaking: Sneaking,
     health: Health,
     max_health: MaxHealth,
+    inventory: Inventory,
     hotbar_selection: HotbarSelection,
     render_layers: RenderLayers,
 }
@@ -110,6 +111,7 @@ impl Default for PlayerBundle {
             sneaking: default(),
             health: Health(max_health),
             max_health: MaxHealth(max_health),
+            inventory: Inventory::creative_default(),
             hotbar_selection: default(),
             render_layers: RenderLayers::layer(WORLD_LAYER),
         }

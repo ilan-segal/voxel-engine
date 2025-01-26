@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::player::hotbar::HotbarSelection;
+use crate::player::inventory::{HotbarSelection, HOTBAR_SIZE};
 
 use super::Ui;
 
@@ -24,7 +24,7 @@ struct HotbarSprites {
 }
 
 #[derive(Component)]
-struct HotbarIndex(u8);
+struct HotbarIndex(usize);
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let sprites = HotbarSprites {
@@ -35,7 +35,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 const SLOT_SPRITE_SIZE: f32 = 50.0;
-const HOTBAR_SIZE: u8 = 10;
 
 fn add_slots(
     trigger: Trigger<OnAdd, HotbarDisplayRoot>,
@@ -78,7 +77,7 @@ fn update_selected_slot(
         return;
     };
     for (mut image, hotbar_index) in hotbar_display.iter_mut() {
-        *image = if hotbar_index.0 == *index {
+        *image = if hotbar_index.0 as u8 == *index {
             sprites.selected_slot.clone()
         } else {
             sprites.slot.clone()
