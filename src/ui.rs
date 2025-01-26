@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use health::HealthDisplayRoot;
 use hotbar::HotbarDisplayRoot;
 
+mod block_icons;
 mod crosshair;
 mod health;
 mod hotbar;
@@ -14,6 +15,7 @@ impl Plugin for UiPlugin {
             crosshair::CrosshairPlugin,
             health::HealthUiPlugin,
             hotbar::HotbarUiPlugin,
+            block_icons::BlockIconPlugin,
         ))
         .add_systems(Startup, setup);
     }

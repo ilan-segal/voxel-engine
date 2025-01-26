@@ -30,9 +30,19 @@ pub fn layer_to_xyz(side: &BlockSide, layer: i32, row: i32, col: i32) -> (i32, i
     }
 }
 
+#[derive(Component)]
+pub struct NoChunkPosition;
+
 fn assign_chunk_position(
     mut commands: Commands,
-    q: Query<(Entity, &Transform), (Without<ChunkPosition>, Or<(With<Player>, With<Chunk>)>)>,
+    q: Query<
+        (Entity, &Transform),
+        (
+            Without<ChunkPosition>,
+            Without<NoChunkPosition>,
+            Or<(With<Player>, With<Chunk>)>,
+        ),
+    >,
 ) {
     q.iter().for_each(|(e, t)| {
         if let Some(mut entity_commands) = commands.get_entity(e) {
