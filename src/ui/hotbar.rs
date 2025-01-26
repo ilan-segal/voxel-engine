@@ -1,15 +1,13 @@
+use super::{block_icons::BlockIconMaterials, Ui};
+use crate::player::inventory::{HotbarSelection, Inventory, ItemType, HOTBAR_SIZE};
 use bevy::prelude::*;
-
-use crate::player::inventory::{HotbarSelection, HOTBAR_SIZE};
-
-use super::Ui;
 
 pub struct HotbarUiPlugin;
 
 impl Plugin for HotbarUiPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup.before(super::setup))
-            .add_systems(Update, update_selected_slot)
+            .add_systems(Update, (update_selected_slot, update_item_display))
             .observe(add_slots);
     }
 }
@@ -36,6 +34,9 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 const SLOT_SPRITE_SIZE: f32 = 50.0;
 
+#[derive(Component)]
+struct HotbarSlot;
+
 fn add_slots(
     trigger: Trigger<OnAdd, HotbarDisplayRoot>,
     mut commands: Commands,
@@ -52,6 +53,7 @@ fn add_slots(
         for i in 0..HOTBAR_SIZE {
             builder.spawn((
                 Ui,
+                HotbarSlot,
                 HotbarIndex(i),
                 sprites.slot.clone(),
                 NodeBundle {
@@ -70,7 +72,7 @@ fn add_slots(
 
 fn update_selected_slot(
     selection: Query<&HotbarSelection, Changed<HotbarSelection>>,
-    mut hotbar_display: Query<(&mut UiImage, &HotbarIndex)>,
+    mut hotbar_display: Query<(&mut UiImage, &HotbarIndex), With<HotbarSlot>>,
     sprites: Res<HotbarSprites>,
 ) {
     let Ok(HotbarSelection { index }) = selection.get_single() else {
@@ -82,5 +84,50 @@ fn update_selected_slot(
         } else {
             sprites.slot.clone()
         };
+    }
+}
+
+fn update_item_display(
+    mut commands: Commands,
+    q_inventory: Query<&Inventory, Changed<Inventory>>,
+    q_hotbar_display: Query<(Entity, &HotbarIndex), With<HotbarSlot>>,
+    block_icons: Res<BlockIconMaterials>,
+) {
+    let Ok(inventory) = q_inventory.get_single() else {
+        return;
+    };
+    info!("eebydeeby");
+    for (entity, HotbarIndex(index)) in q_hotbar_display.iter() {
+        commands
+            .entity(entity)
+            .despawn_descendants();
+        let Some(item) = inventory.hotbar[*index] else {
+            continue;
+        };
+        info!("{:?}", item);
+        let material = match item.item {
+            ItemType::Block(block) => block_icons
+                .map
+                .get(&block)
+                .expect("Block should have a material for icon"),
+        };
+        let item_icon_id = commands
+            .spawn((
+                Ui,
+                HotbarIndex(*index),
+                UiImage::new(material.clone_weak()),
+                NodeBundle {
+                    style: Style {
+                        width: Val::Px(SLOT_SPRITE_SIZE),
+                        height: Val::Px(SLOT_SPRITE_SIZE),
+                        ..default()
+                    },
+                    ..default()
+                },
+            ))
+            .id();
+        commands
+            .entity(entity)
+            .push_children(&[item_icon_id]);
     }
 }

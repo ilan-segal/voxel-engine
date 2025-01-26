@@ -19,6 +19,7 @@ impl Inventory {
     pub fn creative_default() -> Self {
         let mut hotbar = [const { None }; HOTBAR_SIZE];
         for (i, block) in Block::iter()
+            .filter(|block| block != &Block::Air)
             .enumerate()
             .take(HOTBAR_SIZE)
         {
@@ -28,10 +29,10 @@ impl Inventory {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct InventoryItem {
-    item: ItemType,
-    quantity: ItemQuantity,
+    pub item: ItemType,
+    pub quantity: ItemQuantity,
 }
 
 impl InventoryItem {
@@ -43,7 +44,7 @@ impl InventoryItem {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum ItemType {
     Block(Block),
     // TODO: Add variants for non-block items (e.g. food)
@@ -55,7 +56,7 @@ impl From<Block> for ItemType {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum ItemQuantity {
     Infinity,
     Number(u8),
