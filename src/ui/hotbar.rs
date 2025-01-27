@@ -1,5 +1,5 @@
 use super::{block_icons::BlockIconMaterials, Ui, UiFont};
-use crate::player::inventory::{HotbarSelection, Inventory, ItemType, HOTBAR_SIZE};
+use crate::player::inventory::{HotbarSelection, Inventory, ItemQuantity, ItemType, HOTBAR_SIZE};
 use bevy::prelude::*;
 
 pub struct HotbarUiPlugin;
@@ -111,6 +111,10 @@ fn update_item_display(
                 .get(&block)
                 .expect("Block should have a material for icon"),
         };
+        let quantity_font_size = match item.quantity {
+            ItemQuantity::Infinity => 24.0,
+            ItemQuantity::Number(..) => 18.0,
+        };
         let item_icon_id = commands
             .spawn((
                 Ui,
@@ -121,6 +125,7 @@ fn update_item_display(
                         width: Val::Px(SLOT_SPRITE_SIZE),
                         height: Val::Px(SLOT_SPRITE_SIZE),
                         justify_content: JustifyContent::End,
+                        align_content: AlignContent::FlexEnd,
                         ..default()
                     },
                     ..default()
@@ -133,12 +138,20 @@ fn update_item_display(
                         item.quantity,
                         TextStyle {
                             font: font.0.clone_weak(),
-                            font_size: 24.0,
+                            font_size: quantity_font_size,
                             color: Color::WHITE,
                         },
                     )
+                    .with_text_justify(JustifyText::Right)
                     .with_style(Style {
-                        top: Val::Px(SLOT_SPRITE_SIZE * 0.5),
+                        /*
+                        Sorry for the ugly equation, it just calculates a good position
+                        for the text.
+                            Font size -> Top offset as a percentage of SLOT_SPRITE_SIZE
+                            18.0 -> 0.55
+                            24.0 -> 0.5
+                         */
+                        top: Val::Px(SLOT_SPRITE_SIZE * (quantity_font_size / -120.0 + 0.7)),
                         right: Val::Px(8.0),
                         ..default()
                     }),

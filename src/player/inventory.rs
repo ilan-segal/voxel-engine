@@ -23,7 +23,15 @@ impl Inventory {
             .enumerate()
             .take(HOTBAR_SIZE)
         {
-            hotbar[i] = Some(InventoryItem::infinite(block.into()));
+            let quantity = if i == 0 {
+                ItemQuantity::Infinity
+            } else {
+                ItemQuantity::Number(1 << i)
+            };
+            hotbar[i] = Some(InventoryItem {
+                item: ItemType::Block(block),
+                quantity,
+            });
         }
         return Inventory { hotbar };
     }
