@@ -2,8 +2,10 @@ use super::{target_velocity::TargetVelocity, Sprinting};
 use crate::{
     block::Block,
     player::{
-        block_target::TargetedBlock, inventory::HotbarSelection, mode::PlayerMode, Jumping, Player,
-        Sneaking,
+        block_target::{TargetedBlock, TargetedSpace},
+        inventory::{HotbarSelection, Inventory, ItemQuantity, ItemType},
+        mode::PlayerMode,
+        Jumping, Player, Sneaking,
     },
     world::block_update::SetBlockEvent,
 };
@@ -32,6 +34,7 @@ impl Plugin for KeyboardMousePlugin {
                 rotate_camera_with_mouse,
                 process_keyboard_inputs,
                 delete_targeted_block.run_if(input_just_pressed(MouseButton::Left)),
+                place_block.run_if(input_just_pressed(MouseButton::Right)),
                 change_hotbar_selection_from_keys,
                 change_hotbar_selection_from_scrollbar,
             ),
@@ -120,6 +123,33 @@ fn delete_targeted_block(
         set_block_events.send(SetBlockEvent {
             block: Block::Air,
             world_pos: pos.to_array(),
+        });
+    }
+}
+
+fn place_block(
+    targeted_space: Res<TargetedSpace>,
+    mut q_inventory: Query<(&HotbarSelection, &mut Inventory)>,
+    mut set_block_events: EventWriter<SetBlockEvent>,
+) {
+    let Some(space_pos) = targeted_space.0 else {
+        return;
+    };
+    for (selection, mut inventory) in q_inventory.iter_mut() {
+        let index = selection.index as usize;
+        let Some(Some(ref mut item)) = inventory.hotbar.get_mut(index) else {
+            continue;
+        };
+        let ItemType::Block(block) = item.item;
+        if let ItemQuantity::Number(n) = item.quantity {
+            item.quantity = ItemQuantity::Number(n - 1);
+        }
+        if item.quantity == ItemQuantity::Number(0) {
+            inventory.hotbar[index] = None;
+        }
+        set_block_events.send(SetBlockEvent {
+            block,
+            world_pos: space_pos.to_array(),
         });
     }
 }

@@ -16,6 +16,7 @@ impl Plugin for BlockTargetPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<TargetBlockChange>()
             .init_resource::<TargetedBlock>()
+            .init_resource::<TargetedSpace>()
             .add_systems(Startup, setup.after(CubeFrameSetup))
             .add_systems(
                 Update,
@@ -50,8 +51,11 @@ fn setup(
 #[derive(Resource, Default)]
 pub struct TargetedBlock(pub Option<IVec3>);
 
+#[derive(Resource, Default)]
+pub struct TargetedSpace(pub Option<IVec3>);
+
 #[derive(Event)]
-struct TargetBlockChange(Option<IVec3>);
+struct TargetBlockChange(Option<(IVec3, IVec3)>);
 
 #[derive(Component)]
 struct TargetedBlockOutline;
@@ -77,16 +81,20 @@ fn update_targeted_block(
         .map(|t| t.next_up())
         .collect::<Vec<_>>();
     // info!("{:?}", ts.len());
-    for t in ts
+    for (t1, t2) in ts
         .iter()
         .map_windows(|[t1, t2]| 0.5 * (*t1 + *t2))
+        .map_windows(|[t1, t2]| (*t1, *t2))
     {
-        let pos = camera_pos + camera_direction * t.next_down();
+        let pos = camera_pos + camera_direction * t2.next_down();
         // info!("{:?}", pos);
         let block = index.at(pos.x, pos.y, pos.z);
         if block.is_solid() {
             let block_pos = pos.floor().as_ivec3();
-            targeted_block_change.send(TargetBlockChange(Some(block_pos)));
+            let space_pos = (camera_pos + camera_direction * t1.next_down())
+                .floor()
+                .as_ivec3();
+            targeted_block_change.send(TargetBlockChange(Some((space_pos, block_pos))));
             return;
         }
     }
@@ -111,6 +119,7 @@ fn get_plane_distances(s: f32, ds: f32, max_t: f32) -> Vec<f32> {
 
 fn update_targeted_block_outline(
     mut targeted_block: ResMut<TargetedBlock>,
+    mut targeted_space: ResMut<TargetedSpace>,
     mut targeted_block_change: EventReader<TargetBlockChange>,
     mut q_targeted_block_outline: Query<
         (&mut Transform, &mut Visibility),
@@ -121,14 +130,17 @@ fn update_targeted_block_outline(
         .get_single_mut()
         .expect("Block target outline should've been spawned on startup");
     for TargetBlockChange(change) in targeted_block_change.read() {
-        targeted_block.0 = *change;
         match change {
             None => {
                 *visibility = Visibility::Hidden;
+                targeted_block.0 = None;
+                targeted_space.0 = None;
             }
-            Some(pos) => {
+            Some((space_pos, block_pos)) => {
                 *visibility = Visibility::Visible;
-                transform.translation = pos.as_vec3() + Vec3::ONE * 0.5;
+                transform.translation = block_pos.as_vec3() + Vec3::ONE * 0.5;
+                targeted_block.0 = Some(*block_pos);
+                targeted_space.0 = Some(*space_pos);
             }
         }
     }

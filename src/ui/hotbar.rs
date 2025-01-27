@@ -104,7 +104,6 @@ fn update_item_display(
         let Some(item) = inventory.hotbar[*index] else {
             continue;
         };
-        info!("{:?}", item);
         let material = match item.item {
             ItemType::Block(block) => block_icons
                 .map

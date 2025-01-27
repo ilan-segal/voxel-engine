@@ -33,7 +33,10 @@ fn set_block(
         let chunk_x = x.div_floor(chunk_size);
         let chunk_y = y.div_floor(chunk_size);
         let chunk_z = z.div_floor(chunk_size);
-        info!("Deleting block at {:?}", event.world_pos);
+        info!(
+            "Setting block at {:?} to {:?}",
+            event.world_pos, event.block
+        );
         let local_x = (x - chunk_x * chunk_size) as usize;
         let local_y = (y - chunk_y * chunk_size) as usize;
         let local_z = (z - chunk_z * chunk_size) as usize;

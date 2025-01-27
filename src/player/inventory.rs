@@ -23,14 +23,9 @@ impl Inventory {
             .enumerate()
             .take(HOTBAR_SIZE)
         {
-            let quantity = if i == 0 {
-                ItemQuantity::Infinity
-            } else {
-                ItemQuantity::Number(1 << i)
-            };
             hotbar[i] = Some(InventoryItem {
                 item: ItemType::Block(block),
-                quantity,
+                quantity: ItemQuantity::Infinity,
             });
         }
         return Inventory { hotbar };
@@ -41,15 +36,6 @@ impl Inventory {
 pub struct InventoryItem {
     pub item: ItemType,
     pub quantity: ItemQuantity,
-}
-
-impl InventoryItem {
-    pub fn infinite(item: ItemType) -> Self {
-        Self {
-            item,
-            quantity: ItemQuantity::Infinity,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -64,7 +50,7 @@ impl From<Block> for ItemType {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ItemQuantity {
     Infinity,
     Number(u8),
