@@ -1,6 +1,8 @@
 use bevy::{ecs::system::lifetimeless::SQuery, prelude::*};
 use iyes_perf_ui::entry::PerfUiEntry;
 
+use crate::player::Player;
+
 #[derive(Component)]
 pub struct PerfUiCameraPosition {
     precision: usize,
@@ -18,7 +20,7 @@ impl Default for PerfUiCameraPosition {
 
 impl PerfUiEntry for PerfUiCameraPosition {
     type Value = Vec3;
-    type SystemParam = SQuery<&'static Transform, With<Camera3d>>;
+    type SystemParam = SQuery<&'static Transform, (With<Camera3d>, With<Player>)>;
 
     fn label(&self) -> &str {
         "Camera Position"
@@ -32,7 +34,10 @@ impl PerfUiEntry for PerfUiCameraPosition {
         &self,
         q_camera_pos: &mut <Self::SystemParam as bevy::ecs::system::SystemParam>::Item<'_, '_>,
     ) -> Option<Self::Value> {
-        q_camera_pos.get_single().ok().map(|t| t.translation)
+        q_camera_pos
+            .get_single()
+            .ok()
+            .map(|t| t.translation)
         // .map(GlobalTransform::translation)
     }
 

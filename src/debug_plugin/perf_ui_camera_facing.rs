@@ -1,4 +1,4 @@
-use crate::block::BlockSide;
+use crate::{block::BlockSide, player::Player};
 use bevy::{ecs::system::lifetimeless::SQuery, prelude::*};
 use iyes_perf_ui::entry::PerfUiEntry;
 
@@ -17,7 +17,7 @@ impl Default for PerfUiCameraFacing {
 
 impl PerfUiEntry for PerfUiCameraFacing {
     type Value = Dir3;
-    type SystemParam = SQuery<&'static Transform, With<Camera3d>>;
+    type SystemParam = SQuery<&'static Transform, (With<Camera3d>, With<Player>)>;
 
     fn label(&self) -> &str {
         "Camera Facing"
