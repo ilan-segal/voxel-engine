@@ -30,7 +30,11 @@ struct UiRoot;
 #[derive(Component)]
 struct UiHotbar;
 
-fn setup(mut commands: Commands) {
+#[derive(Resource)]
+pub struct UiFont(pub Handle<Font>);
+
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(UiFont(asset_server.load("ui/fonts/UbuntuMono-Regular.ttf")));
     commands.spawn((
         Ui,
         UiRoot,

@@ -1,4 +1,4 @@
-use super::{block_icons::BlockIconMaterials, Ui};
+use super::{block_icons::BlockIconMaterials, Ui, UiFont};
 use crate::player::inventory::{HotbarSelection, Inventory, ItemType, HOTBAR_SIZE};
 use bevy::prelude::*;
 
@@ -92,11 +92,11 @@ fn update_item_display(
     q_inventory: Query<&Inventory, Changed<Inventory>>,
     q_hotbar_display: Query<(Entity, &HotbarIndex), With<HotbarSlot>>,
     block_icons: Res<BlockIconMaterials>,
+    font: Res<UiFont>,
 ) {
     let Ok(inventory) = q_inventory.get_single() else {
         return;
     };
-    info!("eebydeeby");
     for (entity, HotbarIndex(index)) in q_hotbar_display.iter() {
         commands
             .entity(entity)
@@ -120,11 +120,30 @@ fn update_item_display(
                     style: Style {
                         width: Val::Px(SLOT_SPRITE_SIZE),
                         height: Val::Px(SLOT_SPRITE_SIZE),
+                        justify_content: JustifyContent::End,
                         ..default()
                     },
                     ..default()
                 },
             ))
+            .with_children(|builder| {
+                builder.spawn((
+                    Ui,
+                    TextBundle::from_section(
+                        item.quantity,
+                        TextStyle {
+                            font: font.0.clone_weak(),
+                            font_size: 24.0,
+                            color: Color::WHITE,
+                        },
+                    )
+                    .with_style(Style {
+                        top: Val::Px(SLOT_SPRITE_SIZE * 0.5),
+                        right: Val::Px(8.0),
+                        ..default()
+                    }),
+                ));
+            })
             .id();
         commands
             .entity(entity)

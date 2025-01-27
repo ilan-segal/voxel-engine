@@ -61,3 +61,12 @@ pub enum ItemQuantity {
     Infinity,
     Number(u8),
 }
+
+impl Into<String> for ItemQuantity {
+    fn into(self) -> String {
+        match self {
+            Self::Infinity => "∞".into(),
+            Self::Number(n) => format!("{}", n),
+        }
+    }
+}

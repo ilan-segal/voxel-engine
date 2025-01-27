@@ -33,7 +33,7 @@ fn setup_rendered_icons(mut commands: Commands, mut images: ResMut<Assets<Image>
     commands.spawn((
         DirectionalLightBundle {
             directional_light: DirectionalLight {
-                illuminance: -700.0,
+                illuminance: -800.0,
                 ..default()
             },
             transform: Transform::default().looking_to(
