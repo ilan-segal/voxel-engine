@@ -114,9 +114,6 @@ fn begin_mesh_gen_tasks(
     mut commands: Commands,
 ) {
     for (entity, pos, neighborhood) in q_chunk.iter() {
-        if tasks.0.contains_key(&entity) {
-            continue;
-        }
         let task_pool = AsyncComputeTaskPool::get();
         let Some(middle_chunk) = neighborhood.middle_chunk() else {
             warn!("Chunk at {:?} is absent from index", pos);
@@ -151,9 +148,7 @@ fn begin_mesh_gen_tasks_for_positionless_chunks(
     mut commands: Commands,
 ) {
     for (entity, blocks) in q_chunk.iter() {
-        if tasks.0.contains_key(&entity) {
-            continue;
-        }
+        commands.entity(entity).insert(Meshed);
         let mut neighborhood = Neighborhood::default();
         *neighborhood.get_chunk_mut(0, 0, 0) = Some(blocks.0.clone());
         let task_pool = AsyncComputeTaskPool::get();
@@ -164,7 +159,6 @@ fn begin_mesh_gen_tasks_for_positionless_chunks(
             }
         });
         tasks.0.insert(entity, task);
-        commands.entity(entity).insert(Meshed);
     }
 }
 
