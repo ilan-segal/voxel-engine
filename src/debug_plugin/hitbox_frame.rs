@@ -29,8 +29,8 @@ fn setup(mut commands: Commands, mut polyline_materials: ResMut<Assets<PolylineM
     let material = polyline_materials.add(PolylineMaterial {
         width: 5.0,
         color: RED.into(),
-        perspective: true,
-        ..default()
+        perspective: false,
+        depth_bias: -0.1,
     });
     commands.insert_resource(HitboxFrameAssets { material });
 }
