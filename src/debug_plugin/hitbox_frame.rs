@@ -19,7 +19,7 @@ impl Plugin for AabbWireframePlugin {
                 (
                     toggle_hitbox_visibility.run_if(input_just_pressed(KeyCode::F4)),
                     add_hitbox_frame,
-                    align_hitbox_frame_to_axis,
+                    align_hitbox_frame,
                 ),
             );
     }
@@ -41,7 +41,11 @@ struct HitboxFrameAssets {
 }
 
 #[derive(Component)]
-struct HitboxFrame;
+struct HitboxFrame {
+    parent: Entity,
+    translation: Vec3,
+    scale: Vec3,
+}
 
 #[derive(Component)]
 struct HasHitboxFrame;
@@ -55,38 +59,34 @@ fn add_hitbox_frame(
     for (e, aabb) in query.iter() {
         commands
             .entity(e)
-            .insert(HasHitboxFrame)
-            .with_children(|child_builder| {
-                child_builder.spawn((
-                    HitboxFrame,
-                    PolylineBundle {
-                        polyline: mesh.0.clone_weak(),
-                        material: assets.material.clone_weak(),
-                        transform: Transform {
-                            translation: aabb.get_centre_offset(),
-                            scale: aabb.get_dimensions(),
-                            ..Default::default()
-                        },
-                        visibility: Visibility::Hidden,
-                        ..Default::default()
-                    },
-                ));
-            });
+            .insert(HasHitboxFrame);
+        commands.spawn((
+            HitboxFrame {
+                parent: e,
+                translation: -aabb.get_centre_offset(),
+                scale: aabb.get_dimensions(),
+            },
+            PolylineBundle {
+                polyline: mesh.0.clone_weak(),
+                material: assets.material.clone_weak(),
+                visibility: Visibility::Hidden,
+                ..Default::default()
+            },
+        ));
     }
 }
 
-fn align_hitbox_frame_to_axis(
-    mut q_hitbox_frame: Query<(&Parent, &mut Transform), With<HitboxFrame>>,
+fn align_hitbox_frame(
+    mut q_hitbox_frame: Query<(&HitboxFrame, &mut Transform)>,
     q_parent_transform: Query<&GlobalTransform>,
 ) {
-    for (parent, mut transform) in q_hitbox_frame.iter_mut() {
-        let Ok(parent_global_transform) = q_parent_transform.get(parent.get()) else {
+    for (frame, mut transform) in q_hitbox_frame.iter_mut() {
+        let Ok(parent_global_transform) = q_parent_transform.get(frame.parent) else {
             continue;
         };
-        transform.rotation = parent_global_transform
-            .compute_transform()
-            .rotation
-            .inverse();
+        let parent_transform = parent_global_transform.compute_transform();
+        transform.scale = frame.scale * parent_transform.scale;
+        transform.translation = frame.translation + parent_transform.translation;
     }
 }
 
