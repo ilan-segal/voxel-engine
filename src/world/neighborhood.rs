@@ -19,14 +19,12 @@ impl<T> NeighborhoodPlugin<T> {
 
 impl<T: Component + Clone> Plugin for NeighborhoodPlugin<T> {
     fn build(&self, app: &mut App) {
-        app.add_event::<CopyUpdateEvent<T>>()
+        app.add_systems(PreUpdate, update_neighborhood::<T>)
             .add_systems(
-                Update,
+                PostUpdate,
                 (
-                    add_copy::<T>,
+                    (add_copy::<T>, update_copy_to_match_component::<T>),
                     add_neighborhood::<T>,
-                    update_neighborhood::<T>,
-                    update_copy_to_match_component::<T>,
                 )
                     .chain()
                     .in_set(NeighborhoodSet),
@@ -52,29 +50,13 @@ fn add_copy<T: Component + Clone>(
     }
 }
 
-#[derive(Event)]
-struct CopyUpdateEvent<T> {
-    entity: Entity,
-    _phantom_data: PhantomData<T>,
-}
-
-impl<T> From<Entity> for CopyUpdateEvent<T> {
-    fn from(value: Entity) -> Self {
-        Self {
-            entity: value,
-            _phantom_data: PhantomData,
-        }
-    }
-}
-
 fn update_copy_to_match_component<T: Component + Clone>(
-    mut q: Query<(Entity, &T, &mut ComponentCopy<T>), Changed<T>>,
-    mut event_writer: EventWriter<CopyUpdateEvent<T>>,
+    mut q: Query<(&T, &mut ComponentCopy<T>), Changed<T>>,
 ) {
-    for (e, component, mut copy) in q.iter_mut() {
+    for (component, mut copy) in q.iter_mut() {
         let value = Arc::new(component.clone());
         copy.0 = value;
-        event_writer.send(e.into());
+        // event_writer.send(e.into());
     }
 }
 
@@ -197,16 +179,11 @@ fn add_neighborhood<T: Component + Send + Sync + 'static>(
 
 fn update_neighborhood<T: Component + Send + Sync + 'static>(
     index: Res<ChunkIndex>,
-    q_changed_component: Query<(&ComponentCopy<T>, &ChunkPosition)>,
-    mut component_update_events: EventReader<CopyUpdateEvent<T>>,
+    q_changed_component: Query<(&ComponentCopy<T>, &ChunkPosition), Changed<ComponentCopy<T>>>,
+    // mut component_update_events: EventReader<CopyUpdateEvent<T>>,
     mut q_neighborhood: Query<&mut Neighborhood<T>>,
 ) {
-    for event in component_update_events.read() {
-        let entity = event.entity;
-        let Ok((component, pos)) = q_changed_component.get(entity) else {
-            warn!("Couldn't get entity for updating neighborhoods!");
-            continue;
-        };
+    for (component, pos) in q_changed_component.iter() {
         for (x, y, z) in VolumetricRange::new(-1..2, -1..2, -1..2) {
             let offset = IVec3::new(x, y, z);
             let cur_pos = pos.0 + offset;

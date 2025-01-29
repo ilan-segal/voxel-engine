@@ -2,7 +2,7 @@ use crate::chunk::{
     data::{Blocks, Noise3d, Perlin2d},
     position::ChunkPosition,
     spatial::SpatiallyMapped,
-    CHUNK_SIZE,
+    Chunk, CHUNK_SIZE,
 };
 use crate::{block::Block, mesh::MeshSet};
 use bevy::{ecs::query::QueryData, prelude::*, utils::HashMap};
@@ -25,6 +25,7 @@ impl Plugin for ChunkIndexPlugin {
                     .before(MeshSet)
                     .before(WorldSet),
             )
+            .observe(on_chunk_loaded)
             .observe(on_chunk_unloaded);
     }
 }
@@ -67,6 +68,23 @@ pub fn on_blocks_changed_2(
 
 fn on_chunk_unloaded(trigger: Trigger<OnRemove, Blocks>, mut index: ResMut<ChunkIndex>) {
     index.remove_entity(&trigger.entity());
+}
+
+fn on_chunk_loaded(
+    trigger: Trigger<OnAdd, Chunk>,
+    q_pos: Query<&ChunkPosition>,
+    mut index: ResMut<ChunkIndex>,
+) {
+    let entity = trigger.entity();
+    let Ok(pos) = q_pos.get(entity) else {
+        return;
+    };
+    index
+        .entity_by_pos
+        .insert(pos.0, entity);
+    index
+        .pos_by_entity
+        .insert(entity, pos.0);
 }
 
 #[derive(Resource, Default)]
