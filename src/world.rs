@@ -191,10 +191,10 @@ fn receive_chunk_load_tasks(mut commands: Commands, mut tasks: ResMut<ChunkLoadT
                 perlin_2d,
                 noise_3d,
             } => {
-                entity.insert((perlin_2d, noise_3d, Stage::Noise));
+                entity.try_insert((perlin_2d, noise_3d, Stage::Noise));
             }
             AddedChunkData::Blocks(blocks, stage) => {
-                entity.insert((blocks, stage));
+                entity.try_insert((blocks, stage));
             }
         }
         return false;
