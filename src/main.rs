@@ -24,7 +24,6 @@ mod physics;
 mod player;
 mod render_layer;
 mod structure;
-mod texture;
 mod ui;
 mod utils;
 mod world;
@@ -50,11 +49,9 @@ fn main() {
             chunk::ChunkPlugin,
             cube_frame::FramePlugin,
             debug_plugin::DebugPlugin,
-            // file_io::FileIOPlugin,
             mesh::MeshPlugin,
             physics::PhysicsPlugin,
             player::PlayerPlugin,
-            texture::TexturePlugin,
             ui::UiPlugin,
             world::WorldPlugin,
         ))
