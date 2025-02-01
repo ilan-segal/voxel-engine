@@ -4,6 +4,7 @@ use crate::{
         data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, Chunk,
         CHUNK_SIZE,
     },
+    texture::BlockMaterials,
     world::{
         neighborhood::{ComponentCopy, Neighborhood},
         stage::Stage,
@@ -22,19 +23,12 @@ use bevy::{
     utils::HashMap,
 };
 use itertools::Itertools;
-use terrain_material::{
-    get_texture_index, TerrainMaterial, TerrainMaterialHandle, TerrainMaterialPlugin,
-    ATTRIBUTE_TEXTURE_INDEX,
-};
-
-mod terrain_material;
 
 pub struct MeshPlugin;
 
 impl Plugin for MeshPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(TerrainMaterialPlugin)
-            .init_resource::<MeshGenTasks>()
+        app.init_resource::<MeshGenTasks>()
             .add_systems(
                 Update,
                 (
@@ -61,7 +55,7 @@ pub struct MeshSet;
 
 struct MeshTaskData {
     entity: Entity,
-    mesh: Option<Mesh>,
+    mesh: Vec<(Block, BlockSide, Mesh)>,
 }
 
 #[derive(Component)]
@@ -172,10 +166,8 @@ fn receive_mesh_gen_tasks(
     mut commands: Commands,
     mut tasks: ResMut<MeshGenTasks>,
     mut meshes: ResMut<Assets<Mesh>>,
-    // materials: Res<BlockMaterials>,
-    terrain_material: Res<TerrainMaterialHandle>,
+    materials: Res<BlockMaterials>,
     q_render_layers: Query<&RenderLayers>,
-    q_transform: Query<&Transform>,
 ) {
     tasks.0.retain(|_, task| {
         let Some(data) = block_on(future::poll_once(task)) else {
@@ -185,30 +177,30 @@ fn receive_mesh_gen_tasks(
         let Some(mut entity) = commands.get_entity(e) else {
             return true;
         };
-        entity.remove::<Handle<Mesh>>();
-        let Some(mesh) = data.mesh else {
+        entity.despawn_descendants();
+        if data.mesh.is_empty() {
             return false;
-        };
+        }
         let render_layer = q_render_layers
             .get(e)
             .ok()
             .cloned()
             .unwrap_or(RenderLayers::layer(WORLD_LAYER));
-        entity.insert((
-            MaterialMeshBundle {
-                mesh: meshes.add(mesh),
-                material: terrain_material.handle.clone_weak(),
-                transform: q_transform
-                    .get(e)
-                    .ok()
-                    .expect("Chunk should have transformation")
-                    .clone(),
-                ..default()
-            },
-            // meshes.add(mesh),
-            // terrain_material.handle.clone_weak(),
-            render_layer.clone(),
-        ));
+        entity.with_children(|builder| {
+            for (block, side, mesh) in data.mesh {
+                builder.spawn((
+                    PbrBundle {
+                        mesh: meshes.add(mesh),
+                        material: materials
+                            .get(&block, &side)
+                            .unwrap()
+                            .clone_weak(),
+                        ..default()
+                    },
+                    render_layer.clone(),
+                ));
+            }
+        });
         return false;
     });
 }
@@ -236,7 +228,7 @@ impl Quad {
     }
 }
 
-fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Option<Mesh> {
+fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Vec<(Block, BlockSide, Mesh)> {
     let mut quads = vec![];
     quads.extend(greedy_mesh(&chunk, BlockSide::Up));
     quads.extend(greedy_mesh(&chunk, BlockSide::Down));
@@ -532,19 +524,18 @@ fn get_quad_corners(
     }
 }
 
-fn create_meshes(quads: Vec<Quad>) -> Option<Mesh> {
-    return create_mesh_from_quads(quads);
-    // quads
-    //     .iter()
-    //     .map(|q| (q.block, optimize_side_choice(&q.block, &q.side), q))
-    //     .sorted_by_key(|(block, side, _)| (*block, *side))
-    //     .chunk_by(|(block, side, _)| (*block, *side))
-    //     .into_iter()
-    //     .filter_map(|((block, side), qs)| {
-    //         let mesh = create_mesh_from_quads(qs.map(|qs| qs.2).cloned().collect())?;
-    //         Some((block, side, mesh))
-    //     })
-    //     .collect()
+fn create_meshes(quads: Vec<Quad>) -> Vec<(Block, BlockSide, Mesh)> {
+    quads
+        .iter()
+        .map(|q| (q.block, optimize_side_choice(&q.block, &q.side), q))
+        .sorted_by_key(|(block, side, _)| (*block, *side))
+        .chunk_by(|(block, side, _)| (*block, *side))
+        .into_iter()
+        .filter_map(|((block, side), qs)| {
+            let mesh = create_mesh_from_quads(qs.map(|qs| qs.2).cloned().collect())?;
+            Some((block, side, mesh))
+        })
+        .collect()
 }
 
 fn optimize_side_choice(block: &Block, side: &BlockSide) -> BlockSide {
@@ -607,9 +598,7 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
         .flat_map(|q| {
             q.ao_factors.iter().map(move |factor| {
                 let lum = 0.6_f32.powi((*factor).into());
-                let original_color = q.block.get_colour();
-                return Color::from(q.block.get_colour().to_linear() * lum)
-                    .with_alpha(original_color.alpha());
+                return Color::WHITE.with_luminance(lum);
             })
         })
         .map(|c| c.to_linear().to_f32_array())
@@ -618,20 +607,14 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
         .iter()
         .flat_map(|q| q.uvs)
         .collect::<Vec<_>>();
-    let texture_indices = quads
-        .iter()
-        .map(|quad| get_texture_index(&quad.block, &quad.side))
-        .flat_map(|index| vec![index; 4])
-        .collect::<Vec<_>>();
     let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::RENDER_WORLD,
     )
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
-    // .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colours)
     .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uv)
-    .with_inserted_attribute(ATTRIBUTE_TEXTURE_INDEX, texture_indices)
     .with_inserted_indices(Indices::U32(indices));
     return Some(mesh);
 }
