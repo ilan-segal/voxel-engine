@@ -21,8 +21,10 @@ use bevy::{
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
     utils::HashMap,
 };
+use itertools::Itertools;
 use terrain_material::{
-    get_texture_index, TerrainMaterialHandle, TerrainMaterialPlugin, ATTRIBUTE_TEXTURE_INDEX,
+    get_texture_index, TerrainMaterial, TerrainMaterialHandle, TerrainMaterialPlugin,
+    ATTRIBUTE_TEXTURE_INDEX,
 };
 
 mod terrain_material;
@@ -242,7 +244,7 @@ fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Option<Mesh> {
     quads.extend(greedy_mesh(&chunk, BlockSide::South));
     quads.extend(greedy_mesh(&chunk, BlockSide::West));
     quads.extend(greedy_mesh(&chunk, BlockSide::East));
-    return create_mesh(quads);
+    return create_meshes(quads);
 }
 
 // TODO: Replace slow implementation with binary mesher
@@ -530,7 +532,31 @@ fn get_quad_corners(
     }
 }
 
-fn create_mesh(mut quads: Vec<Quad>) -> Option<Mesh> {
+fn create_meshes(quads: Vec<Quad>) -> Option<Mesh> {
+    return create_mesh_from_quads(quads);
+    // quads
+    //     .iter()
+    //     .map(|q| (q.block, optimize_side_choice(&q.block, &q.side), q))
+    //     .sorted_by_key(|(block, side, _)| (*block, *side))
+    //     .chunk_by(|(block, side, _)| (*block, *side))
+    //     .into_iter()
+    //     .filter_map(|((block, side), qs)| {
+    //         let mesh = create_mesh_from_quads(qs.map(|qs| qs.2).cloned().collect())?;
+    //         Some((block, side, mesh))
+    //     })
+    //     .collect()
+}
+
+fn optimize_side_choice(block: &Block, side: &BlockSide) -> BlockSide {
+    // Normalize so there are fewer separate meshes
+    match (block, side) {
+        (Block::Wood, BlockSide::Up) | (Block::Wood, BlockSide::Down) => BlockSide::Up,
+        (Block::Wood, _) => BlockSide::East,
+        _ => BlockSide::default(),
+    }
+}
+
+fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
     if quads.is_empty() {
         return None;
     }
@@ -551,7 +577,7 @@ fn create_mesh(mut quads: Vec<Quad>) -> Option<Mesh> {
             return a.cross(b).normalize();
         })
         .map(|norm| norm.to_array())
-        .flat_map(|norm| [norm; 4])
+        .flat_map(|norm| std::iter::repeat_n(norm, 4))
         .collect::<Vec<_>>();
     let indices = (0..quads.len())
         .flat_map(|quad_index| {
@@ -595,7 +621,7 @@ fn create_mesh(mut quads: Vec<Quad>) -> Option<Mesh> {
     let texture_indices = quads
         .iter()
         .map(|quad| get_texture_index(&quad.block, &quad.side))
-        .flat_map(|index| [index; 4])
+        .flat_map(|index| vec![index; 4])
         .collect::<Vec<_>>();
     let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
