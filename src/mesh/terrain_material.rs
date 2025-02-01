@@ -91,9 +91,10 @@ impl Material for TerrainMaterial {
     ) -> Result<(), SpecializedMeshPipelineError> {
         let vertex_layout = layout.0.get_layout(&[
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
-            Mesh::ATTRIBUTE_COLOR.at_shader_location(1),
+            Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
             Mesh::ATTRIBUTE_UV_0.at_shader_location(2),
-            ATTRIBUTE_TEXTURE_INDEX.at_shader_location(3),
+            Mesh::ATTRIBUTE_COLOR.at_shader_location(3),
+            ATTRIBUTE_TEXTURE_INDEX.at_shader_location(4),
         ])?;
         descriptor.vertex.buffers = vec![vertex_layout];
         Ok(())
@@ -124,10 +125,7 @@ impl AsBindGroup for TerrainMaterial {
         let textures = vec![&fallback_image.texture_view; MAX_TEXTURE_COUNT];
 
         // convert bevy's resource types to WGPU's references
-        let mut textures: Vec<_> = textures
-            .into_iter()
-            .map(|texture| &**texture)
-            .collect();
+        let mut textures: Vec<_> = textures.into_iter().map(|texture| &**texture).collect();
 
         // fill in up to the first `MAX_TEXTURE_COUNT` textures and samplers to the arrays
         for (id, image) in images.into_iter().enumerate() {

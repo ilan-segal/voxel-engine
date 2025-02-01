@@ -74,14 +74,9 @@ fn update_mesh_status(
 ) {
     for (e, stage) in q.iter() {
         if stage == &Stage::final_stage() {
-            commands
-                .entity(e)
-                .remove::<Meshed>()
-                .insert(CheckedForMesh);
+            commands.entity(e).remove::<Meshed>().insert(CheckedForMesh);
         } else {
-            commands
-                .entity(e)
-                .insert((CheckedForMesh, Meshed));
+            commands.entity(e).insert((CheckedForMesh, Meshed));
         }
     }
 }
@@ -92,9 +87,7 @@ fn mark_mesh_as_stale(
     mut tasks: ResMut<MeshGenTasks>,
 ) {
     for entity in q_changed_neighborhood.iter() {
-        commands
-            .entity(entity)
-            .remove::<CheckedForMesh>();
+        commands.entity(entity).remove::<CheckedForMesh>();
         tasks.0.remove(&entity);
     }
 }
@@ -248,10 +241,7 @@ fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Option<Mesh> {
 // TODO: Replace slow implementation with binary mesher
 fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let middle = chunk
-        .middle_chunk()
-        .clone()
-        .expect("Already checked");
+    let middle = chunk.middle_chunk().clone().expect("Already checked");
     let mut blocks = middle.as_ref().clone();
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {
@@ -588,10 +578,7 @@ fn create_mesh(mut quads: Vec<Quad>) -> Option<Mesh> {
         })
         .map(|c| c.to_linear().to_f32_array())
         .collect::<Vec<_>>();
-    let uv = quads
-        .iter()
-        .flat_map(|q| q.uvs)
-        .collect::<Vec<_>>();
+    let uv = quads.iter().flat_map(|q| q.uvs).collect::<Vec<_>>();
     let texture_indices = quads
         .iter()
         .map(|quad| get_texture_index(&quad.block, &quad.side))
@@ -602,7 +589,7 @@ fn create_mesh(mut quads: Vec<Quad>) -> Option<Mesh> {
         RenderAssetUsages::RENDER_WORLD,
     )
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
-    // .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colours)
     .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uv)
     .with_inserted_attribute(ATTRIBUTE_TEXTURE_INDEX, texture_indices)
