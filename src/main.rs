@@ -9,6 +9,7 @@ use bevy::{
     core_pipeline::smaa::SmaaSettings,
     pbr::wireframe::{WireframeConfig, WireframePlugin},
     prelude::*,
+    render::view::RenderLayers,
     window::CursorGrabMode,
 };
 use player::PlayerBundle;
@@ -76,6 +77,24 @@ fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
         brightness: 750.,
         ..default()
     });
+    commands.spawn((
+        DirectionalLightBundle {
+            directional_light: DirectionalLight {
+                illuminance: light_consts::lux::OVERCAST_DAY,
+                ..default()
+            },
+            transform: Transform::default().looking_to(
+                Vec3 {
+                    x: -1.0,
+                    y: -0.00,
+                    z: -0.25,
+                },
+                Vec3::Y,
+            ),
+            ..default()
+        },
+        RenderLayers::layer(WORLD_LAYER),
+    ));
 }
 
 fn toggle_wireframe(

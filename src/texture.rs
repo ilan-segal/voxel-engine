@@ -1,7 +1,9 @@
 use bevy::{
+    pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
-    render::texture::{
-        ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor,
+    render::{
+        render_resource::{AsBindGroup, ShaderRef},
+        texture::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
     },
 };
 
@@ -11,22 +13,43 @@ pub struct TexturePlugin;
 
 impl Plugin for TexturePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup);
+        app.add_plugins(MaterialPlugin::<TerrainMaterial>::default())
+            .add_systems(Startup, setup);
+    }
+}
+
+type TerrainMaterial = ExtendedMaterial<StandardMaterial, TerrainMaterialExtension>;
+
+#[derive(Asset, AsBindGroup, Reflect, Debug, Clone, Default)]
+pub struct TerrainMaterialExtension {
+    #[uniform(100)]
+    quantize_steps: u32,
+}
+
+const TERRAIN_MATERIAL_SHADER_PATH: &str = "shaders/terrain.wgsl";
+
+impl MaterialExtension for TerrainMaterialExtension {
+    fn fragment_shader() -> ShaderRef {
+        TERRAIN_MATERIAL_SHADER_PATH.into()
+    }
+
+    fn deferred_fragment_shader() -> ShaderRef {
+        TERRAIN_MATERIAL_SHADER_PATH.into()
     }
 }
 
 #[derive(Resource)]
 pub struct BlockMaterials {
-    stone: Handle<StandardMaterial>,
-    dirt: Handle<StandardMaterial>,
-    grass: Handle<StandardMaterial>,
-    wood: Handle<StandardMaterial>,
-    wood_top: Handle<StandardMaterial>,
-    leaves: Handle<StandardMaterial>,
+    stone: Handle<TerrainMaterial>,
+    dirt: Handle<TerrainMaterial>,
+    grass: Handle<TerrainMaterial>,
+    wood: Handle<TerrainMaterial>,
+    wood_top: Handle<TerrainMaterial>,
+    leaves: Handle<TerrainMaterial>,
 }
 
 impl BlockMaterials {
-    pub fn get(&self, block: &Block, side: &BlockSide) -> Option<&Handle<StandardMaterial>> {
+    pub fn get(&self, block: &Block, side: &BlockSide) -> Option<&Handle<TerrainMaterial>> {
         match (block, side) {
             (Block::Stone, _) => Some(&self.stone),
             (Block::Dirt, _) => Some(&self.dirt),
@@ -42,7 +65,7 @@ impl BlockMaterials {
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<TerrainMaterial>>,
 ) {
     let mut get_material =
         |path, colour| get_material_with_colour(path, &asset_server, &mut materials, colour);
@@ -61,9 +84,9 @@ fn setup(
 fn get_material_with_colour(
     path: &'static str,
     asset_server: &Res<AssetServer>,
-    materials: &mut ResMut<Assets<StandardMaterial>>,
+    materials: &mut ResMut<Assets<TerrainMaterial>>,
     colour: Color,
-) -> Handle<StandardMaterial> {
+) -> Handle<TerrainMaterial> {
     let image = asset_server.load_with_settings(path, |image_loader_settings| {
         *image_loader_settings = ImageLoaderSettings {
             sampler: ImageSampler::Descriptor(ImageSamplerDescriptor {
@@ -75,12 +98,13 @@ fn get_material_with_colour(
             ..default()
         }
     });
-    let material = StandardMaterial {
+    let base = StandardMaterial {
         base_color_texture: Some(image),
         base_color: colour,
         reflectance: 0.0,
-        alpha_mode: AlphaMode::Mask(0.5),
+        alpha_mode: AlphaMode::AlphaToCoverage,
         ..default()
     };
-    return materials.add(material);
+    let extension = TerrainMaterialExtension::default();
+    return materials.add(ExtendedMaterial { base, extension });
 }

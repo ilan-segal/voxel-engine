@@ -93,7 +93,7 @@ impl Default for PlayerBundle {
             fog_settings: FogSettings {
                 color: Color::WHITE,
                 falloff: FogFalloff::from_visibility_colors(
-                    CHUNK_SIZE as f32 * 16.0, // distance in world units up to which objects retain visibility (>= 5% contrast)
+                    CHUNK_SIZE as f32 * 10.0, // distance in world units up to which objects retain visibility (>= 5% contrast)
                     Color::WHITE, // atmospheric extinction color (after light is lost due to absorption by atmospheric particles)
                     Color::linear_rgba(0.8, 0.8, 0.92, 0.3), //SKY_COLOUR.with_alpha(0.5), // atmospheric inscattering color (light gained due to scattering from the sun)
                 ),

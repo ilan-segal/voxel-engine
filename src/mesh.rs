@@ -189,7 +189,7 @@ fn receive_mesh_gen_tasks(
         entity.with_children(|builder| {
             for (block, side, mesh) in data.mesh {
                 builder.spawn((
-                    PbrBundle {
+                    MaterialMeshBundle {
                         mesh: meshes.add(mesh),
                         material: materials
                             .get(&block, &side)
