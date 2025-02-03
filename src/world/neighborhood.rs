@@ -114,13 +114,8 @@ impl Neighborhood<Blocks> {
         row: i32,
         col: i32,
     ) -> bool {
-        let cur_block = self
-            .at_layer(side, layer, row, col)
-            .copied()
-            .unwrap_or_default();
         match self.at_layer(side, layer + 1, row, col) {
-            Some(block) if block == &cur_block => true,
-            None | Some(&Block::Air) | Some(&Block::Leaves) => false,
+            Some(&Block::Air) | Some(&Block::Leaves) => false,
             _ => true,
         }
     }

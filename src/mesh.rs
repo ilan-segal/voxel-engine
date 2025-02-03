@@ -1,3 +1,15 @@
+use bevy::{
+    prelude::*,
+    render::{
+        mesh::{Indices, PrimitiveTopology},
+        render_asset::RenderAssetUsages,
+        view::RenderLayers,
+    },
+    tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
+    utils::HashMap,
+};
+use itertools::Itertools;
+
 use crate::{
     block::{Block, BlockSide},
     chunk::{
@@ -12,17 +24,6 @@ use crate::{
     },
     WORLD_LAYER,
 };
-use bevy::{
-    prelude::*,
-    render::{
-        mesh::{Indices, PrimitiveTopology},
-        render_asset::RenderAssetUsages,
-        view::RenderLayers,
-    },
-    tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
-    utils::HashMap,
-};
-use itertools::Itertools;
 
 pub struct MeshPlugin;
 
@@ -194,7 +195,7 @@ fn receive_mesh_gen_tasks(
                         material: materials
                             .get(&block, &side)
                             .unwrap()
-                            .clone_weak(),
+                            .clone(),
                         ..default()
                     },
                     render_layer.clone(),
