@@ -24,6 +24,18 @@ impl Aabb {
         }
     }
 
+    pub fn cube(side_length: f32) -> Self {
+        let half = side_length * 0.5;
+        Self {
+            x: half,
+            y: half,
+            z: half,
+            neg_x: half,
+            neg_y: half,
+            neg_z: half,
+        }
+    }
+
     pub fn get_dimensions(&self) -> Vec3 {
         Vec3 {
             x: self.x + self.neg_x,
@@ -35,5 +47,16 @@ impl Aabb {
     pub fn get_centre_offset(&self) -> Vec3 {
         let dimensions = self.get_dimensions();
         Vec3::new(self.neg_x, self.neg_y, self.neg_z) - dimensions * 0.5
+    }
+
+    pub fn with_scale(&self, scale: Vec3) -> Self {
+        Self {
+            x: self.x * scale.x,
+            neg_x: self.neg_x * scale.x,
+            y: self.y * scale.x,
+            neg_y: self.neg_y * scale.x,
+            z: self.z * scale.x,
+            neg_z: self.neg_z * scale.x,
+        }
     }
 }

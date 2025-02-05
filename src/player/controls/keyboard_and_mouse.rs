@@ -1,14 +1,5 @@
-use super::{target_velocity::TargetVelocity, Sprinting};
-use crate::{
-    block::Block,
-    player::{
-        block_target::{TargetedBlock, TargetedSpace},
-        inventory::{HotbarSelection, Inventory, ItemQuantity, ItemType},
-        mode::PlayerMode,
-        Jumping, Player, Sneaking,
-    },
-    world::block_update::SetBlockEvent,
-};
+use std::f32::consts::PI;
+
 use bevy::{
     ecs::query::QueryData,
     input::{
@@ -19,7 +10,20 @@ use bevy::{
     prelude::*,
     utils::{Entry, HashMap},
 };
-use std::f32::consts::PI;
+
+use super::{target_velocity::TargetVelocity, Sprinting};
+use crate::{
+    block::Block,
+    item::{DroppedItemBundle, Item, ItemBundle, Quantity, DROPPED_ITEM_SCALE},
+    physics::{aabb::Aabb, collision::Collidable, friction::Friction},
+    player::{
+        block_target::{TargetedBlock, TargetedSpace},
+        inventory::{HotbarSelection, Inventory, ItemType},
+        mode::PlayerMode,
+        Jumping, Player, Sneaking,
+    },
+    world::block_update::SetBlockEvent,
+};
 
 pub struct KeyboardMousePlugin;
 
@@ -35,6 +39,7 @@ impl Plugin for KeyboardMousePlugin {
                 process_keyboard_inputs,
                 delete_targeted_block.run_if(input_just_pressed(MouseButton::Left)),
                 place_block.run_if(input_just_pressed(MouseButton::Right)),
+                drop_item.run_if(input_just_pressed(KeyCode::KeyQ)),
                 change_hotbar_selection_from_keys,
                 change_hotbar_selection_from_scrollbar,
             ),
@@ -141,10 +146,8 @@ fn place_block(
             continue;
         };
         let ItemType::Block(block) = item.item;
-        if let ItemQuantity::Number(n) = item.quantity {
-            item.quantity = ItemQuantity::Number(n - 1);
-        }
-        if item.quantity == ItemQuantity::Number(0) {
+        item.quantity.decrease(1);
+        if item.quantity == Quantity::Finite(0) {
             inventory.hotbar[index] = None;
         }
         set_block_events.send(SetBlockEvent {
@@ -270,5 +273,37 @@ fn change_hotbar_selection_from_scrollbar(
                 .wrapping_add_signed(delta)
         };
         selection.index = new_index;
+    }
+}
+
+fn drop_item(
+    mut q_inventory: Query<(&HotbarSelection, &mut Inventory, &GlobalTransform)>,
+    mut commands: Commands,
+) {
+    for (selection, mut inventory, global_transform) in q_inventory.iter_mut() {
+        let index = selection.index as usize;
+        let Some(Some(ref mut item)) = inventory.hotbar.get_mut(index) else {
+            continue;
+        };
+        item.quantity.decrease(1);
+        let ItemType::Block(block) = item.item;
+        let player_transform = global_transform.compute_transform();
+        commands.spawn(DroppedItemBundle {
+            item: ItemBundle {
+                item: Item::Block(block),
+                quantity: item.quantity,
+            },
+            transform: TransformBundle::from_transform(Transform {
+                translation: player_transform.translation,
+                scale: Vec3::ONE * DROPPED_ITEM_SCALE,
+                ..default()
+            }),
+            chunk_position: default(),
+            gravity: default(),
+            velocity: (player_transform.rotation * Vec3::NEG_Z * 5.0).into(),
+            aabb: Aabb::cube(1.0),
+            collidable: Collidable,
+            friction: Friction { coefficient: 0.1 },
+        });
     }
 }

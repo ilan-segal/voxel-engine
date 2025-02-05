@@ -30,7 +30,7 @@ fn setup(mut commands: Commands, mut polyline_materials: ResMut<Assets<PolylineM
         width: 5.0,
         color: RED.into(),
         perspective: false,
-        depth_bias: -0.1,
+        depth_bias: -0.001,
     });
     commands.insert_resource(HitboxFrameAssets { material });
 }
@@ -55,6 +55,7 @@ fn add_hitbox_frame(
     query: Query<(Entity, &Aabb), Without<HasHitboxFrame>>,
     assets: Res<HitboxFrameAssets>,
     mesh: Res<CubeFrameMeshHandle>,
+    is_visible: ResMut<IsVisible>,
 ) {
     for (e, aabb) in query.iter() {
         commands
@@ -69,7 +70,11 @@ fn add_hitbox_frame(
             PolylineBundle {
                 polyline: mesh.0.clone_weak(),
                 material: assets.material.clone_weak(),
-                visibility: Visibility::Hidden,
+                visibility: if is_visible.0 {
+                    Visibility::Visible
+                } else {
+                    Visibility::Hidden
+                },
                 ..Default::default()
             },
         ));

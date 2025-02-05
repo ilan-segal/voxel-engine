@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use strum::IntoEnumIterator;
 
-use crate::block::Block;
+use crate::{block::Block, item::Quantity};
 
 pub const HOTBAR_SIZE: usize = 10;
 
@@ -25,7 +25,7 @@ impl Inventory {
         {
             hotbar[i] = Some(InventoryItem {
                 item: ItemType::Block(block),
-                quantity: ItemQuantity::Infinity,
+                quantity: Quantity::Infinity,
             });
         }
         return Inventory { hotbar };
@@ -35,7 +35,7 @@ impl Inventory {
 #[derive(Clone, Copy, Debug)]
 pub struct InventoryItem {
     pub item: ItemType,
-    pub quantity: ItemQuantity,
+    pub quantity: Quantity,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -47,20 +47,5 @@ pub enum ItemType {
 impl From<Block> for ItemType {
     fn from(value: Block) -> Self {
         Self::Block(value)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ItemQuantity {
-    Infinity,
-    Number(u8),
-}
-
-impl Into<String> for ItemQuantity {
-    fn into(self) -> String {
-        match self {
-            Self::Infinity => "∞".into(),
-            Self::Number(n) => format!("{}", n),
-        }
     }
 }

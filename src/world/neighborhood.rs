@@ -115,7 +115,7 @@ impl Neighborhood<Blocks> {
         col: i32,
     ) -> bool {
         match self.at_layer(side, layer + 1, row, col) {
-            Some(&Block::Air) | Some(&Block::Leaves) => false,
+            None | Some(&Block::Air) | Some(&Block::Leaves) => false,
             _ => true,
         }
     }

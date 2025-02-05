@@ -1,5 +1,8 @@
 use super::{block_icons::BlockIconMaterials, Ui, UiFont};
-use crate::player::inventory::{HotbarSelection, Inventory, ItemQuantity, ItemType, HOTBAR_SIZE};
+use crate::{
+    item::Quantity,
+    player::inventory::{HotbarSelection, Inventory, ItemType, HOTBAR_SIZE},
+};
 use bevy::prelude::*;
 
 pub struct HotbarUiPlugin;
@@ -111,8 +114,8 @@ fn update_item_display(
                 .expect("Block should have a material for icon"),
         };
         let quantity_font_size = match item.quantity {
-            ItemQuantity::Infinity => 24.0,
-            ItemQuantity::Number(..) => 18.0,
+            Quantity::Infinity => 24.0,
+            Quantity::Finite(..) => 18.0,
         };
         let item_icon_id = commands
             .spawn((

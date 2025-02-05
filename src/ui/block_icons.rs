@@ -2,6 +2,7 @@ use crate::{
     block::Block,
     chunk::{data::Blocks, spatial::SpatiallyMapped, Chunk, NoChunkPosition},
     render_layer::BLOCK_ICON_LAYER,
+    texture::TerrainMaterial,
     world::stage::Stage,
 };
 use bevy::{
@@ -20,7 +21,9 @@ pub struct BlockIconPlugin;
 
 impl Plugin for BlockIconPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_rendered_icons);
+        app.init_resource::<BlockMeshes>()
+            .add_systems(Startup, setup_rendered_icons)
+            .add_systems(Update, register_block_mesh);
     }
 }
 
@@ -28,6 +31,14 @@ impl Plugin for BlockIconPlugin {
 pub struct BlockIconMaterials {
     pub map: HashMap<Block, Handle<Image>>,
 }
+
+#[derive(Resource, Default)]
+pub struct BlockMeshes {
+    pub map: HashMap<Block, Vec<(Handle<Mesh>, Handle<TerrainMaterial>)>>,
+}
+
+#[derive(Component)]
+struct ArchetypalBlock(Block);
 
 fn setup_rendered_icons(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     commands.spawn((
@@ -83,6 +94,7 @@ fn setup_rendered_icons(mut commands: Commands, mut images: ResMut<Assets<Image>
         commands.spawn((
             Chunk,
             NoChunkPosition, // To prevent interacting with the real world
+            ArchetypalBlock(block),
             Stage::final_stage(),
             icon_layer.clone(),
             blocks,
@@ -132,4 +144,27 @@ fn setup_rendered_icons(mut commands: Commands, mut images: ResMut<Assets<Image>
     }
 
     commands.insert_resource(block_icon_materials);
+}
+
+#[derive(Component)]
+struct Checked;
+
+fn register_block_mesh(
+    q: Query<(Entity, &Handle<Mesh>, &Handle<TerrainMaterial>, &Parent), Without<Checked>>,
+    q_parent: Query<&ArchetypalBlock>,
+    mut meshes: ResMut<BlockMeshes>,
+    mut commands: Commands,
+) {
+    for (entity, mesh_handle, material_handle, parent) in q.iter() {
+        commands.entity(entity).insert(Checked);
+        let Ok(ArchetypalBlock(block)) = q_parent.get(parent.get()) else {
+            continue;
+        };
+        info!("Adding mesh to archetype for {:?}", block);
+        meshes
+            .map
+            .entry(*block)
+            .or_insert(vec![])
+            .push((mesh_handle.clone(), material_handle.clone()));
+    }
 }

@@ -15,11 +15,13 @@ use bevy::{
 use player::PlayerBundle;
 use render_layer::WORLD_LAYER;
 
+mod age;
 mod block;
 mod camera_distance;
 mod chunk;
 mod cube_frame;
 mod debug_plugin;
+mod item;
 mod mesh;
 mod physics;
 mod player;
@@ -47,6 +49,7 @@ fn main() {
                 })
                 .set(ImagePlugin::default_nearest()),
             WireframePlugin,
+            age::AgePlugin,
             camera_distance::CameraDistancePlugin,
             chunk::ChunkPlugin,
             cube_frame::FramePlugin,
@@ -58,6 +61,7 @@ fn main() {
             texture::TexturePlugin,
             ui::UiPlugin,
             world::WorldPlugin,
+            item::ItemPlugin,
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, toggle_wireframe)

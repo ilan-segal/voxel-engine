@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use health::HealthDisplayRoot;
 use hotbar::HotbarDisplayRoot;
 
-mod block_icons;
+pub mod block_icons;
 mod crosshair;
 mod health;
 mod hotbar;

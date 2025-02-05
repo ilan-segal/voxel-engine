@@ -18,7 +18,7 @@ impl Plugin for TexturePlugin {
     }
 }
 
-type TerrainMaterial = ExtendedMaterial<StandardMaterial, TerrainMaterialExtension>;
+pub type TerrainMaterial = ExtendedMaterial<StandardMaterial, TerrainMaterialExtension>;
 
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone, Default)]
 pub struct TerrainMaterialExtension {

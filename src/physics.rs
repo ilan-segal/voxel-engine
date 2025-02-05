@@ -3,6 +3,7 @@ use core::f32;
 use aabb::Aabb;
 use bevy::{ecs::query::QueryData, prelude::*};
 use collision::{Collidable, Collision};
+use friction::Friction;
 use gravity::Gravity;
 use velocity::Velocity;
 
@@ -10,6 +11,7 @@ use crate::{chunk::position::ChunkPosition, utils::VolumetricRange, world::index
 
 pub mod aabb;
 pub mod collision;
+pub mod friction;
 pub mod gravity;
 pub mod velocity;
 
@@ -55,13 +57,27 @@ fn apply_gravity(mut q_object: Query<(&Gravity, &mut Velocity)>, time: Res<Time>
 }
 
 fn stop_velocity_from_collisions(
-    mut q_object: Query<&mut Velocity>,
+    mut q_object: Query<(&mut Velocity, Option<&Friction>)>,
     mut collisions: EventReader<Collision>,
 ) {
     for Collision { entity, normal } in collisions.read() {
-        let Ok(mut v) = q_object.get_mut(*entity) else {
+        let Ok((mut v, friction)) = q_object.get_mut(*entity) else {
             continue;
         };
+        let horizontal_velocity = v.0.with_y(0.0);
+        if horizontal_velocity.length() > 0.0
+            && normal.y != 0.0
+            && v.0.y < 0.0
+            && let Some(friction) = friction
+        {
+            if friction.coefficient < horizontal_velocity.length() {
+                let dv_from_friction =
+                    horizontal_velocity.normalize() * friction.coefficient * -1.0;
+                v.0 += dv_from_friction;
+            } else {
+                v.0 -= horizontal_velocity;
+            }
+        }
         if normal.x != 0. {
             v.0.x = 0.;
         }
@@ -102,25 +118,28 @@ fn apply_velocity_with_terrain_collision(
 ) {
     for mut object in q_object.iter_mut() {
         let full_displacement = object.v.0 * time.delta_seconds();
+        let adjusted_aabb = object
+            .aabb
+            .with_scale(object.transform.scale);
         let mut pos = object.transform.translation;
         pos.x += full_displacement.x;
         let collide_x = collide_with_terrain(
             &mut pos,
-            &object.aabb,
+            &adjusted_aabb,
             &full_displacement.with_y(0.).with_z(0.),
             &chunk_index,
         );
         pos.y += full_displacement.y;
         let collide_y = collide_with_terrain(
             &mut pos,
-            &object.aabb,
+            &adjusted_aabb,
             &full_displacement.with_x(0.).with_z(0.),
             &chunk_index,
         );
         pos.z += full_displacement.z;
         let collide_z = collide_with_terrain(
             &mut pos,
-            &object.aabb,
+            &adjusted_aabb,
             &full_displacement.with_x(0.).with_y(0.),
             &chunk_index,
         );
