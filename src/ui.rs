@@ -2,6 +2,8 @@ use bevy::prelude::*;
 use health::HealthDisplayRoot;
 use hotbar::HotbarDisplayRoot;
 
+use crate::state::GameState;
+
 pub mod block_icons;
 mod crosshair;
 mod health;
@@ -17,7 +19,7 @@ impl Plugin for UiPlugin {
             hotbar::HotbarUiPlugin,
             block_icons::BlockIconPlugin,
         ))
-        .add_systems(Startup, setup);
+        .add_systems(OnEnter(GameState::InGame), setup);
     }
 }
 

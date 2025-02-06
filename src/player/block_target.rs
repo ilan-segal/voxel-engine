@@ -65,11 +65,13 @@ fn update_targeted_block(
     mut targeted_block_change: EventWriter<TargetBlockChange>,
     index: Res<ChunkIndex>,
 ) {
-    let transform = q_camera
+    let Some(transform) = q_camera
         .get_single()
         .ok()
         .map(GlobalTransform::compute_transform)
-        .expect("There should be exactly one player camera");
+    else {
+        return;
+    };
     let camera_pos = transform.translation;
     let camera_direction = transform.forward().as_vec3();
     const REACH_DISTANCE: f32 = 1000.0;
@@ -126,9 +128,9 @@ fn update_targeted_block_outline(
         With<TargetedBlockOutline>,
     >,
 ) {
-    let (mut transform, mut visibility) = q_targeted_block_outline
-        .get_single_mut()
-        .expect("Block target outline should've been spawned on startup");
+    let Ok((mut transform, mut visibility)) = q_targeted_block_outline.get_single_mut() else {
+        return;
+    };
     for TargetBlockChange(change) in targeted_block_change.read() {
         match change {
             None => {

@@ -9,6 +9,7 @@ use crate::{
     },
     player::Player,
     render_layer::WORLD_LAYER,
+    state::GameState,
     structure::StructureType,
 };
 use bevy::{
@@ -59,7 +60,8 @@ impl Plugin for WorldPlugin {
                 begin_structure_load_tasks,
                 receive_chunk_load_tasks,
             )
-                .in_set(WorldSet),
+                .in_set(WorldSet)
+                .run_if(in_state(GameState::InGame)),
         )
         .observe(kill_tasks_for_unloaded_chunks);
     }

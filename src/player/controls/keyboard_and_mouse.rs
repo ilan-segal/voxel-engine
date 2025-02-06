@@ -22,6 +22,7 @@ use crate::{
         mode::PlayerMode,
         Jumping, Player, Sneaking,
     },
+    state::GameState,
     world::block_update::SetBlockEvent,
 };
 
@@ -42,7 +43,8 @@ impl Plugin for KeyboardMousePlugin {
                 drop_item.run_if(input_just_pressed(KeyCode::KeyQ)),
                 change_hotbar_selection_from_keys,
                 change_hotbar_selection_from_scrollbar,
-            ),
+            )
+                .run_if(in_state(GameState::InGame)),
         )
         .observe(toggle_player_mode);
     }

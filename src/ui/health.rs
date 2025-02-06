@@ -1,8 +1,11 @@
 use bevy::prelude::*;
 
-use crate::player::{
-    health::{Health, MaxHealth},
-    Player,
+use crate::{
+    player::{
+        health::{Health, MaxHealth},
+        Player,
+    },
+    state::GameState,
 };
 
 use super::Ui;
@@ -11,7 +14,7 @@ pub struct HealthUiPlugin;
 
 impl Plugin for HealthUiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup.after(super::setup))
+        app.add_systems(OnEnter(GameState::InGame), setup.after(super::setup))
             .add_systems(Update, update_health_display);
     }
 }

@@ -1,12 +1,17 @@
 use bevy::prelude::*;
 
+use crate::state::GameState;
+
 use super::{Ui, UiRoot};
 
 pub struct CrosshairPlugin;
 
 impl Plugin for CrosshairPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_crosshair.after(super::setup));
+        app.add_systems(
+            OnEnter(GameState::InGame),
+            spawn_crosshair.after(super::setup),
+        );
     }
 }
 

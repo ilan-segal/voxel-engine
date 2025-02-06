@@ -3,13 +3,6 @@ use crate::block::Block;
 use bevy::prelude::*;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-// #[derive(Clone, PartialEq)]
-// pub struct ChunkData {
-//     pub stage: Stage,
-//     pub blocks: Vec<Block>,
-//     pub perlin_2d: Vec<f32>,
-// }
-
 #[derive(Component, Clone)]
 pub struct Blocks(pub Vec<Block>);
 

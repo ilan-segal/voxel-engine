@@ -2,6 +2,7 @@ use super::{block_icons::BlockIconMaterials, Ui, UiFont};
 use crate::{
     item::Quantity,
     player::inventory::{HotbarSelection, Inventory, ItemType, HOTBAR_SIZE},
+    state::GameState,
 };
 use bevy::prelude::*;
 
@@ -9,7 +10,7 @@ pub struct HotbarUiPlugin;
 
 impl Plugin for HotbarUiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup.before(super::setup))
+        app.add_systems(OnEnter(GameState::InGame), setup.before(super::setup))
             .add_systems(Update, (update_selected_slot, update_item_display))
             .observe(add_slots);
     }

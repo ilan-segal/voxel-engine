@@ -14,6 +14,7 @@ use bevy::{
 };
 use player::PlayerBundle;
 use render_layer::WORLD_LAYER;
+use state::GameState;
 
 mod age;
 mod block;
@@ -26,6 +27,7 @@ mod mesh;
 mod physics;
 mod player;
 mod render_layer;
+mod state;
 mod structure;
 mod texture;
 mod ui;
@@ -63,14 +65,15 @@ fn main() {
             world::WorldPlugin,
             item::ItemPlugin,
         ))
-        .add_systems(Startup, setup)
+        .insert_state(GameState::InGame)
+        .add_systems(OnEnter(GameState::InGame), setup_game)
         .add_systems(Update, toggle_wireframe)
         .insert_resource(ClearColor(SKY_COLOUR))
         .insert_resource(Msaa::Sample8)
         .run();
 }
 
-fn setup(mut commands: Commands, mut windows: Query<&mut Window>) {
+fn setup_game(mut commands: Commands, mut windows: Query<&mut Window>) {
     let mut window = windows.single_mut();
     window.cursor.visible = false;
     window.cursor.grab_mode = CursorGrabMode::Locked;

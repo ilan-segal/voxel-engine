@@ -1,5 +1,8 @@
 use super::{falling_state::FallingState, mode::PlayerMode, Jumping, Player, Sneaking, Sprinting};
-use crate::physics::{gravity::Gravity, velocity::Velocity, PhysicsSystemSet};
+use crate::{
+    physics::{gravity::Gravity, velocity::Velocity, PhysicsSystemSet},
+    state::GameState,
+};
 use bevy::{ecs::query::QueryData, prelude::*};
 use target_velocity::TargetVelocity;
 
@@ -17,7 +20,8 @@ impl Plugin for ControlsPlugin {
                     update_velocity_for_survival_mode,
                     update_velocity_for_no_clip_mode,
                 )
-                    .before(PhysicsSystemSet::Act),
+                    .before(PhysicsSystemSet::Act)
+                    .run_if(in_state(GameState::InGame)),
             );
     }
 }
