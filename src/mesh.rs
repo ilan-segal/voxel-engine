@@ -1,14 +1,10 @@
 use bevy::{
     prelude::*,
-    render::{
-        mesh::{Indices, PrimitiveTopology},
-        render_asset::RenderAssetUsages,
-        view::RenderLayers,
-    },
+    render::view::RenderLayers,
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
     utils::HashMap,
 };
-use itertools::Itertools;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     block::{Block, BlockSide},
@@ -16,6 +12,7 @@ use crate::{
         data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, Chunk,
         CHUNK_SIZE,
     },
+    mesh::terrain_mesh::{PrecomputedTerrainMeshes, SquareMeshSpec},
     texture::BlockMaterials,
     world::{
         neighborhood::{ComponentCopy, Neighborhood},
@@ -25,11 +22,14 @@ use crate::{
     WORLD_LAYER,
 };
 
+pub mod terrain_mesh;
+
 pub struct MeshPlugin;
 
 impl Plugin for MeshPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<MeshGenTasks>()
+        app.add_plugins(terrain_mesh::TerrainMeshPlugin)
+            .init_resource::<MeshGenTasks>()
             .add_systems(
                 Update,
                 (
@@ -56,7 +56,14 @@ pub struct MeshSet;
 
 struct MeshTaskData {
     entity: Entity,
-    mesh: Vec<(Block, BlockSide, Mesh)>,
+    mesh: Vec<BlockFaceMeshSpec>,
+}
+
+struct BlockFaceMeshSpec {
+    mesh_spec: SquareMeshSpec,
+    block: Block,
+    side: BlockSide,
+    pos: IVec3,
 }
 
 #[derive(Component)]
@@ -166,8 +173,8 @@ fn begin_mesh_gen_tasks_for_positionless_chunks(
 fn receive_mesh_gen_tasks(
     mut commands: Commands,
     mut tasks: ResMut<MeshGenTasks>,
-    mut meshes: ResMut<Assets<Mesh>>,
     materials: Res<BlockMaterials>,
+    precomputed_meshes: Res<PrecomputedTerrainMeshes>,
     q_render_layers: Query<&RenderLayers>,
 ) {
     tasks.0.retain(|_, task| {
@@ -188,14 +195,19 @@ fn receive_mesh_gen_tasks(
             .cloned()
             .unwrap_or(RenderLayers::layer(WORLD_LAYER));
         entity.with_children(|builder| {
-            for (block, side, mesh) in data.mesh {
+            for spec in data.mesh {
+                let mesh = precomputed_meshes
+                    .map
+                    .get(&spec.mesh_spec)
+                    .expect("Precomputed mesh for block face");
                 builder.spawn((
                     MaterialMeshBundle {
-                        mesh: meshes.add(mesh),
+                        mesh: mesh.clone(),
                         material: materials
-                            .get(&block, &side)
-                            .unwrap()
+                            .get(&spec.block, &spec.side)
+                            .expect("Material for block face")
                             .clone(),
+                        transform: Transform::from_translation(spec.pos.as_vec3()),
                         ..default()
                     },
                     render_layer.clone(),
@@ -210,26 +222,25 @@ fn receive_mesh_gen_tasks(
 struct Quad {
     block: Block,
     side: BlockSide,
-    vertices: [Vec3; 4],
+    pos: IVec3,
     ao_factors: [u8; 4],
-    uvs: [[f32; 2]; 4],
 }
 
-impl Quad {
-    fn rotate_against_anisotropy(&mut self) {
-        if self.ao_factors[0] + self.ao_factors[2] > self.ao_factors[1] + self.ao_factors[3] {
-            self.rotate_left(1);
-        }
-    }
+// impl Quad {
+//     fn rotate_against_anisotropy(&mut self) {
+//         if self.ao_factors[0] + self.ao_factors[2] > self.ao_factors[1] + self.ao_factors[3] {
+//             self.rotate_left(1);
+//         }
+//     }
 
-    fn rotate_left(&mut self, mid: usize) {
-        self.vertices.rotate_left(mid);
-        self.ao_factors.rotate_left(mid);
-        self.uvs.rotate_left(mid);
-    }
-}
+//     fn rotate_left(&mut self, mid: usize) {
+//         self.vertices.rotate_left(mid);
+//         self.ao_factors.rotate_left(mid);
+//         self.uvs.rotate_left(mid);
+//     }
+// }
 
-fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Vec<(Block, BlockSide, Mesh)> {
+fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Vec<BlockFaceMeshSpec> {
     let mut quads = vec![];
     quads.extend(greedy_mesh(&chunk, BlockSide::Up));
     quads.extend(greedy_mesh(&chunk, BlockSide::Down));
@@ -237,7 +248,7 @@ fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Vec<(Block, BlockSide, M
     quads.extend(greedy_mesh(&chunk, BlockSide::South));
     quads.extend(greedy_mesh(&chunk, BlockSide::West));
     quads.extend(greedy_mesh(&chunk, BlockSide::East));
-    return create_meshes(quads);
+    return create_mesh_specs(quads);
 }
 
 // TODO: Replace slow implementation with binary mesher
@@ -270,97 +281,99 @@ fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> 
                     get_ao_factor(chunk, &direction, layer, row, col, AoCorner::BottomRight);
                 let top_right_ao_factor =
                     get_ao_factor(chunk, &direction, layer, row, col, AoCorner::TopRight);
-                let mut height = 0;
-                if bottom_left_ao_factor == top_left_ao_factor
-                    && bottom_right_ao_factor == top_right_ao_factor
-                {
-                    while height + row < CHUNK_SIZE - 1
-                        && block
-                            == blocks.get_from_layer_coords(
-                                &direction,
-                                layer,
-                                height + row + 1,
-                                col,
-                            )
-                        && !chunk.block_is_hidden_from_above(
-                            &direction,
-                            layer as i32,
-                            (height + row + 1) as i32,
-                            col as i32,
-                        )
-                    {
-                        let new_top_left_factor = get_ao_factor(
-                            chunk,
-                            &direction,
-                            layer,
-                            row + height + 1,
-                            col,
-                            AoCorner::TopLeft,
-                        );
-                        if new_top_left_factor != top_left_ao_factor {
-                            break;
-                        }
-                        let new_top_right_factor = get_ao_factor(
-                            chunk,
-                            &direction,
-                            layer,
-                            row + height + 1,
-                            col,
-                            AoCorner::TopRight,
-                        );
-                        if new_top_right_factor != top_right_ao_factor {
-                            break;
-                        }
+                // let mut height = 0;
+                // if bottom_left_ao_factor == top_left_ao_factor
+                //     && bottom_right_ao_factor == top_right_ao_factor
+                // {
+                //     while height + row < CHUNK_SIZE - 1
+                //         && block
+                //             == blocks.get_from_layer_coords(
+                //                 &direction,
+                //                 layer,
+                //                 height + row + 1,
+                //                 col,
+                //             )
+                //         && !chunk.block_is_hidden_from_above(
+                //             &direction,
+                //             layer as i32,
+                //             (height + row + 1) as i32,
+                //             col as i32,
+                //         )
+                //     {
+                //         let new_top_left_factor = get_ao_factor(
+                //             chunk,
+                //             &direction,
+                //             layer,
+                //             row + height + 1,
+                //             col,
+                //             AoCorner::TopLeft,
+                //         );
+                //         if new_top_left_factor != top_left_ao_factor {
+                //             break;
+                //         }
+                //         let new_top_right_factor = get_ao_factor(
+                //             chunk,
+                //             &direction,
+                //             layer,
+                //             row + height + 1,
+                //             col,
+                //             AoCorner::TopRight,
+                //         );
+                //         if new_top_right_factor != top_right_ao_factor {
+                //             break;
+                //         }
 
-                        height += 1;
-                    }
-                }
-                let mut width = 0;
-                if bottom_left_ao_factor == bottom_right_ao_factor
-                    && top_left_ao_factor == top_right_ao_factor
-                {
-                    while col + width < CHUNK_SIZE - 1
-                        && (row..=height + row).all(|cur_row| {
-                            block
-                                == blocks.get_from_layer_coords(
-                                    &direction,
-                                    layer,
-                                    cur_row,
-                                    col + width + 1,
-                                )
-                                && !chunk.block_is_hidden_from_above(
-                                    &direction,
-                                    layer as i32,
-                                    cur_row as i32,
-                                    (col + width) as i32 + 1,
-                                )
-                        })
-                    {
-                        let new_bottom_right_factor = get_ao_factor(
-                            chunk,
-                            &direction,
-                            layer,
-                            row + height,
-                            col + width + 1,
-                            AoCorner::BottomRight,
-                        );
-                        if new_bottom_right_factor != bottom_right_ao_factor {
-                            break;
-                        }
-                        let new_top_right_factor = get_ao_factor(
-                            chunk,
-                            &direction,
-                            layer,
-                            row + height,
-                            col + width + 1,
-                            AoCorner::TopRight,
-                        );
-                        if new_top_right_factor != top_right_ao_factor {
-                            break;
-                        }
-                        width += 1;
-                    }
-                }
+                //         height += 1;
+                //     }
+                // }
+                // let mut width = 0;
+                // if bottom_left_ao_factor == bottom_right_ao_factor
+                //     && top_left_ao_factor == top_right_ao_factor
+                // {
+                //     while col + width < CHUNK_SIZE - 1
+                //         && (row..=height + row).all(|cur_row| {
+                //             block
+                //                 == blocks.get_from_layer_coords(
+                //                     &direction,
+                //                     layer,
+                //                     cur_row,
+                //                     col + width + 1,
+                //                 )
+                //                 && !chunk.block_is_hidden_from_above(
+                //                     &direction,
+                //                     layer as i32,
+                //                     cur_row as i32,
+                //                     (col + width) as i32 + 1,
+                //                 )
+                //         })
+                //     {
+                //         let new_bottom_right_factor = get_ao_factor(
+                //             chunk,
+                //             &direction,
+                //             layer,
+                //             row + height,
+                //             col + width + 1,
+                //             AoCorner::BottomRight,
+                //         );
+                //         if new_bottom_right_factor != bottom_right_ao_factor {
+                //             break;
+                //         }
+                //         let new_top_right_factor = get_ao_factor(
+                //             chunk,
+                //             &direction,
+                //             layer,
+                //             row + height,
+                //             col + width + 1,
+                //             AoCorner::TopRight,
+                //         );
+                //         if new_top_right_factor != top_right_ao_factor {
+                //             break;
+                //         }
+                //         width += 1;
+                //     }
+                // }
+                let width = 0;
+                let height = 0;
                 let vertices = get_quad_corners(&direction, layer, row, height, col, width);
                 let ao_factors = if direction == BlockSide::Down {
                     [
@@ -377,20 +390,20 @@ fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> 
                         top_left_ao_factor,
                     ]
                 };
-                let u = width as f32 + 1.0;
-                let v = height as f32 + 1.0;
-                let uvs = if direction == BlockSide::North || direction == BlockSide::West {
-                    [[v, u], [v, 0.0], [0., 0.], [0., u]]
-                } else {
-                    [[0., v], [u, v], [u, 0.0], [0., 0.]]
-                };
+                // let u = width as f32 + 1.0;
+                // let v = height as f32 + 1.0;
+                // let uvs = if direction == BlockSide::North || direction == BlockSide::West {
+                //     [[v, u], [v, 0.0], [0., 0.], [0., u]]
+                // } else {
+                //     [[0., v], [u, v], [u, 0.0], [0., 0.]]
+                // };
 
                 let quad = Quad {
+                    pos: vertices.get(0).unwrap().as_ivec3(),
                     side: direction,
-                    vertices,
                     ao_factors,
                     block: *block,
-                    uvs,
+                    // uvs,
                 };
                 quads.push(quad);
                 for cur_row in row..=height + row {
@@ -525,16 +538,16 @@ fn get_quad_corners(
     }
 }
 
-fn create_meshes(quads: Vec<Quad>) -> Vec<(Block, BlockSide, Mesh)> {
+fn create_mesh_specs(quads: Vec<Quad>) -> Vec<BlockFaceMeshSpec> {
     quads
-        .iter()
-        .map(|q| (q.block, optimize_side_choice(&q.block, &q.side), q))
-        .sorted_by_key(|(block, side, _)| (*block, *side))
-        .chunk_by(|(block, side, _)| (*block, *side))
-        .into_iter()
-        .filter_map(|((block, side), qs)| {
-            let mesh = create_mesh_from_quads(qs.map(|qs| qs.2).cloned().collect())?;
-            Some((block, side, mesh))
+        .par_iter()
+        .map(|quad| BlockFaceMeshSpec {
+            mesh_spec: SquareMeshSpec {
+                ao_factors: quad.ao_factors,
+            },
+            block: quad.block,
+            side: quad.side,
+            pos: quad.pos,
         })
         .collect()
 }
@@ -548,74 +561,74 @@ fn optimize_side_choice(block: &Block, side: &BlockSide) -> BlockSide {
     }
 }
 
-fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
-    if quads.is_empty() {
-        return None;
-    }
-    for i in 0..quads.len() {
-        quads[i].rotate_against_anisotropy();
-    }
-    let vertices = quads
-        .iter()
-        .flat_map(|q| q.vertices.iter())
-        .map(|v| v.to_array())
-        .collect::<Vec<_>>();
-    let normals = quads
-        .iter()
-        .map(|q| q.vertices)
-        .map(|vs| {
-            let a = vs[1] - vs[0];
-            let b = vs[2] - vs[0];
-            return a.cross(b).normalize();
-        })
-        .map(|norm| norm.to_array())
-        .flat_map(|norm| std::iter::repeat_n(norm, 4))
-        .collect::<Vec<_>>();
-    let indices = (0..quads.len())
-        .flat_map(|quad_index| {
-            let quad_index = quad_index as u32;
-            [
-                /*
-                3---2
-                |b /|
-                | / |
-                |/ a|
-                0---1
-                 */
-                // Triangle a
-                4 * quad_index + 0,
-                4 * quad_index + 1,
-                4 * quad_index + 2,
-                // Triangle b
-                4 * quad_index + 0,
-                4 * quad_index + 2,
-                4 * quad_index + 3,
-            ]
-        })
-        .collect::<Vec<_>>();
-    // let colour = block.get_colour().unwrap_or_default();
-    let colours = quads
-        .iter()
-        .flat_map(|q| {
-            q.ao_factors.iter().map(move |factor| {
-                let lum = 0.6_f32.powi((*factor).into());
-                return Color::WHITE.with_luminance(lum);
-            })
-        })
-        .map(|c| c.to_linear().to_f32_array())
-        .collect::<Vec<_>>();
-    let uv = quads
-        .iter()
-        .flat_map(|q| q.uvs)
-        .collect::<Vec<_>>();
-    let mesh = Mesh::new(
-        PrimitiveTopology::TriangleList,
-        RenderAssetUsages::RENDER_WORLD,
-    )
-    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colours)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uv)
-    .with_inserted_indices(Indices::U32(indices));
-    return Some(mesh);
-}
+// fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
+//     if quads.is_empty() {
+//         return None;
+//     }
+//     for i in 0..quads.len() {
+//         quads[i].rotate_against_anisotropy();
+//     }
+//     let vertices = quads
+//         .iter()
+//         .flat_map(|q| q.vertices.iter())
+//         .map(|v| v.to_array())
+//         .collect::<Vec<_>>();
+//     let normals = quads
+//         .iter()
+//         .map(|q| q.vertices)
+//         .map(|vs| {
+//             let a = vs[1] - vs[0];
+//             let b = vs[2] - vs[0];
+//             return a.cross(b).normalize();
+//         })
+//         .map(|norm| norm.to_array())
+//         .flat_map(|norm| std::iter::repeat_n(norm, 4))
+//         .collect::<Vec<_>>();
+//     let indices = (0..quads.len())
+//         .flat_map(|quad_index| {
+//             let quad_index = quad_index as u32;
+//             [
+//                 /*
+//                 3---2
+//                 |b /|
+//                 | / |
+//                 |/ a|
+//                 0---1
+//                  */
+//                 // Triangle a
+//                 4 * quad_index + 0,
+//                 4 * quad_index + 1,
+//                 4 * quad_index + 2,
+//                 // Triangle b
+//                 4 * quad_index + 0,
+//                 4 * quad_index + 2,
+//                 4 * quad_index + 3,
+//             ]
+//         })
+//         .collect::<Vec<_>>();
+//     // let colour = block.get_colour().unwrap_or_default();
+//     let colours = quads
+//         .iter()
+//         .flat_map(|q| {
+//             q.ao_factors.iter().map(move |factor| {
+//                 let lum = 0.6_f32.powi((*factor).into());
+//                 return Color::WHITE.with_luminance(lum);
+//             })
+//         })
+//         .map(|c| c.to_linear().to_f32_array())
+//         .collect::<Vec<_>>();
+//     let uv = quads
+//         .iter()
+//         .flat_map(|q| q.uvs)
+//         .collect::<Vec<_>>();
+//     let mesh = Mesh::new(
+//         PrimitiveTopology::TriangleList,
+//         RenderAssetUsages::RENDER_WORLD,
+//     )
+//     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
+//     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+//     .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colours)
+//     .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uv)
+//     .with_inserted_indices(Indices::U32(indices));
+//     return Some(mesh);
+// }
