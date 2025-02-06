@@ -569,7 +569,7 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
             return a.cross(b).normalize();
         })
         .map(|norm| norm.to_array())
-        .flat_map(|norm| std::iter::repeat_n(norm, 4))
+        .flat_map(|norm| [norm; 4])
         .collect::<Vec<_>>();
     let indices = (0..quads.len())
         .flat_map(|quad_index| {
