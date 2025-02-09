@@ -14,6 +14,7 @@ use bevy::{
 use super::{target_velocity::TargetVelocity, Sprinting};
 use crate::{
     block::Block,
+    state::GameState,
     item::{DroppedItemBundle, Item, ItemBundle, Quantity, DROPPED_ITEM_SCALE},
     physics::{aabb::Aabb, collision::Collidable, friction::Friction},
     player::{
@@ -22,7 +23,6 @@ use crate::{
         mode::PlayerMode,
         Jumping, Player, Sneaking,
     },
-    state::GameState,
     world::block_update::SetBlockEvent,
 };
 

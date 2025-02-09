@@ -14,8 +14,11 @@ pub struct HealthUiPlugin;
 
 impl Plugin for HealthUiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::InGame), setup.after(super::setup))
-            .add_systems(Update, update_health_display);
+        app.add_systems(Startup, setup)
+            .add_systems(
+                Update,
+                update_health_display.run_if(in_state(GameState::InGame)),
+            );
     }
 }
 

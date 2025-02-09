@@ -56,7 +56,6 @@ fn main() {
             chunk::ChunkPlugin,
             cube_frame::FramePlugin,
             debug_plugin::DebugPlugin,
-            // file_io::FileIOPlugin,
             mesh::MeshPlugin,
             physics::PhysicsPlugin,
             player::PlayerPlugin,
@@ -65,12 +64,22 @@ fn main() {
             world::WorldPlugin,
             item::ItemPlugin,
         ))
-        .insert_state(GameState::InGame)
+        .insert_state(GameState::Init)
         .add_systems(OnEnter(GameState::InGame), setup_game)
-        .add_systems(Update, toggle_wireframe)
+        .add_systems(
+            Update,
+            (
+                toggle_wireframe,
+                go_to_main_menu.run_if(in_state(GameState::Init)),
+            ),
+        )
         .insert_resource(ClearColor(SKY_COLOUR))
         .insert_resource(Msaa::Sample8)
         .run();
+}
+
+fn go_to_main_menu(mut next_state: ResMut<NextState<GameState>>) {
+    next_state.set(GameState::MainMenu);
 }
 
 fn setup_game(mut commands: Commands, mut windows: Query<&mut Window>) {

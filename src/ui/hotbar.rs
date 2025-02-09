@@ -1,4 +1,4 @@
-use super::{block_icons::BlockIconMaterials, Ui, UiFont};
+use super::{block_icons::BlockIconMaterials, health::HealthDisplayRoot, Ui, UiFont};
 use crate::{
     item::Quantity,
     player::inventory::{HotbarSelection, Inventory, ItemType, HOTBAR_SIZE},
@@ -10,8 +10,12 @@ pub struct HotbarUiPlugin;
 
 impl Plugin for HotbarUiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::InGame), setup.before(super::setup))
-            .add_systems(Update, (update_selected_slot, update_item_display))
+        app.add_systems(Startup, setup)
+            .add_systems(
+                Update,
+                (update_selected_slot, update_item_display).run_if(in_state(GameState::InGame)),
+            )
+            .add_systems(OnEnter(GameState::InGame), spawn_hotbar)
             .observe(add_slots);
     }
 }
@@ -37,6 +41,42 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 }
 
 const SLOT_SPRITE_SIZE: f32 = 50.0;
+
+#[derive(Component)]
+struct UiHotbar;
+
+fn spawn_hotbar(mut commands: Commands) {
+    commands
+        .spawn((
+            Ui,
+            UiHotbar,
+            NodeBundle {
+                style: Style {
+                    height: Val::Percent(100.0),
+                    justify_content: JustifyContent::End,
+                    justify_self: JustifySelf::Center,
+                    flex_direction: FlexDirection::Column,
+                    ..default()
+                },
+                ..default()
+            },
+        ))
+        .with_children(|builder| {
+            builder.spawn((Ui, HealthDisplayRoot, NodeBundle::default()));
+            builder.spawn((
+                Ui,
+                HotbarDisplayRoot,
+                NodeBundle {
+                    style: Style {
+                        width: Val::Percent(100.0),
+                        align_content: AlignContent::Start,
+                        ..default()
+                    },
+                    ..default()
+                },
+            ));
+        });
+}
 
 #[derive(Component)]
 struct HotbarSlot;
