@@ -74,14 +74,3 @@ pub struct InventoryItem {
     pub item: Item,
     pub quantity: Quantity,
 }
-
-#[derive(Component)]
-pub struct InventorySlot;
-
-type InventoryRow = [Option<Entity>; INVENTORY_WIDTH];
-
-#[derive(Component)]
-pub struct InventoryIndex {
-    // inventory: Vec<InventoryRow>,
-    hotbar: InventoryRow,
-}
