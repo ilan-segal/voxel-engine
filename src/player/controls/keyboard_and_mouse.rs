@@ -14,15 +14,15 @@ use bevy::{
 use super::{target_velocity::TargetVelocity, Sprinting};
 use crate::{
     block::Block,
-    state::GameState,
     item::{DroppedItemBundle, Item, ItemBundle, Quantity, DROPPED_ITEM_SCALE},
     physics::{aabb::Aabb, collision::Collidable, friction::Friction},
     player::{
         block_target::{TargetedBlock, TargetedSpace},
-        inventory::{HotbarSelection, Inventory, ItemType},
+        inventory::{HotbarSelection, Inventory},
         mode::PlayerMode,
         Jumping, Player, Sneaking,
     },
+    state::GameState,
     world::block_update::SetBlockEvent,
 };
 
@@ -147,7 +147,7 @@ fn place_block(
         let Some(Some(ref mut item)) = inventory.hotbar.get_mut(index) else {
             continue;
         };
-        let ItemType::Block(block) = item.item;
+        let Item::Block(block) = item.item;
         item.quantity.decrease(1);
         if item.quantity == Quantity::Finite(0) {
             inventory.hotbar[index] = None;
@@ -288,14 +288,14 @@ fn drop_item(
             continue;
         };
         item.quantity.decrease(1);
-        let ItemType::Block(block) = item.item;
+        let Item::Block(block) = item.item;
         let player_transform = global_transform.compute_transform();
         commands.spawn(DroppedItemBundle {
             item: ItemBundle {
                 item: Item::Block(block),
                 quantity: item.quantity,
             },
-            transform: TransformBundle::from_transform(Transform {
+            spatial: SpatialBundle::from_transform(Transform {
                 translation: player_transform.translation,
                 scale: Vec3::ONE * DROPPED_ITEM_SCALE,
                 ..default()

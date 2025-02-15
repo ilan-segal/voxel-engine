@@ -1,7 +1,7 @@
 use super::{block_icons::BlockIconMaterials, health::HealthDisplayRoot, Ui, UiFont};
 use crate::{
-    item::Quantity,
-    player::inventory::{HotbarSelection, Inventory, ItemType, HOTBAR_SIZE},
+    item::{Item, Quantity},
+    player::inventory::{HotbarSelection, Inventory, HOTBAR_SIZE},
     state::GameState,
 };
 use bevy::prelude::*;
@@ -149,7 +149,7 @@ fn update_item_display(
             continue;
         };
         let material = match item.item {
-            ItemType::Block(block) => block_icons
+            Item::Block(block) => block_icons
                 .map
                 .get(&block)
                 .expect("Block should have a material for icon"),

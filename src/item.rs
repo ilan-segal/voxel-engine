@@ -21,7 +21,7 @@ impl Plugin for ItemPlugin {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Copy, Clone, Debug)]
 pub enum Item {
     Block(Block),
 }
@@ -65,7 +65,7 @@ pub struct ItemBundle {
 #[derive(Bundle)]
 pub struct DroppedItemBundle {
     pub item: ItemBundle,
-    pub transform: TransformBundle,
+    pub spatial: SpatialBundle,
     pub chunk_position: ChunkPosition,
     pub aabb: Aabb,
     pub collidable: Collidable,
@@ -93,12 +93,12 @@ fn add_mesh(
                 };
                 commands
                     .entity(entity)
-                    .insert((Meshed, Visibility::Inherited))
+                    .insert(Meshed)
                     .with_children(|builder| {
                         builder
                             .spawn((
                                 ItemMeshRoot,
-                                Visibility::Inherited,
+                                InheritedVisibility::VISIBLE,
                                 TransformBundle::default(),
                                 Age::default(),
                             ))
