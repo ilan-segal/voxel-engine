@@ -14,7 +14,7 @@ use block_target::BlockTargetPlugin;
 use controls::target_velocity::TargetVelocity;
 use falling_state::FallingState;
 use health::{Health, MaxHealth};
-use inventory::{HotbarSelection, Inventory};
+use inventory::{HotbarSelection, Inventory, PickUpRange};
 use mode::PlayerMode;
 
 pub mod block_target;
@@ -28,16 +28,20 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((BlockTargetPlugin, controls::ControlsPlugin))
-            .add_systems(
-                Update,
-                (
-                    update_grounded_state
-                        .after(PhysicsSystemSet::Act)
-                        .before(PhysicsSystemSet::React),
-                    update_gravity,
-                ),
-            );
+        app.add_plugins((
+            BlockTargetPlugin,
+            controls::ControlsPlugin,
+            inventory::InventoryPlugin,
+        ))
+        .add_systems(
+            Update,
+            (
+                update_grounded_state
+                    .after(PhysicsSystemSet::Act)
+                    .before(PhysicsSystemSet::React),
+                update_gravity,
+            ),
+        );
     }
 }
 
@@ -71,6 +75,7 @@ pub struct PlayerBundle {
     health: Health,
     max_health: MaxHealth,
     inventory: Inventory,
+    pick_up_range: PickUpRange,
     hotbar_selection: HotbarSelection,
     render_layers: RenderLayers,
 }
@@ -112,6 +117,7 @@ impl Default for PlayerBundle {
             health: Health(max_health),
             max_health: MaxHealth(max_health),
             inventory: Inventory::creative_default(),
+            pick_up_range: PickUpRange { meters: 2.0 },
             hotbar_selection: default(),
             render_layers: RenderLayers::layer(WORLD_LAYER),
         }
@@ -148,9 +154,7 @@ fn update_gravity(
             PlayerMode::Survival => commands
                 .entity(entity)
                 .insert((Gravity::default(), Collidable)),
-            PlayerMode::NoClip => commands
-                .entity(entity)
-                .remove::<(Gravity, Collidable)>(),
+            PlayerMode::NoClip => commands.entity(entity).remove::<(Gravity, Collidable)>(),
         };
     }
 }

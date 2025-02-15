@@ -280,10 +280,14 @@ fn drop_item(
         item.quantity.decrease(1);
         let Item::Block(block) = item.item;
         let player_transform = global_transform.compute_transform();
+        let quantity = match item.quantity {
+            Quantity::Infinity => Quantity::Infinity,
+            Quantity::Finite(_) => Quantity::Finite(1),
+        };
         commands.spawn(DroppedItemBundle {
             item: ItemBundle {
                 item: Item::Block(block),
-                quantity: item.quantity,
+                quantity,
             },
             spatial: SpatialBundle::from_transform(Transform {
                 translation: player_transform.translation,
@@ -296,6 +300,7 @@ fn drop_item(
             aabb: Aabb::cube(1.0),
             collidable: Collidable,
             friction: Friction { coefficient: 0.1 },
+            age: default(),
         });
     }
 }

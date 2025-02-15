@@ -58,9 +58,7 @@ fn add_hitbox_frame(
     is_visible: ResMut<IsVisible>,
 ) {
     for (e, aabb) in query.iter() {
-        commands
-            .entity(e)
-            .insert(HasHitboxFrame);
+        commands.entity(e).try_insert(HasHitboxFrame);
         commands.spawn((
             HitboxFrame {
                 parent: e,

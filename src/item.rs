@@ -1,4 +1,7 @@
-use std::f32::consts::TAU;
+use std::{
+    f32::consts::TAU,
+    ops::{Add, Sub},
+};
 
 use bevy::{prelude::*, render::view::RenderLayers};
 
@@ -17,14 +20,18 @@ pub struct ItemPlugin;
 
 impl Plugin for ItemPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (add_mesh, dropped_item_floating_movement));
+        app.add_systems(Update, dropped_item_floating_movement)
+            .add_systems(PostUpdate, add_mesh);
     }
 }
 
-#[derive(Component, Copy, Clone, Debug)]
+#[derive(Component, Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Item {
     Block(Block),
 }
+
+pub const STACK_LIMIT: u8 = 100;
+pub const SECONDS_BEFORE_ELIGIBLE_FOR_PICKUP: f32 = 2.0;
 
 #[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Quantity {
@@ -56,6 +63,34 @@ impl Quantity {
     }
 }
 
+impl Sub<Self> for Quantity {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Infinity, Self::Infinity) => Self::Finite(0),
+            (Self::Finite(_), Self::Infinity) => Self::Finite(0),
+            (Self::Infinity, Self::Finite(_)) => Self::Infinity,
+            (Self::Finite(n), Self::Finite(m)) if n >= m => Self::Finite(n - m),
+            (Self::Finite(_), Self::Finite(_)) => Self::Finite(0),
+        }
+    }
+}
+
+impl Add<Self> for Quantity {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Infinity, _) => Self::Infinity,
+            (_, Self::Infinity) => Self::Infinity,
+            (Self::Finite(n), Self::Finite(m)) => {
+                Self::Finite((n as u16 + m as u16).min(u8::MAX as u16) as u8)
+            }
+        }
+    }
+}
+
 #[derive(Bundle)]
 pub struct ItemBundle {
     pub item: Item,
@@ -72,6 +107,7 @@ pub struct DroppedItemBundle {
     pub gravity: Gravity,
     pub velocity: Velocity,
     pub friction: Friction,
+    pub age: Age,
 }
 
 #[derive(Component)]
