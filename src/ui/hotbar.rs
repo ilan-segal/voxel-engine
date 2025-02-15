@@ -1,7 +1,7 @@
 use super::{block_icons::BlockIconMaterials, health::HealthDisplayRoot, Ui, UiFont};
 use crate::{
     item::{Item, Quantity},
-    player::inventory::{HotbarSelection, Inventory, HOTBAR_SIZE},
+    player::inventory::{HotbarSelection, Inventory, INVENTORY_WIDTH},
     state::GameState,
 };
 use bevy::prelude::*;
@@ -94,7 +94,7 @@ fn add_slots(
         let width = Val::Px(SLOT_SPRITE_SIZE);
         let height = Val::Px(SLOT_SPRITE_SIZE);
         let margin = UiRect::all(Val::Px(1.0));
-        for i in 0..HOTBAR_SIZE {
+        for i in 0..INVENTORY_WIDTH {
             builder.spawn((
                 Ui,
                 HotbarSlot,

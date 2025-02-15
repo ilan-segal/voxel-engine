@@ -6,7 +6,7 @@ use crate::{
     item::{Item, Quantity},
 };
 
-pub const HOTBAR_SIZE: usize = 10;
+pub const INVENTORY_WIDTH: usize = 10;
 
 #[derive(Component, Default)]
 pub struct HotbarSelection {
@@ -15,16 +15,16 @@ pub struct HotbarSelection {
 
 #[derive(Component, Default, Clone, Copy)]
 pub struct Inventory {
-    pub hotbar: [Option<InventoryItem>; HOTBAR_SIZE],
+    pub hotbar: [Option<InventoryItem>; INVENTORY_WIDTH],
 }
 
 impl Inventory {
     pub fn creative_default() -> Self {
-        let mut hotbar = [const { None }; HOTBAR_SIZE];
+        let mut hotbar = [const { None }; INVENTORY_WIDTH];
         for (i, block) in Block::iter()
             .filter(|block| block != &Block::Air)
             .enumerate()
-            .take(HOTBAR_SIZE)
+            .take(INVENTORY_WIDTH)
         {
             hotbar[i] = Some(InventoryItem {
                 item: Item::Block(block),
@@ -39,4 +39,15 @@ impl Inventory {
 pub struct InventoryItem {
     pub item: Item,
     pub quantity: Quantity,
+}
+
+#[derive(Component)]
+pub struct InventorySlot;
+
+type InventoryRow = [Option<Entity>; INVENTORY_WIDTH];
+
+#[derive(Component)]
+pub struct InventoryIndex {
+    inventory: Vec<InventoryRow>,
+    hotbar: InventoryRow,
 }
