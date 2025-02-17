@@ -7,7 +7,10 @@
 
 use bevy::{
     core_pipeline::smaa::SmaaSettings,
-    pbr::wireframe::{WireframeConfig, WireframePlugin},
+    pbr::{
+        light_consts::lux::CLEAR_SUNRISE,
+        wireframe::{WireframeConfig, WireframePlugin},
+    },
     prelude::*,
     render::view::GpuCulling,
     window::CursorGrabMode,
@@ -88,6 +91,17 @@ fn setup_game(mut commands: Commands, mut windows: Query<&mut Window>) {
     window.cursor.grab_mode = CursorGrabMode::Locked;
 
     commands.spawn((PlayerBundle::default(), SmaaSettings::default(), GpuCulling));
+    commands.spawn(DirectionalLightBundle {
+        directional_light: DirectionalLight {
+            color: Color::WHITE,
+            illuminance: CLEAR_SUNRISE,
+            shadows_enabled: true,
+            ..default()
+        },
+        transform: Transform::from_translation(Vec3::new(0.0, 2.0, 0.0))
+            .looking_to(Vec3::NEG_Y, Vec3::Y),
+        ..default()
+    });
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
         brightness: 750.,
