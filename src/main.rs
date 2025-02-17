@@ -98,8 +98,7 @@ fn setup_game(mut commands: Commands, mut windows: Query<&mut Window>) {
             shadows_enabled: true,
             ..default()
         },
-        transform: Transform::from_translation(Vec3::new(0.0, 2.0, 0.0))
-            .looking_to(Vec3::NEG_Y, Vec3::Y),
+        transform: Transform::default().looking_to(Vec3::NEG_Y, Vec3::Y),
         ..default()
     });
     commands.insert_resource(AmbientLight {
