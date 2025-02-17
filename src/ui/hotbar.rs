@@ -1,6 +1,6 @@
 use super::{block_icons::BlockIconMaterials, health::HealthDisplayRoot, Ui, UiFont};
 use crate::{
-    item::{Item, Quantity},
+    item::Item,
     player::inventory::{HotbarSelection, Inventory, INVENTORY_WIDTH},
     state::GameState,
 };
@@ -154,10 +154,7 @@ fn update_item_display(
                 .get(&block)
                 .expect("Block should have a material for icon"),
         };
-        let quantity_font_size = match item.quantity {
-            Quantity::Infinity => 24.0,
-            Quantity::Finite(..) => 18.0,
-        };
+        let quantity_font_size = 18.0;
         let item_icon_id = commands
             .spawn((
                 Ui,

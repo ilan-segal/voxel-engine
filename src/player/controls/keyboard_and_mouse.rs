@@ -62,7 +62,9 @@ fn rotate_camera_with_mouse(
     const CAMERA_MOUSE_SENSITIVITY_Y: f32 = 0.0025;
     for MouseMotion { delta } in mouse_events.read() {
         transform.rotate_axis(Dir3::NEG_Y, delta.x * CAMERA_MOUSE_SENSITIVITY_X);
-        let (yaw, mut pitch, _) = transform.rotation.to_euler(EulerRot::YXZ);
+        let (yaw, mut pitch, _) = transform
+            .rotation
+            .to_euler(EulerRot::YXZ);
         pitch = (pitch - delta.y * CAMERA_MOUSE_SENSITIVITY_Y).clamp(-PI * 0.5, PI * 0.5);
         transform.rotation = Quat::from_euler(
             // YXZ order corresponds to the common
@@ -107,7 +109,10 @@ fn process_keyboard_inputs(
         v_horizontal.x += 1.0;
     }
     if v_horizontal != Vec3::ZERO {
-        let (yaw, _, _) = object.t.rotation.to_euler(EulerRot::YXZ);
+        let (yaw, _, _) = object
+            .t
+            .rotation
+            .to_euler(EulerRot::YXZ);
         v_horizontal = (Quat::from_rotation_y(yaw) * v_horizontal).normalize();
         object.target_v.0 += v_horizontal;
     }
@@ -144,9 +149,6 @@ fn place_block(
         };
         let Item::Block(block) = item.item;
         item.quantity.decrease(1);
-        if item.quantity == Quantity::Finite(0) {
-            inventory.hotbar[index] = None;
-        }
         set_block_events.send(SetBlockEvent {
             block,
             world_pos: space_pos.to_array(),
@@ -280,10 +282,7 @@ fn drop_item(
         item.quantity.decrease(1);
         let Item::Block(block) = item.item;
         let player_transform = global_transform.compute_transform();
-        let quantity = match item.quantity {
-            Quantity::Infinity => Quantity::Infinity,
-            Quantity::Finite(_) => Quantity::Finite(1),
-        };
+        let quantity = Quantity(1);
         commands.spawn(DroppedItemBundle {
             item: ItemBundle {
                 item: Item::Block(block),

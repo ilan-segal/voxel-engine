@@ -22,10 +22,7 @@ fn clear_empty_stacks_from_inventory(mut q_inventory: Query<&mut Inventory, Chan
             let Some(slot) = inventory.hotbar[index] else {
                 continue;
             };
-            let Quantity::Finite(amount) = slot.quantity else {
-                continue;
-            };
-            if amount == 0 {
+            if slot.quantity.0 == 0 {
                 inventory.hotbar[index] = None;
             }
         }
@@ -56,9 +53,14 @@ fn pick_up_dropped_items(
         if item.age.seconds < SECONDS_BEFORE_ELIGIBLE_FOR_PICKUP {
             continue;
         }
-        let item_pos = item.transform.compute_transform().translation;
+        let item_pos = item
+            .transform
+            .compute_transform()
+            .translation;
         for (mut inventory, range, global_transform) in q_inventory.iter_mut() {
-            let pos = global_transform.compute_transform().translation;
+            let pos = global_transform
+                .compute_transform()
+                .translation;
             let distance = (item_pos - pos).length();
             if distance > range.meters {
                 continue;
@@ -70,9 +72,13 @@ fn pick_up_dropped_items(
 
             match pickup_spec.location {
                 InventoryLocation::Hotbar(index) => {
-                    let slot = inventory.hotbar.get_mut(index).expect("Valid slot index");
-                    let existing_amount =
-                        (*slot).map(|s| s.quantity).unwrap_or(Quantity::Finite(0));
+                    let slot = inventory
+                        .hotbar
+                        .get_mut(index)
+                        .expect("Valid slot index");
+                    let existing_amount = (*slot)
+                        .map(|s| s.quantity)
+                        .unwrap_or_default();
                     let new_amount = existing_amount + pickup_spec.quantity;
                     *slot = Some(InventoryItem {
                         item: *item.item,
@@ -82,11 +88,12 @@ fn pick_up_dropped_items(
             }
 
             let new_quantity = *item.quantity - pickup_spec.quantity;
-            match new_quantity {
-                Quantity::Finite(0) => commands.entity(item.entity).despawn_recursive(),
-                _ => {
-                    *item.quantity = new_quantity;
-                }
+            if new_quantity.0 == 0 {
+                commands
+                    .entity(item.entity)
+                    .despawn_recursive()
+            } else {
+                *item.quantity = new_quantity;
             }
         }
     }
@@ -148,7 +155,7 @@ impl Inventory {
         {
             hotbar[i] = Some(InventoryItem {
                 item: Item::Block(block),
-                quantity: Quantity::Finite(10),
+                quantity: Quantity(1),
             });
         }
         return Inventory { hotbar };
@@ -165,21 +172,11 @@ impl Inventory {
             if inventory_item.item != item {
                 continue;
             }
-            let Quantity::Finite(item_quantity) = quantity else {
-                return Some(ItemPickupSpec {
-                    location: InventoryLocation::Hotbar(index),
-                    quantity,
-                });
-            };
-            let cur_quantity = inventory_item.quantity;
-            let room = match cur_quantity {
-                Quantity::Infinity => 0,
-                Quantity::Finite(n) => STACK_LIMIT - n,
-            };
+            let room = STACK_LIMIT - inventory_item.quantity.0;
             if room > 0 {
                 return Some(ItemPickupSpec {
                     location: InventoryLocation::Hotbar(index),
-                    quantity: Quantity::Finite(room.min(item_quantity)),
+                    quantity: Quantity(room.min(quantity.0)),
                 });
             }
         }

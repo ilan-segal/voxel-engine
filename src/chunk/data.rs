@@ -8,8 +8,7 @@ pub struct Blocks(pub Vec<Block>);
 
 impl Default for Blocks {
     fn default() -> Self {
-        let blocks = std::iter::repeat_n(Block::default(), CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
-            .collect::<_>();
+        let blocks = vec![default(); CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE];
         return Self(blocks);
     }
 }

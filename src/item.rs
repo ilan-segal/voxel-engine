@@ -33,33 +33,22 @@ pub enum Item {
 pub const STACK_LIMIT: u8 = 100;
 pub const SECONDS_BEFORE_ELIGIBLE_FOR_PICKUP: f32 = 2.0;
 
-#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Quantity {
-    Finite(u8),
-    Infinity,
-}
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq, Default)]
+pub struct Quantity(pub u8);
 
 impl Into<String> for Quantity {
     fn into(self) -> String {
-        match self {
-            Self::Infinity => "∞".into(),
-            Self::Finite(n) => format!("{}", n),
+        match self.0 {
+            0 | 1 => "".into(),
+            n => format!("{}", n),
         }
     }
 }
 
 impl Quantity {
     pub fn decrease(&mut self, amount: u8) {
-        *self = match *self {
-            Self::Infinity => Self::Infinity,
-            Self::Finite(value) => {
-                if value < amount {
-                    Self::Finite(0)
-                } else {
-                    Self::Finite(value - amount)
-                }
-            }
-        }
+        let value = self.0;
+        self.0 = if value < amount { 0 } else { value - amount };
     }
 }
 
@@ -67,12 +56,12 @@ impl Sub<Self> for Quantity {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
-            (Self::Infinity, Self::Infinity) => Self::Finite(0),
-            (Self::Finite(_), Self::Infinity) => Self::Finite(0),
-            (Self::Infinity, Self::Finite(_)) => Self::Infinity,
-            (Self::Finite(n), Self::Finite(m)) if n >= m => Self::Finite(n - m),
-            (Self::Finite(_), Self::Finite(_)) => Self::Finite(0),
+        let cur = self.0;
+        let other = rhs.0;
+        if cur < other {
+            Self(0)
+        } else {
+            Self(cur - other)
         }
     }
 }
@@ -81,13 +70,7 @@ impl Add<Self> for Quantity {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
-            (Self::Infinity, _) => Self::Infinity,
-            (_, Self::Infinity) => Self::Infinity,
-            (Self::Finite(n), Self::Finite(m)) => {
-                Self::Finite((n as u16 + m as u16).min(u8::MAX as u16) as u8)
-            }
-        }
+        Self((self.0 as u16 + rhs.0 as u16).min(u8::MAX as u16) as u8)
     }
 }
 
