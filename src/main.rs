@@ -95,7 +95,7 @@ fn setup_game(mut commands: Commands, mut windows: Query<&mut Window>) {
         directional_light: DirectionalLight {
             color: Color::WHITE,
             illuminance: CLEAR_SUNRISE,
-            shadows_enabled: true,
+            shadows_enabled: false,
             ..default()
         },
         transform: Transform::default().looking_to(Vec3::NEG_Y, Vec3::Y),

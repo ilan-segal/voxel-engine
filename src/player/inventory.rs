@@ -155,7 +155,7 @@ impl Inventory {
         {
             hotbar[i] = Some(InventoryItem {
                 item: Item::Block(block),
-                quantity: Quantity(1),
+                quantity: Quantity(STACK_LIMIT),
             });
         }
         return Inventory { hotbar };
