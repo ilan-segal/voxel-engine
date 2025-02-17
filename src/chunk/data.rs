@@ -1,4 +1,4 @@
-use super::{spatial::SpatiallyMapped, CHUNK_SIZE};
+use super::{spatial::SpatiallyMapped, CHUNK_LENGTH};
 use crate::block::Block;
 use bevy::prelude::*;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -8,7 +8,7 @@ pub struct Blocks(pub Vec<Block>);
 
 impl Default for Blocks {
     fn default() -> Self {
-        let blocks = vec![default(); CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE];
+        let blocks = vec![default(); CHUNK_LENGTH];
         return Self(blocks);
     }
 }

@@ -5,7 +5,7 @@ use crate::{
         data::{Blocks, Noise3d, Perlin2d},
         position::ChunkPosition,
         spatial::SpatiallyMapped,
-        Chunk, CHUNK_SIZE, CHUNK_SIZE_I32,
+        Chunk, CHUNK_LENGTH, CHUNK_SIZE, CHUNK_SIZE_I32,
     },
     player::Player,
     render_layer::WORLD_LAYER,
@@ -34,7 +34,7 @@ pub mod block_update;
 pub mod chunk_neighborhood;
 pub mod index;
 pub mod neighborhood;
-mod seed;
+pub mod seed;
 pub mod stage;
 mod world_noise;
 
@@ -241,7 +241,7 @@ fn generate_chunk_noise(noise: WorldGenNoise, chunk_pos: IVec3) -> (Perlin2d, No
             ]) as f32;
         })
         .collect::<_>();
-    let noise_3d = (0..CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
+    let noise_3d = (0..CHUNK_LENGTH)
         .into_par_iter()
         .map(|idx| {
             let x = idx % (CHUNK_SIZE * CHUNK_SIZE);
