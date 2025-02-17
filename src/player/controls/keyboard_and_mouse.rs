@@ -19,7 +19,7 @@ use crate::{
     player::{
         block_target::{TargetedBlock, TargetedSpace},
         inventory::{HotbarSelection, Inventory},
-        mode::PlayerMode,
+        mode::{player_in_mode, PlayerMode},
         Jumping, Player, Sneaking,
     },
     state::GameState,
@@ -38,7 +38,10 @@ impl Plugin for KeyboardMousePlugin {
                 age_presses,
                 rotate_camera_with_mouse,
                 process_keyboard_inputs,
-                delete_targeted_block.run_if(input_just_pressed(MouseButton::Left)),
+                delete_targeted_block.run_if(
+                    input_just_pressed(MouseButton::Left)
+                        .and_then(player_in_mode(PlayerMode::NoClip)),
+                ),
                 place_block.run_if(input_just_pressed(MouseButton::Right)),
                 drop_item.run_if(input_just_pressed(KeyCode::KeyQ)),
                 change_hotbar_selection_from_keys,
@@ -136,19 +139,21 @@ fn delete_targeted_block(
 
 fn place_block(
     targeted_space: Res<TargetedSpace>,
-    mut q_inventory: Query<(&HotbarSelection, &mut Inventory)>,
+    mut q_inventory: Query<(&HotbarSelection, &mut Inventory, &PlayerMode)>,
     mut set_block_events: EventWriter<SetBlockEvent>,
 ) {
     let Some(space_pos) = targeted_space.0 else {
         return;
     };
-    for (selection, mut inventory) in q_inventory.iter_mut() {
+    for (selection, mut inventory, mode) in q_inventory.iter_mut() {
         let index = selection.index as usize;
         let Some(Some(ref mut item)) = inventory.hotbar.get_mut(index) else {
             continue;
         };
         let Item::Block(block) = item.item;
-        item.quantity.decrease(1);
+        if mode == &PlayerMode::Survival {
+            item.quantity.decrease(1);
+        }
         set_block_events.send(SetBlockEvent {
             block,
             world_pos: space_pos.to_array(),
