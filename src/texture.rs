@@ -21,10 +21,7 @@ impl Plugin for TexturePlugin {
 pub type TerrainMaterial = ExtendedMaterial<StandardMaterial, TerrainMaterialExtension>;
 
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone, Default)]
-pub struct TerrainMaterialExtension {
-    #[uniform(100)]
-    quantize_steps: u32,
-}
+pub struct TerrainMaterialExtension {}
 
 const TERRAIN_MATERIAL_SHADER_PATH: &str = "shaders/terrain.wgsl";
 
