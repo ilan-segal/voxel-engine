@@ -1,7 +1,21 @@
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
-#[derive(Default, Clone, Copy, PartialEq, Eq, Debug, Hash, PartialOrd, Ord, EnumIter)]
+#[derive(
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Debug,
+    Hash,
+    PartialOrd,
+    Ord,
+    EnumIter,
+    Serialize,
+    Deserialize,
+)]
 pub enum Block {
     #[default]
     Air,

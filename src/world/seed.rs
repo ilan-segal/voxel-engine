@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 pub struct SeedPlugin;
 
@@ -11,7 +12,7 @@ impl Plugin for SeedPlugin {
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LoadSeed;
 
-#[derive(Resource)]
+#[derive(Resource, Serialize, Deserialize)]
 pub struct WorldSeed(pub u32);
 
 fn setup(mut commands: Commands) {

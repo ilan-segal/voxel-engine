@@ -8,7 +8,7 @@ pub struct Blocks(pub Vec<Block>);
 
 impl Default for Blocks {
     fn default() -> Self {
-        let blocks = vec![default(); CHUNK_LENGTH];
+        let blocks = vec![Block::Air; CHUNK_LENGTH];
         return Self(blocks);
     }
 }
