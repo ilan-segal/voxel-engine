@@ -27,8 +27,8 @@ use stage::Stage;
 use std::collections::HashSet;
 use world_noise::WorldGenNoise;
 
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 3;
-const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 3;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 2;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 2;
 
 pub mod block_update;
 pub mod chunk_neighborhood;
@@ -103,7 +103,10 @@ fn kill_tasks_for_unloaded_chunks(
     index: Res<ChunkIndex>,
     mut tasks: ResMut<ChunkLoadTasks>,
 ) {
-    if let Some(pos) = index.pos_by_entity.get(&trigger.entity()) {
+    if let Some(pos) = index
+        .pos_by_entity
+        .get(&trigger.entity())
+    {
         tasks.0.remove(&ChunkPosition(*pos));
     }
 }
@@ -135,7 +138,9 @@ fn update_chunks(
     for (entity, chunk_pos) in q_chunk_position.iter() {
         if !should_be_loaded_positions.remove(&chunk_pos.0) {
             // The chunk should be unloaded since it's not in our set
-            commands.entity(entity).insert(ToDespawn);
+            commands
+                .entity(entity)
+                .insert(ToDespawn);
         }
     }
     // Finally, load the new chunks
@@ -319,7 +324,9 @@ fn begin_structure_load_tasks(
         }
         let neighborhood = index.get_neighborhood(&pos.0);
         if neighborhood.get_lowest_stage() < Stage::Terrain
-            || neighborhood.iter_chunks().any(|c| c.is_none())
+            || neighborhood
+                .iter_chunks()
+                .any(|c| c.is_none())
         {
             continue;
         }
@@ -336,7 +343,11 @@ fn begin_structure_load_tasks(
 }
 
 fn generate_structures(neighborhood: ChunkNeighborhood) -> Blocks {
-    let mut blocks = neighborhood.middle().expect("Middle chunk").blocks.clone();
+    let mut blocks = neighborhood
+        .middle()
+        .expect("Middle chunk")
+        .blocks
+        .clone();
     let structure_types = vec![StructureType::Tree];
     let structure_blocks = structure_types
         .iter()

@@ -17,11 +17,24 @@
 #endif
 
 struct TerrainMaterialExtension {
-    // quantize_steps: u32,
+    quantize_steps: u32,
 }
 
-// @group(2) @binding(100)
-// var<uniform> my_extended_material: TerrainMaterialExtension;
+@group(2) @binding(100)
+var<uniform> my_extended_material: TerrainMaterialExtension;
+
+struct Vertex {
+    /*
+    Bits:
+    0-5: X position (6 bits: 0 to 32, steps of 1)
+    6-11: Y position (6 bits: 0 to 32, steps of 1)
+    12-17: Z position (6 bits: 0 to 32, steps of 1)
+    18-20: Normal index (3 bits: 0 to 5, indexing 6 possible normals in voxel terrain)
+    21-22: Ambient occlusion factor (2 bits: 0 to 3, indexing 4 possible darkness values from ambient occlusion)
+    23-31: ??? (Texture/material index??? With 9 bits to play with that allows for 2^9=512 possible textures)
+    */
+    @location(0) data: u32,
+}
 
 // struct Vertex {
 //     @builtin(instance_index) instance_index: u32,
@@ -38,8 +51,8 @@ struct TerrainMaterialExtension {
 //     let mesh_world_from_local = mesh_functions::get_world_from_local(vertex.instance_index);
 
 //     out.instance_index = vertex.instance_index;
-//     out.world_position = mesh_functions::mesh_position_local_to_world(world_from_local, vec4<f32>(vertex.position, 1.0));
-//     out.position = position_world_to_clip(out.world_position.xyz);
+//     out.world_position = mesh_functions::mesh_position_local_to_world(mesh_world_from_local, vec4<f32>(vertex.position, 1.0));
+//     out.position = mesh_functions::position_world_to_clip(out.world_position.xyz);
 //     out.world_normal = mesh_functions::mesh_normal_local_to_world(
 //         vertex.normal,
 //         vertex.instance_index
