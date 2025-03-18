@@ -150,11 +150,15 @@ fn to_local_coordinates(x: i32, y: i32, z: i32) -> (usize, i32, usize, i32, usiz
 }
 
 fn add_neighborhood<T: Component + Send + Sync + 'static>(
-    q: Query<(Entity, &ComponentCopy<T>, &ChunkPosition), Without<Neighborhood<T>>>,
+    q_no_neighborhood: Query<(Entity, &ChunkPosition), Without<Neighborhood<T>>>,
+    q_component: Query<&ComponentCopy<T>>,
     mut commands: Commands,
     index: Res<ChunkIndex>,
 ) {
-    for (entity, component, pos) in q.iter() {
+    for (entity, pos) in q_no_neighborhood.iter() {
+        let Ok(component) = q_component.get(entity) else {
+            continue;
+        };
         let mut neighborhood = Neighborhood::<T>::default();
         *neighborhood.get_chunk_mut(0, 0, 0) = Some(component.0.clone());
         for (x, y, z) in VolumetricRange::new(-1..2, -1..2, -1..2) {
@@ -166,7 +170,7 @@ fn add_neighborhood<T: Component + Send + Sync + 'static>(
             let Some(neighbor_id) = index.entity_by_pos.get(&neighbor_pos) else {
                 continue;
             };
-            let Ok((_, neighbor_component, _)) = q.get(*neighbor_id) else {
+            let Ok(neighbor_component) = q_component.get(*neighbor_id) else {
                 continue;
             };
             *neighborhood.get_chunk_mut(x, y, z) = Some(neighbor_component.0.clone());
