@@ -10,7 +10,6 @@ use crate::{
     player::Player,
     render_layer::WORLD_LAYER,
     state::GameState,
-    structure::StructureType,
 };
 use bevy::{
     prelude::*,
@@ -19,7 +18,6 @@ use bevy::{
     utils::HashMap,
 };
 use index::ChunkIndex;
-use neighborhood::Neighborhood;
 use noise::NoiseFn;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use seed::{LoadSeed, WorldSeed};
@@ -346,42 +344,42 @@ fn generate_terrain_for_chunk(noise: Perlin2d, pos: ChunkPosition) -> Blocks {
 //     }
 // }
 
-fn generate_structures(blocks: &Neighborhood<Blocks>, noise: &Neighborhood<Noise3d>) -> Blocks {
-    let mut middle_blocks_chunk = blocks
-        .middle_chunk()
-        .clone()
-        .expect("Middle chunk")
-        .as_ref()
-        .clone();
-    let structure_types = vec![StructureType::Tree];
-    let structure_blocks = structure_types
-        .iter()
-        .flat_map(|s| s.get_structures(blocks, noise))
-        .flat_map(|(structure, [x0, y0, z0])| {
-            structure
-                .get_blocks()
-                .iter()
-                .map(move |(block, [x1, y1, z1])| (*block, [x0 + x1, y0 + y1, z0 + z1]))
-                .collect::<Vec<_>>()
-        })
-        .filter(|(_, [x, y, z])| {
-            let x = *x;
-            let y = *y;
-            let z = *z;
-            0 <= x
-                && x < CHUNK_SIZE as i32
-                && 0 <= y
-                && y < CHUNK_SIZE as i32
-                && 0 <= z
-                && z < CHUNK_SIZE as i32
-        })
-        .collect::<Vec<_>>();
-    // TODO: Vary available structure types by looking at local data
-    for (block, [x, y, z]) in structure_blocks.iter().copied() {
-        let x = x as usize;
-        let y = y as usize;
-        let z = z as usize;
-        *middle_blocks_chunk.at_pos_mut([x, y, z]) = block;
-    }
-    return middle_blocks_chunk;
-}
+// fn generate_structures(blocks: &Neighborhood<Blocks>, noise: &Neighborhood<Noise3d>) -> Blocks {
+//     let mut middle_blocks_chunk = blocks
+//         .middle_chunk()
+//         .clone()
+//         .expect("Middle chunk")
+//         .as_ref()
+//         .clone();
+//     let structure_types = vec![StructureType::Tree];
+//     let structure_blocks = structure_types
+//         .iter()
+//         .flat_map(|s| s.get_structures(blocks, noise))
+//         .flat_map(|(structure, [x0, y0, z0])| {
+//             structure
+//                 .get_blocks()
+//                 .iter()
+//                 .map(move |(block, [x1, y1, z1])| (*block, [x0 + x1, y0 + y1, z0 + z1]))
+//                 .collect::<Vec<_>>()
+//         })
+//         .filter(|(_, [x, y, z])| {
+//             let x = *x;
+//             let y = *y;
+//             let z = *z;
+//             0 <= x
+//                 && x < CHUNK_SIZE as i32
+//                 && 0 <= y
+//                 && y < CHUNK_SIZE as i32
+//                 && 0 <= z
+//                 && z < CHUNK_SIZE as i32
+//         })
+//         .collect::<Vec<_>>();
+//     // TODO: Vary available structure types by looking at local data
+//     for (block, [x, y, z]) in structure_blocks.iter().copied() {
+//         let x = x as usize;
+//         let y = y as usize;
+//         let z = z as usize;
+//         *middle_blocks_chunk.at_pos_mut([x, y, z]) = block;
+//     }
+//     return middle_blocks_chunk;
+// }
