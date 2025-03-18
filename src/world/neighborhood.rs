@@ -167,18 +167,17 @@ fn add_neighborhood<T: Component + Send + Sync + 'static>(
                 continue;
             }
             let neighbor_pos = pos.0 + offset;
-            let Some(neighbor_component) = index
+            if let Some(neighbor_component) = index
                 .entity_by_pos
                 .get(&neighbor_pos)
                 .and_then(|id| q_component.get(*id).ok())
-            else {
-                continue;
+            {
+                *neighborhood.get_chunk_mut(x, y, z) = Some(neighbor_component.0.clone());
             };
-            *neighborhood.get_chunk_mut(x, y, z) = Some(neighbor_component.0.clone());
         }
-        if let Some(mut c) = commands.get_entity(entity) {
-            c.insert(neighborhood);
-        }
+        commands
+            .entity(entity)
+            .try_insert(neighborhood);
     }
 }
 
