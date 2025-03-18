@@ -3,9 +3,10 @@ use bevy_polyline::prelude::*;
 use itertools::Itertools;
 
 use crate::{
+    chunk::data::Blocks,
     cube_frame::{CubeFrameMeshHandle, CubeFrameSetup},
     render_layer::WORLD_LAYER,
-    world::index::ChunkIndex,
+    world::neighborhood::ComponentIndex,
 };
 
 use super::Player;
@@ -63,7 +64,7 @@ struct TargetedBlockOutline;
 fn update_targeted_block(
     q_camera: Query<&GlobalTransform, (With<Camera3d>, With<Player>)>,
     mut targeted_block_change: EventWriter<TargetBlockChange>,
-    index: Res<ChunkIndex>,
+    index: Res<ComponentIndex<Blocks>>,
 ) {
     let Some(transform) = q_camera
         .get_single()
@@ -90,7 +91,10 @@ fn update_targeted_block(
     {
         let pos = camera_pos + camera_direction * t2.next_down();
         // info!("{:?}", pos);
-        let block = index.at(pos.x, pos.y, pos.z);
+        let block = index
+            .at_pos(pos.floor().as_ivec3())
+            .cloned()
+            .unwrap_or_default();
         if block.is_solid() {
             let block_pos = pos.floor().as_ivec3();
             let space_pos = (camera_pos + camera_direction * t1.next_down())

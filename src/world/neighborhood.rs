@@ -2,11 +2,12 @@ use super::index::ChunkIndex;
 use crate::{
     block::{Block, BlockSide},
     chunk::{
-        data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, CHUNK_SIZE,
+        data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, Chunk,
+        CHUNK_SIZE, CHUNK_SIZE_I32,
     },
     utils::VolumetricRange,
 };
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::HashMap};
 use std::{marker::PhantomData, sync::Arc};
 
 pub struct NeighborhoodPlugin<T>(PhantomData<T>);
@@ -19,16 +20,20 @@ impl<T> NeighborhoodPlugin<T> {
 
 impl<T: Component + Clone> Plugin for NeighborhoodPlugin<T> {
     fn build(&self, app: &mut App) {
-        app.add_systems(PreUpdate, update_neighborhood::<T>)
+        app.init_resource::<ComponentIndex<T>>()
+            .add_systems(PreUpdate, update_neighborhood::<T>)
             .add_systems(
                 PostUpdate,
                 (
                     (add_copy::<T>, update_copy_to_match_component::<T>),
+                    update_index::<T>,
                     add_neighborhood::<T>,
                 )
                     .chain()
                     .in_set(NeighborhoodSet),
-            );
+            )
+            .observe(add_to_index::<T>)
+            .observe(remove_from_index::<T>);
     }
 }
 
@@ -88,6 +93,14 @@ impl<T> Neighborhood<T> {
 
     fn get_chunk_index(x: i32, y: i32, z: i32) -> usize {
         (9 * (x + 1) + 3 * (y + 1) + (z + 1)) as usize
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.0.iter().all(|c| c.is_some())
+    }
+
+    pub fn is_incomplete(&self) -> bool {
+        !self.is_complete()
     }
 }
 
@@ -198,4 +211,81 @@ fn update_neighborhood<T: Component + Send + Sync + 'static>(
             *cur_neighborhood.get_chunk_mut(x, y, z) = Some(component.0.clone());
         }
     }
+}
+
+#[derive(Resource)]
+pub struct ComponentIndex<T> {
+    component_by_position: HashMap<[i32; 3], Arc<T>>,
+}
+
+impl<T> Default for ComponentIndex<T> {
+    fn default() -> Self {
+        Self {
+            component_by_position: default(),
+        }
+    }
+}
+
+impl<T: SpatiallyMapped<3>> ComponentIndex<T> {
+    pub fn at_pos(&self, pos: impl Into<[i32; 3]>) -> Option<&T::Item> {
+        let [x, y, z] = pos.into();
+
+        let chunk_x = x.div_floor(CHUNK_SIZE_I32);
+        let chunk_y = y.div_floor(CHUNK_SIZE_I32);
+        let chunk_z = z.div_floor(CHUNK_SIZE_I32);
+
+        let local_y = (y - chunk_y * CHUNK_SIZE_I32) as usize;
+        let local_x = (x - chunk_x * CHUNK_SIZE_I32) as usize;
+        let local_z = (z - chunk_z * CHUNK_SIZE_I32) as usize;
+
+        let chunk_pos = [chunk_x, chunk_y, chunk_z];
+        return self
+            .component_by_position
+            .get(&chunk_pos)
+            .map(|chunk| {
+                chunk
+                    .at_pos([local_x, local_y, local_z])
+                    .clone()
+            });
+    }
+}
+
+fn update_index<T: Component + Send + Sync + 'static>(
+    q_component: Query<(&ChunkPosition, &ComponentCopy<T>), Changed<ComponentCopy<T>>>,
+    mut index: ResMut<ComponentIndex<T>>,
+) {
+    for (pos, copy) in q_component.iter() {
+        let key = pos.0.into();
+        index
+            .component_by_position
+            .insert(key, copy.0.clone());
+    }
+}
+
+fn add_to_index<T: Component + Send + Sync + 'static>(
+    trigger: Trigger<OnAdd, Chunk>,
+    q: Query<(&ChunkPosition, &ComponentCopy<T>)>,
+    mut index: ResMut<ComponentIndex<T>>,
+) {
+    let entity = trigger.entity();
+    let Ok((pos, component)) = q.get(entity) else {
+        return;
+    };
+    index
+        .component_by_position
+        .insert(pos.0.into(), component.0.clone());
+}
+
+fn remove_from_index<T: Component + Send + Sync + 'static>(
+    trigger: Trigger<OnRemove, Chunk>,
+    q: Query<&ChunkPosition, With<ComponentCopy<T>>>,
+    mut index: ResMut<ComponentIndex<T>>,
+) {
+    let entity = trigger.entity();
+    let Ok(pos) = q.get(entity) else {
+        return;
+    };
+    index
+        .component_by_position
+        .remove(&pos.0.to_array());
 }

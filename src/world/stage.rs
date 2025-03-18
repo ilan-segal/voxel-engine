@@ -5,11 +5,11 @@ pub enum Stage {
     #[default]
     Noise,
     Terrain,
-    Structures,
+    // Structures,
 }
 
 impl Stage {
     pub fn final_stage() -> Self {
-        Self::Structures
+        Self::Terrain
     }
 }

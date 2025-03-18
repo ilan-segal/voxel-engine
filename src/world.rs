@@ -18,8 +18,8 @@ use bevy::{
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
     utils::HashMap,
 };
-use chunk_neighborhood::ChunkNeighborhood;
 use index::ChunkIndex;
+use neighborhood::Neighborhood;
 use noise::NoiseFn;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use seed::{LoadSeed, WorldSeed};
@@ -31,7 +31,6 @@ const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 5;
 const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 5;
 
 pub mod block_update;
-pub mod chunk_neighborhood;
 pub mod index;
 pub mod neighborhood;
 pub mod seed;
@@ -49,6 +48,7 @@ impl Plugin for WorldPlugin {
             neighborhood::NeighborhoodPlugin::<Blocks>::new(),
             neighborhood::NeighborhoodPlugin::<Stage>::new(),
             neighborhood::NeighborhoodPlugin::<Noise3d>::new(),
+            neighborhood::NeighborhoodPlugin::<Perlin2d>::new(),
         ))
         .init_resource::<ChunkLoadTasks>()
         .add_systems(Startup, init_noise.after(LoadSeed))
@@ -57,7 +57,7 @@ impl Plugin for WorldPlugin {
             (
                 (update_chunks, despawn_chunks, begin_noise_load_tasks).chain(),
                 begin_terrain_load_tasks,
-                begin_structure_load_tasks,
+                // begin_structure_load_tasks,
                 receive_chunk_load_tasks,
             )
                 .in_set(WorldSet)
@@ -317,45 +317,46 @@ fn generate_terrain_for_chunk(noise: Perlin2d, pos: ChunkPosition) -> Blocks {
     return blocks;
 }
 
-fn begin_structure_load_tasks(
-    mut tasks: ResMut<ChunkLoadTasks>,
-    index: Res<ChunkIndex>,
-    q_chunk: Query<(Entity, &ChunkPosition, &Stage), With<Chunk>>,
-) {
-    for (entity, pos, stage) in q_chunk.iter() {
-        if tasks.0.contains_key(pos) || stage != &Stage::Terrain {
-            continue;
-        }
-        let neighborhood = index.get_neighborhood(&pos.0);
-        if neighborhood.get_lowest_stage() < Stage::Terrain
-            || neighborhood
-                .iter_chunks()
-                .any(|c| c.is_none())
-        {
-            continue;
-        }
-        let task_pool = AsyncComputeTaskPool::get();
-        let task = task_pool.spawn(async move {
-            let blocks = generate_structures(neighborhood);
-            ChunkLoadTaskData {
-                entity,
-                added_data: AddedChunkData::Blocks(blocks, Stage::Structures),
-            }
-        });
-        tasks.0.insert(*pos, task);
-    }
-}
+// fn begin_structure_load_tasks(
+//     mut tasks: ResMut<ChunkLoadTasks>,
+//     index: Res<ChunkIndex>,
+//     q_chunk: Query<(Entity, &ChunkPosition, &Stage), With<Chunk>>,
+// ) {
+//     for (entity, pos, stage) in q_chunk.iter() {
+//         if tasks.0.contains_key(pos) || stage != &Stage::Terrain {
+//             continue;
+//         }
+//         let neighborhood = index.get_neighborhood(&pos.0);
+//         if neighborhood.get_lowest_stage() < Stage::Terrain
+//             || neighborhood
+//                 .iter_chunks()
+//                 .any(|c| c.is_none())
+//         {
+//             continue;
+//         }
+//         let task_pool = AsyncComputeTaskPool::get();
+//         let task = task_pool.spawn(async move {
+//             let blocks = generate_structures(neighborhood);
+//             ChunkLoadTaskData {
+//                 entity,
+//                 added_data: AddedChunkData::Blocks(blocks, Stage::Structures),
+//             }
+//         });
+//         tasks.0.insert(*pos, task);
+//     }
+// }
 
-fn generate_structures(neighborhood: ChunkNeighborhood) -> Blocks {
-    let mut blocks = neighborhood
-        .middle()
+fn generate_structures(blocks: &Neighborhood<Blocks>, noise: &Neighborhood<Noise3d>) -> Blocks {
+    let mut middle_blocks_chunk = blocks
+        .middle_chunk()
+        .clone()
         .expect("Middle chunk")
-        .blocks
+        .as_ref()
         .clone();
     let structure_types = vec![StructureType::Tree];
     let structure_blocks = structure_types
         .iter()
-        .flat_map(|s| s.get_structures(&neighborhood))
+        .flat_map(|s| s.get_structures(blocks, noise))
         .flat_map(|(structure, [x0, y0, z0])| {
             structure
                 .get_blocks()
@@ -380,7 +381,7 @@ fn generate_structures(neighborhood: ChunkNeighborhood) -> Blocks {
         let x = x as usize;
         let y = y as usize;
         let z = z as usize;
-        *blocks.at_pos_mut([x, y, z]) = block;
+        *middle_blocks_chunk.at_pos_mut([x, y, z]) = block;
     }
-    return blocks;
+    return middle_blocks_chunk;
 }

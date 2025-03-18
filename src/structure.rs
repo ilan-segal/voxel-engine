@@ -1,6 +1,11 @@
 use crate::{
-    block::Block, chunk::CHUNK_SIZE_I32, utils::VolumetricRange,
-    world::chunk_neighborhood::ChunkNeighborhood,
+    block::Block,
+    chunk::{
+        data::{Blocks, Noise3d},
+        CHUNK_SIZE_I32,
+    },
+    utils::VolumetricRange,
+    world::neighborhood::Neighborhood,
 };
 
 pub enum Structure {
@@ -46,27 +51,21 @@ pub enum StructureType {
 }
 
 impl StructureType {
-    pub fn get_structures(&self, neighborhood: &ChunkNeighborhood) -> Vec<(Structure, [i32; 3])> {
+    pub fn get_structures(
+        &self,
+        blocks: &Neighborhood<Blocks>,
+        noise: &Neighborhood<Noise3d>,
+    ) -> Vec<(Structure, [i32; 3])> {
         match self {
             StructureType::Tree => {
                 const TREE_PROBABILITY: f32 = 0.01;
                 let min = -CHUNK_SIZE_I32; // Inclusive
                 let max = 2 * CHUNK_SIZE_I32; // Exclusive
                 VolumetricRange::new(min..max, min..max - 1, min..max)
-                    .filter(|(x, y, z)| {
-                        neighborhood
-                            .block_at(*x, *y, *z)
-                            .unwrap()
-                            == &Block::Grass
-                    })
-                    .filter(|(x, y, z)| {
-                        neighborhood
-                            .noise_at(*x, *y, *z)
-                            .unwrap()
-                            <= &TREE_PROBABILITY
-                    })
+                    .filter(|(x, y, z)| blocks.at(*x, *y, *z).unwrap() == &Block::Grass)
+                    .filter(|(x, y, z)| noise.at(*x, *y, *z).unwrap() <= &TREE_PROBABILITY)
                     .map(|(x, y, z)| {
-                        let local_noise = neighborhood.noise_at(x, y, z).unwrap();
+                        let local_noise = noise.at(x, y, z).unwrap();
                         let trunk_height = if local_noise < &0.5 { 4 } else { 5 };
                         (
                             Structure::Tree {

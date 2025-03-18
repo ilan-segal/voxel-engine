@@ -7,7 +7,11 @@ use friction::Friction;
 use gravity::Gravity;
 use velocity::Velocity;
 
-use crate::{chunk::position::ChunkPosition, utils::VolumetricRange, world::index::ChunkIndex};
+use crate::{
+    chunk::{data::Blocks, position::ChunkPosition},
+    utils::VolumetricRange,
+    world::neighborhood::ComponentIndex,
+};
 
 pub mod aabb;
 pub mod collision;
@@ -112,7 +116,7 @@ struct MovingObjectQuery {
 
 fn apply_velocity_with_terrain_collision(
     mut q_object: Query<MovingObjectQuery, With<Collidable>>,
-    chunk_index: Res<ChunkIndex>,
+    chunk_index: Res<ComponentIndex<Blocks>>,
     time: Res<Time>,
     mut collisions: EventWriter<Collision>,
 ) {
@@ -169,7 +173,7 @@ fn collide_with_terrain(
     pos: &mut Vec3,
     aabb: &Aabb,
     displacement: &Vec3,
-    index: &ChunkIndex,
+    index: &ComponentIndex<Blocks>,
 ) -> bool {
     let mut collision = false;
 
@@ -216,7 +220,7 @@ fn collide_with_terrain(
 }
 
 fn solid_block_is_in_range(
-    index: &ChunkIndex,
+    index: &ComponentIndex<Blocks>,
     x1: f32,
     x2: f32,
     y1: f32,
@@ -230,7 +234,10 @@ fn solid_block_is_in_range(
     let x2 = x2 as i32;
     let y2 = y2 as i32;
     let z2 = z2 as i32;
-    VolumetricRange::new(x1..x2 + 1, y1..y2 + 1, z1..z2 + 1)
-        .map(|(x, y, z)| (x as f32, y as f32, z as f32))
-        .any(|(x, y, z)| index.at(x, y, z).is_solid())
+    VolumetricRange::new(x1..x2 + 1, y1..y2 + 1, z1..z2 + 1).any(|(x, y, z)| {
+        match index.at_pos([x, y, z]) {
+            None => false,
+            Some(block) => block.is_solid(),
+        }
+    })
 }
