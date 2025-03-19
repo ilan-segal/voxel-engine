@@ -23,6 +23,10 @@ impl SpatiallyMapped<3> for Blocks {
     fn at_pos_mut(&mut self, pos: [usize; 3]) -> &mut Block {
         self.0.at_pos_mut(pos)
     }
+
+    fn from_fn<F: Sync + Fn([usize; 3]) -> Self::Item>(f: F) -> Self {
+        Self(SpatiallyMapped::from_fn(f))
+    }
 }
 
 impl Blocks {
@@ -46,6 +50,10 @@ impl SpatiallyMapped<2> for Perlin2d {
     fn at_pos_mut(&mut self, pos: [usize; 2]) -> &mut f32 {
         self.0.at_pos_mut(pos)
     }
+
+    fn from_fn<F: Sync + Fn([usize; 2]) -> Self::Item>(f: F) -> Self {
+        Self(SpatiallyMapped::from_fn(f))
+    }
 }
 
 #[derive(Component, Clone)]
@@ -60,5 +68,28 @@ impl SpatiallyMapped<3> for Noise3d {
 
     fn at_pos_mut(&mut self, pos: [usize; 3]) -> &mut f32 {
         self.0.at_pos_mut(pos)
+    }
+
+    fn from_fn<F: Sync + Fn([usize; 3]) -> Self::Item>(f: F) -> Self {
+        Self(SpatiallyMapped::from_fn(f))
+    }
+}
+
+#[derive(Component, Clone)]
+pub struct ContinentNoise(pub Vec<f32>);
+
+impl SpatiallyMapped<2> for ContinentNoise {
+    type Item = f32;
+
+    fn at_pos(&self, pos: [usize; 2]) -> &f32 {
+        self.0.at_pos(pos)
+    }
+
+    fn at_pos_mut(&mut self, pos: [usize; 2]) -> &mut f32 {
+        self.0.at_pos_mut(pos)
+    }
+
+    fn from_fn<F: Sync + Fn([usize; 2]) -> Self::Item>(f: F) -> Self {
+        Self(SpatiallyMapped::from_fn(f))
     }
 }

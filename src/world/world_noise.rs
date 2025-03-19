@@ -3,6 +3,35 @@ use noise::{NoiseFn, Perlin};
 use std::{f64::consts::E, sync::Arc};
 
 #[derive(Resource, Clone)]
+pub struct ContinentNoiseGenerator(pub Arc<StackedNoise>);
+
+impl ContinentNoiseGenerator {
+    pub fn new(seed: u32) -> Self {
+        let noise = StackedNoise(vec![
+            NoiseGenerator {
+                perlin: Perlin::new(seed.rotate_left(1)),
+                scale: 1000.0,
+                amplitude: 1.0,
+                offset: 0.0,
+            },
+            NoiseGenerator {
+                perlin: Perlin::new(seed.rotate_left(2)),
+                scale: 500.0,
+                amplitude: 0.5,
+                offset: 10.0,
+            },
+            NoiseGenerator {
+                perlin: Perlin::new(seed.rotate_left(3)),
+                scale: 250.0,
+                amplitude: 0.25,
+                offset: 20.0,
+            },
+        ]);
+        Self(Arc::new(noise))
+    }
+}
+
+#[derive(Resource, Clone)]
 pub struct WorldGenNoise(Arc<WorldGenNoiseInner>);
 
 struct WorldGenNoiseInner {
@@ -134,15 +163,15 @@ struct NoiseGenerator {
 }
 
 impl NoiseFn<i32, 2> for NoiseGenerator {
-    fn get(&self, point: [i32; 2]) -> f64 {
-        let [x, y] = point;
-        return self.get([x, y, 0]);
+    fn get(&self, [x, y]: [i32; 2]) -> f64 {
+        let sample_x = x as f64 / self.scale + self.offset;
+        let sample_y = y as f64 / self.scale + self.offset;
+        return self.perlin.get([sample_x, sample_y]) * self.amplitude;
     }
 }
 
 impl NoiseFn<i32, 3> for NoiseGenerator {
-    fn get(&self, point: [i32; 3]) -> f64 {
-        let [x, y, z] = point;
+    fn get(&self, [x, y, z]: [i32; 3]) -> f64 {
         let sample_x = x as f64 / self.scale + self.offset;
         let sample_y = y as f64 / self.scale + self.offset;
         let sample_z = z as f64 / self.scale + self.offset;
@@ -169,7 +198,7 @@ fn sigmoid(x: f64) -> f64 {
     (1.0 + E.powf(-x)).recip()
 }
 
-struct StackedNoise(Vec<NoiseGenerator>);
+pub struct StackedNoise(Vec<NoiseGenerator>);
 
 impl NoiseFn<i32, 2> for StackedNoise {
     fn get(&self, point: [i32; 2]) -> f64 {
