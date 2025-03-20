@@ -175,10 +175,7 @@ impl NoiseFn<i32, 3> for NoiseGenerator {
         let sample_x = x as f64 / self.scale + self.offset;
         let sample_y = y as f64 / self.scale + self.offset;
         let sample_z = z as f64 / self.scale + self.offset;
-        return self
-            .perlin
-            .get([sample_x, sample_y, sample_z])
-            * self.amplitude;
+        return self.perlin.get([sample_x, sample_y, sample_z]) * self.amplitude;
     }
 }
 

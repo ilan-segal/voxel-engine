@@ -1,10 +1,15 @@
 use super::{spatial::SpatiallyMapped, CHUNK_LENGTH};
-use crate::block::Block;
+use crate::{block::Block, define_spatial};
 use bevy::prelude::*;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-#[derive(Component, Clone)]
-pub struct Blocks(pub Vec<Block>);
+define_spatial!(Blocks, 3, Block);
+
+impl Blocks {
+    pub fn is_meshable(&self) -> bool {
+        self.0.par_iter().any(|b| b.is_meshable())
+    }
+}
 
 impl Default for Blocks {
     fn default() -> Self {
@@ -13,83 +18,6 @@ impl Default for Blocks {
     }
 }
 
-impl SpatiallyMapped<3> for Blocks {
-    type Item = Block;
-
-    fn at_pos(&self, pos: [usize; 3]) -> &Block {
-        self.0.at_pos(pos)
-    }
-
-    fn at_pos_mut(&mut self, pos: [usize; 3]) -> &mut Block {
-        self.0.at_pos_mut(pos)
-    }
-
-    fn from_fn<F: Sync + Fn([usize; 3]) -> Self::Item>(f: F) -> Self {
-        Self(SpatiallyMapped::from_fn(f))
-    }
-}
-
-impl Blocks {
-    pub fn is_meshable(&self) -> bool {
-        self.0
-            .par_iter()
-            .any(|b| b.is_meshable())
-    }
-}
-
-#[derive(Component, Clone)]
-pub struct Perlin2d(pub Vec<f32>);
-
-impl SpatiallyMapped<2> for Perlin2d {
-    type Item = f32;
-
-    fn at_pos(&self, pos: [usize; 2]) -> &f32 {
-        self.0.at_pos(pos)
-    }
-
-    fn at_pos_mut(&mut self, pos: [usize; 2]) -> &mut f32 {
-        self.0.at_pos_mut(pos)
-    }
-
-    fn from_fn<F: Sync + Fn([usize; 2]) -> Self::Item>(f: F) -> Self {
-        Self(SpatiallyMapped::from_fn(f))
-    }
-}
-
-#[derive(Component, Clone)]
-pub struct Noise3d(pub Vec<f32>);
-
-impl SpatiallyMapped<3> for Noise3d {
-    type Item = f32;
-
-    fn at_pos(&self, pos: [usize; 3]) -> &f32 {
-        self.0.at_pos(pos)
-    }
-
-    fn at_pos_mut(&mut self, pos: [usize; 3]) -> &mut f32 {
-        self.0.at_pos_mut(pos)
-    }
-
-    fn from_fn<F: Sync + Fn([usize; 3]) -> Self::Item>(f: F) -> Self {
-        Self(SpatiallyMapped::from_fn(f))
-    }
-}
-
-#[derive(Component, Clone)]
-pub struct ContinentNoise(pub Vec<f32>);
-
-impl SpatiallyMapped<2> for ContinentNoise {
-    type Item = f32;
-
-    fn at_pos(&self, pos: [usize; 2]) -> &f32 {
-        self.0.at_pos(pos)
-    }
-
-    fn at_pos_mut(&mut self, pos: [usize; 2]) -> &mut f32 {
-        self.0.at_pos_mut(pos)
-    }
-
-    fn from_fn<F: Sync + Fn([usize; 2]) -> Self::Item>(f: F) -> Self {
-        Self(SpatiallyMapped::from_fn(f))
-    }
-}
+define_spatial!(Perlin2d, 2, f32);
+define_spatial!(Noise3d, 3, f32);
+define_spatial!(ContinentNoise, 2, f32);
