@@ -1,5 +1,5 @@
 use super::{spatial::SpatiallyMapped, CHUNK_LENGTH, CHUNK_SIZE_I32};
-use crate::{block::Block, define_spatial, map_from_noise_2d};
+use crate::{block::Block, define_spatial, map_from_noise_2d, map_from_noise_3d};
 use bevy::prelude::*;
 use noise::NoiseFn;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -19,9 +19,8 @@ impl Default for Blocks {
     }
 }
 
-define_spatial!(Perlin2d, 2, f32);
-map_from_noise_2d!(Perlin2d);
 define_spatial!(Noise3d, 3, f32);
+map_from_noise_3d!(Noise3d);
 define_spatial!(ContinentNoise, 2, f32);
 map_from_noise_2d!(ContinentNoise);
 define_spatial!(HeightNoise, 2, f32);

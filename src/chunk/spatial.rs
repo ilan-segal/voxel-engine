@@ -112,7 +112,7 @@ macro_rules! map_from_noise_2d {
 #[macro_export]
 macro_rules! map_from_noise_3d {
     ($name:ident) => {
-        impl<T: NoiseFn<i32, 2> + Sync> From<(T, IVec3)> for $name {
+        impl<T: NoiseFn<i32, 3> + Sync> From<(T, IVec3)> for $name {
             fn from((noise, chunk_pos): (T, IVec3)) -> Self {
                 Self::from_fn(|[x, y, z]| {
                     noise.get([

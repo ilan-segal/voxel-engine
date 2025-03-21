@@ -2,7 +2,7 @@ use crate::{
     block::Block,
     camera_distance::CameraDistance,
     chunk::{
-        data::{Blocks, ContinentNoise, HeightNoise, Noise3d, Perlin2d},
+        data::{Blocks, ContinentNoise, HeightNoise, Noise3d},
         position::ChunkPosition,
         spatial::SpatiallyMapped,
         Chunk, CHUNK_SIZE, CHUNK_SIZE_I32,
@@ -22,7 +22,7 @@ use index::ChunkIndex;
 use seed::{LoadSeed, WorldSeed};
 use stage::Stage;
 use std::collections::HashSet;
-use world_noise::{ContinentNoiseGenerator, HeightNoiseGenerator, WorldGenNoise};
+use world_noise::{ContinentNoiseGenerator, HeightNoiseGenerator};
 
 const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 5;
 const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 5;
@@ -45,7 +45,6 @@ impl Plugin for WorldPlugin {
             neighborhood::NeighborhoodPlugin::<Blocks>::new(),
             neighborhood::NeighborhoodPlugin::<Stage>::new(),
             neighborhood::NeighborhoodPlugin::<Noise3d>::new(),
-            neighborhood::NeighborhoodPlugin::<Perlin2d>::new(),
         ))
         .init_resource::<ChunkLoadTasks>()
         .add_systems(Startup, init_noise.after(LoadSeed))
@@ -65,7 +64,6 @@ impl Plugin for WorldPlugin {
 }
 
 fn init_noise(mut commands: Commands, seed: Res<WorldSeed>) {
-    commands.insert_resource(WorldGenNoise::new(seed.0));
     commands.insert_resource(ContinentNoiseGenerator::new(seed.0));
     commands.insert_resource(HeightNoiseGenerator::new(seed.0));
 }
