@@ -92,3 +92,36 @@ macro_rules! define_spatial {
         }
     };
 }
+
+#[macro_export]
+macro_rules! map_from_noise_2d {
+    ($name:ident) => {
+        impl<T: NoiseFn<i32, 2> + Sync> From<(T, IVec3)> for $name {
+            fn from((noise, chunk_pos): (T, IVec3)) -> Self {
+                Self::from_fn(|[x, y]| {
+                    noise.get([
+                        (x as i32 + chunk_pos.x * CHUNK_SIZE_I32),
+                        (y as i32 + chunk_pos.z * CHUNK_SIZE_I32),
+                    ]) as f32
+                })
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! map_from_noise_3d {
+    ($name:ident) => {
+        impl<T: NoiseFn<i32, 2> + Sync> From<(T, IVec3)> for $name {
+            fn from((noise, chunk_pos): (T, IVec3)) -> Self {
+                Self::from_fn(|[x, y, z]| {
+                    noise.get([
+                        (x as i32 + chunk_pos.x * CHUNK_SIZE_I32),
+                        (y as i32 + chunk_pos.y * CHUNK_SIZE_I32),
+                        (z as i32 + chunk_pos.z * CHUNK_SIZE_I32),
+                    ]) as f32
+                })
+            }
+        }
+    };
+}

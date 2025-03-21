@@ -2,28 +2,27 @@ use crate::{
     block::Block,
     camera_distance::CameraDistance,
     chunk::{
-        data::{Blocks, ContinentNoise, Noise3d, Perlin2d},
+        data::{Blocks, ContinentNoise, HeightNoise, Noise3d, Perlin2d},
         position::ChunkPosition,
         spatial::SpatiallyMapped,
-        Chunk, CHUNK_LENGTH, CHUNK_SIZE, CHUNK_SIZE_I32,
+        Chunk, CHUNK_SIZE, CHUNK_SIZE_I32,
     },
     player::Player,
     render_layer::WORLD_LAYER,
     state::GameState,
 };
 use bevy::{
+    ecs::query::QueryData,
     prelude::*,
     render::view::RenderLayers,
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
     utils::HashMap,
 };
 use index::ChunkIndex;
-use noise::NoiseFn;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use seed::{LoadSeed, WorldSeed};
 use stage::Stage;
 use std::collections::HashSet;
-use world_noise::{ContinentNoiseGenerator, WorldGenNoise};
+use world_noise::{ContinentNoiseGenerator, HeightNoiseGenerator, WorldGenNoise};
 
 const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 5;
 const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 5;
@@ -68,18 +67,11 @@ impl Plugin for WorldPlugin {
 fn init_noise(mut commands: Commands, seed: Res<WorldSeed>) {
     commands.insert_resource(WorldGenNoise::new(seed.0));
     commands.insert_resource(ContinentNoiseGenerator::new(seed.0));
+    commands.insert_resource(HeightNoiseGenerator::new(seed.0));
 }
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WorldSet;
-
-#[derive(Bundle)]
-pub struct ChunkBundle {
-    pub stage: Stage,
-    pub blocks: Blocks,
-    pub perlin_2d: Perlin2d,
-    pub noise_3d: Noise3d,
-}
 
 struct ChunkLoadTaskData {
     entity: Entity,
@@ -87,7 +79,10 @@ struct ChunkLoadTaskData {
 }
 
 enum AddedChunkData {
-    Noise { continent_noise: ContinentNoise },
+    Noise {
+        continent_noise: ContinentNoise,
+        height_noise: HeightNoise,
+    },
     Blocks(Blocks, Stage),
 }
 
@@ -99,10 +94,7 @@ fn kill_tasks_for_unloaded_chunks(
     index: Res<ChunkIndex>,
     mut tasks: ResMut<ChunkLoadTasks>,
 ) {
-    if let Some(pos) = index
-        .pos_by_entity
-        .get(&trigger.entity())
-    {
+    if let Some(pos) = index.pos_by_entity.get(&trigger.entity()) {
         tasks.0.remove(&ChunkPosition(*pos));
     }
 }
@@ -134,9 +126,7 @@ fn update_chunks(
     for (entity, chunk_pos) in q_chunk_position.iter() {
         if !should_be_loaded_positions.remove(&chunk_pos.0) {
             // The chunk should be unloaded since it's not in our set
-            commands
-                .entity(entity)
-                .insert(ToDespawn);
+            commands.entity(entity).insert(ToDespawn);
         }
     }
     // Finally, load the new chunks
@@ -167,11 +157,7 @@ fn despawn_chunks(q_chunk: Query<(Entity, &ToDespawn, &CameraDistance)>, mut com
     q_chunk
         .iter()
         // Descending order (highest distance first)
-        .sort_by::<&CameraDistance>(|a, b| {
-            b.0
-                .partial_cmp(&a.0)
-                .unwrap()
-        })
+        .sort_by::<&CameraDistance>(|a, b| b.0.partial_cmp(&a.0).unwrap())
         .take(CHUNKS_DESPAWNED_PER_FRAME)
         .for_each(|(entity, _, _)| commands.entity(entity).despawn_recursive());
 }
@@ -186,9 +172,10 @@ fn receive_chunk_load_tasks(mut commands: Commands, mut tasks: ResMut<ChunkLoadT
         };
         match data.added_data {
             AddedChunkData::Noise {
-                continent_noise: continent,
+                continent_noise,
+                height_noise,
             } => {
-                entity.try_insert((continent, Stage::Noise));
+                entity.try_insert((continent_noise, height_noise, Stage::Noise));
             }
             AddedChunkData::Blocks(blocks, stage) => {
                 entity.try_insert((blocks, stage));
@@ -202,97 +189,109 @@ fn begin_noise_load_tasks(
     mut tasks: ResMut<ChunkLoadTasks>,
     q_chunk: Query<(Entity, &ChunkPosition), (With<Chunk>, Without<ContinentNoise>)>,
     continent_noise_generator: Res<ContinentNoiseGenerator>,
+    height_noise_generator: Res<HeightNoiseGenerator>,
 ) {
     for (entity, pos) in q_chunk.iter() {
         if tasks.0.contains_key(pos) {
             continue;
         }
         let task_pool = AsyncComputeTaskPool::get();
-        let cloned_noise = continent_noise_generator.clone();
+        let continent_noise_generator = continent_noise_generator.clone();
+        let height_noise_generator = height_noise_generator.clone();
         let pos_ivec = pos.0;
         let task = task_pool.spawn(async move {
-            let continent_noise = generate_chunk_noise(cloned_noise, pos_ivec);
+            let (continent_noise, height_noise) =
+                generate_chunk_noise(pos_ivec, continent_noise_generator, height_noise_generator);
             ChunkLoadTaskData {
                 entity,
-                added_data: AddedChunkData::Noise { continent_noise },
+                added_data: AddedChunkData::Noise {
+                    continent_noise,
+                    height_noise,
+                },
             }
         });
         tasks.0.insert(*pos, task);
     }
 }
 
-fn generate_chunk_noise(noise: ContinentNoiseGenerator, chunk_pos: IVec3) -> ContinentNoise {
-    ContinentNoise::from_fn(|[x, y]| {
-        noise.0.get([
-            (x as i32 + chunk_pos.x * CHUNK_SIZE_I32),
-            (y as i32 + chunk_pos.z * CHUNK_SIZE_I32),
-        ]) as f32
-    })
+fn generate_chunk_noise(
+    chunk_pos: IVec3,
+    continent_noise: ContinentNoiseGenerator,
+    height_noise: HeightNoiseGenerator,
+) -> (ContinentNoise, HeightNoise) {
+    let continent = ContinentNoise::from((continent_noise.0.as_ref(), chunk_pos));
+    let height = HeightNoise::from((height_noise.0.as_ref(), chunk_pos));
+    (continent, height)
+}
+
+#[derive(QueryData)]
+struct TerrainGenerateData {
+    entity: Entity,
+    chunk_pos: &'static ChunkPosition,
+    stage: &'static Stage,
+    continent_noise: &'static ContinentNoise,
+    height_noise: &'static HeightNoise,
 }
 
 fn begin_terrain_load_tasks(
     mut tasks: ResMut<ChunkLoadTasks>,
-    q_chunk: Query<
-        (Entity, &ChunkPosition, &ContinentNoise, &Stage),
-        (With<Chunk>, Without<Blocks>, Changed<Stage>),
-    >,
+    q_chunk: Query<TerrainGenerateData, (With<Chunk>, Without<Blocks>, Changed<Stage>)>,
 ) {
-    for (entity, pos, continent_noise, stage) in q_chunk.iter() {
-        if tasks.0.contains_key(pos) || stage != &Stage::Noise {
+    for item in q_chunk.iter() {
+        if tasks.0.contains_key(item.chunk_pos) || item.stage != &Stage::Noise {
             continue;
         }
         let task_pool = AsyncComputeTaskPool::get();
-        let continent_noise = continent_noise.clone();
-        let cloned_pos = pos.clone();
+        let continent_noise = item.continent_noise.clone();
+        let height_noise = item.height_noise.clone();
+        let cloned_pos = item.chunk_pos.clone();
         let task = task_pool.spawn(async move {
-            let blocks = generate_terrain_for_chunk(continent_noise, cloned_pos);
+            let blocks = generate_terrain_for_chunk(cloned_pos, continent_noise, height_noise);
             ChunkLoadTaskData {
-                entity,
+                entity: item.entity,
                 added_data: AddedChunkData::Blocks(blocks, Stage::Terrain),
             }
         });
-        tasks.0.insert(*pos, task);
+        tasks.0.insert(*item.chunk_pos, task);
     }
 }
 
-fn generate_terrain_for_chunk(continent: ContinentNoise, pos: ChunkPosition) -> Blocks {
-    const SCALE: f32 = 60.0;
+fn generate_terrain_for_chunk(
+    pos: ChunkPosition,
+    continent: ContinentNoise,
+    height: HeightNoise,
+) -> Blocks {
+    const CONTINENT_SCALE: f32 = 60.0;
+    const LAND_HEIGHT_SCALE: f32 = 50.0;
     let chunk_pos = pos.0;
     Blocks::from_fn(|[x, y, z]| {
-        let continent_noise = continent.at_pos([x, z]) * SCALE;
         let y = (chunk_pos.y * CHUNK_SIZE_I32 + y as i32) as f32;
-        if y < continent_noise {
+        let continent_noise = (continent.at_pos([x, z]) - 0.5) * 2.0;
+        if continent_noise < 0.0 {
+            return if y < continent_noise * CONTINENT_SCALE {
+                Block::Stone
+            } else {
+                Block::Air
+            };
+        }
+        let coast_height_factor = stretch_range_onto_unit_interval(continent_noise, 0.0, 0.2);
+        let height_noise = height.at_pos([x, z]);
+        if y < height_noise * coast_height_factor * LAND_HEIGHT_SCALE {
             Block::Stone
         } else {
             Block::Air
         }
     })
-    // let mut blocks = Blocks::default();
-    // for z in 0..CHUNK_SIZE {
-    //     for x in 0..CHUNK_SIZE {
-    //         let height = (continent.at_pos([x, z]) * SCALE) as i32 + 1;
-    //         let Some(chunk_height) = Some(height - (chunk_pos.y * CHUNK_SIZE as i32))
-    //             .filter(|h| h >= &0)
-    //             .map(|h| h as usize)
-    //         else {
-    //             continue;
-    //         };
-    //         if chunk_height >= DIRT_DEPTH - 1 {
-    //             for y in (0..=chunk_height - (DIRT_DEPTH - 1)).filter(|h| h < &CHUNK_SIZE) {
-    //                 *blocks.at_pos_mut([x, y, z]) = Block::Stone;
-    //             }
-    //         }
-    //         if chunk_height >= DIRT_DEPTH {
-    //             for y in (chunk_height - DIRT_DEPTH..chunk_height).filter(|h| h < &CHUNK_SIZE) {
-    //                 *blocks.at_pos_mut([x, y, z]) = Block::Dirt;
-    //             }
-    //         }
-    //         if chunk_height < CHUNK_SIZE {
-    //             *blocks.at_pos_mut([x, chunk_height, z]) = Block::Grass;
-    //         }
-    //     }
-    // }
-    // return blocks;
+}
+
+fn stretch_range_onto_unit_interval(value: f32, a: f32, b: f32) -> f32 {
+    let range_size = b - a;
+    let scaled_value = (value - a) / range_size;
+    return clamp(scaled_value, 0., 1.);
+}
+
+fn clamp(value: f32, a: f32, b: f32) -> f32 {
+    value.max(a).min(b)
 }
 
 // fn begin_structure_load_tasks(

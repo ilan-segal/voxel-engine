@@ -32,6 +32,35 @@ impl ContinentNoiseGenerator {
 }
 
 #[derive(Resource, Clone)]
+pub struct HeightNoiseGenerator(pub Arc<StackedNoise>);
+
+impl HeightNoiseGenerator {
+    pub fn new(seed: u32) -> Self {
+        let noise = StackedNoise(vec![
+            NoiseGenerator {
+                perlin: Perlin::new(seed.rotate_left(4)),
+                scale: 100.0,
+                amplitude: 1.0,
+                offset: 0.0,
+            },
+            NoiseGenerator {
+                perlin: Perlin::new(seed.rotate_left(5)),
+                scale: 50.0,
+                amplitude: 0.5,
+                offset: 10.0,
+            },
+            NoiseGenerator {
+                perlin: Perlin::new(seed.rotate_left(6)),
+                scale: 25.0,
+                amplitude: 0.25,
+                offset: 20.0,
+            },
+        ]);
+        Self(Arc::new(noise))
+    }
+}
+
+#[derive(Resource, Clone)]
 pub struct WorldGenNoise(Arc<WorldGenNoiseInner>);
 
 struct WorldGenNoiseInner {
