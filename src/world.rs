@@ -24,8 +24,8 @@ use stage::Stage;
 use std::collections::HashSet;
 use world_noise::{ContinentNoiseGenerator, HeightNoiseGenerator};
 
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 5;
-const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 5;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 3;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 3;
 
 pub mod block_update;
 pub mod index;

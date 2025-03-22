@@ -49,9 +49,7 @@ fn add_copy<T: Component + Clone>(
 ) {
     for (entity, component) in q.iter() {
         let copy = Arc::new(component.clone());
-        commands
-            .entity(entity)
-            .insert(ComponentCopy(copy));
+        commands.entity(entity).insert(ComponentCopy(copy));
     }
 }
 
@@ -119,9 +117,12 @@ impl Neighborhood<Blocks> {
         row: i32,
         col: i32,
     ) -> bool {
+        let current_block = self
+            .at_layer(side, layer, row, col)
+            .expect("Expect block in this neighborhood");
         match self.at_layer(side, layer + 1, row, col) {
             None | Some(&Block::Air) | Some(&Block::Leaves) => false,
-            _ => true,
+            Some(block) => !(block.is_translucent() && current_block != block),
         }
     }
 
@@ -175,9 +176,7 @@ fn add_neighborhood<T: Component + Send + Sync + 'static>(
                 *neighborhood.get_chunk_mut(x, y, z) = Some(neighbor_component.0.clone());
             };
         }
-        commands
-            .entity(entity)
-            .try_insert(neighborhood);
+        commands.entity(entity).try_insert(neighborhood);
     }
 }
 
@@ -248,9 +247,7 @@ fn update_index<T: Component + Send + Sync + 'static>(
 ) {
     for (pos, copy) in q_component.iter() {
         let key = pos.0.into();
-        index
-            .component_by_position
-            .insert(key, copy.0.clone());
+        index.component_by_position.insert(key, copy.0.clone());
     }
 }
 
@@ -277,7 +274,5 @@ fn remove_from_index<T: Component + Send + Sync + 'static>(
     let Ok(pos) = q.get(entity) else {
         return;
     };
-    index
-        .component_by_position
-        .remove(&pos.0.to_array());
+    index.component_by_position.remove(&pos.0.to_array());
 }

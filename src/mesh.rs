@@ -16,7 +16,7 @@ use crate::{
         data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, Chunk,
         CHUNK_SIZE,
     },
-    texture::BlockMaterials,
+    texture::{BlockMaterials, MaterialHandle},
     world::{
         neighborhood::{ComponentCopy, Neighborhood},
         stage::Stage,
@@ -71,14 +71,9 @@ fn update_mesh_status(
 ) {
     for (e, stage) in q.iter() {
         if stage == &Stage::final_stage() {
-            commands
-                .entity(e)
-                .remove::<Meshed>()
-                .insert(CheckedForMesh);
+            commands.entity(e).remove::<Meshed>().insert(CheckedForMesh);
         } else {
-            commands
-                .entity(e)
-                .insert((CheckedForMesh, Meshed));
+            commands.entity(e).insert((CheckedForMesh, Meshed));
         }
     }
 }
@@ -89,9 +84,7 @@ fn mark_mesh_as_stale(
     mut tasks: ResMut<MeshGenTasks>,
 ) {
     for entity in q_changed_neighborhood.iter() {
-        commands
-            .entity(entity)
-            .remove::<CheckedForMesh>();
+        commands.entity(entity).remove::<CheckedForMesh>();
         tasks.0.remove(&entity);
     }
 }
@@ -189,17 +182,37 @@ fn receive_mesh_gen_tasks(
             .unwrap_or(RenderLayers::layer(WORLD_LAYER));
         entity.with_children(|builder| {
             for (block, side, mesh) in data.mesh {
-                builder.spawn((
-                    MaterialMeshBundle {
-                        mesh: meshes.add(mesh),
-                        material: materials
-                            .get(&block, &side)
-                            .unwrap()
-                            .clone(),
-                        ..default()
-                    },
-                    render_layer.clone(),
-                ));
+                match materials.get(&block, &side) {
+                    MaterialHandle::Terrain(handle) => {
+                        builder.spawn((
+                            MaterialMeshBundle {
+                                mesh: meshes.add(mesh),
+                                material: handle.clone_weak(),
+                                ..default()
+                            },
+                            render_layer.clone(),
+                        ));
+                    }
+                    MaterialHandle::Fluid(handle) => {
+                        builder.spawn((
+                            MaterialMeshBundle {
+                                mesh: meshes.add(mesh),
+                                material: handle.clone_weak(),
+                                ..default()
+                            },
+                            render_layer.clone(),
+                        ));
+                    }
+                    MaterialHandle::None => panic!("No material handle defined for block"),
+                }
+                // builder.spawn((
+                //     MaterialMeshBundle {
+                //         mesh: meshes.add(mesh),
+                //         material: materials.get(&block, &side).unwrap().clone(),
+                //         ..default()
+                //     },
+                //     render_layer.clone(),
+                // ));
             }
         });
         return false;
@@ -243,10 +256,7 @@ fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Vec<(Block, BlockSide, M
 // TODO: Replace slow implementation with binary mesher
 fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let middle = chunk
-        .middle_chunk()
-        .clone()
-        .expect("Already checked");
+    let middle = chunk.middle_chunk().clone().expect("Already checked");
     let mut blocks = middle.as_ref().clone();
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {
@@ -604,10 +614,7 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
         })
         .map(|c| c.to_linear().to_f32_array())
         .collect::<Vec<_>>();
-    let uv = quads
-        .iter()
-        .flat_map(|q| q.uvs)
-        .collect::<Vec<_>>();
+    let uv = quads.iter().flat_map(|q| q.uvs).collect::<Vec<_>>();
     let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD,

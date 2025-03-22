@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
-use std::{f64::consts::E, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Resource, Clone)]
 pub struct ContinentNoiseGenerator(pub Arc<StackedNoise>);
@@ -60,36 +60,36 @@ impl HeightNoiseGenerator {
     }
 }
 
-struct WhiteNoise {
-    seed: u32,
-}
+// struct WhiteNoise {
+//     seed: u32,
+// }
 
-impl WhiteNoise {
-    fn new(seed: u32) -> Self {
-        Self { seed }
-    }
-}
+// impl WhiteNoise {
+//     fn new(seed: u32) -> Self {
+//         Self { seed }
+//     }
+// }
 
-impl NoiseFn<i32, 3> for WhiteNoise {
-    fn get(&self, [x, y, z]: [i32; 3]) -> f64 {
-        let x = fast_hash(x + 1 * self.seed as i32);
-        let y = fast_hash(y ^ self.seed as i32);
-        let z = fast_hash(z + self.seed as i32);
-        let result = (x ^ y ^ z) as u32;
-        const MAXIMUM: u32 = 0xDEADBEEF;
-        return (result % MAXIMUM) as f64 / (MAXIMUM as f64);
-    }
-}
+// impl NoiseFn<i32, 3> for WhiteNoise {
+//     fn get(&self, [x, y, z]: [i32; 3]) -> f64 {
+//         let x = fast_hash(x + 1 * self.seed as i32);
+//         let y = fast_hash(y ^ self.seed as i32);
+//         let z = fast_hash(z + self.seed as i32);
+//         let result = (x ^ y ^ z) as u32;
+//         const MAXIMUM: u32 = 0xDEADBEEF;
+//         return (result % MAXIMUM) as f64 / (MAXIMUM as f64);
+//     }
+// }
 
-fn fast_hash(a: i32) -> u32 {
-    let mut a = a.abs() as u32;
-    a = (a ^ 61) ^ (a >> 16);
-    a = a + (a << 3);
-    a = a ^ (a >> 4);
-    a = a.wrapping_mul(0x27d4eb2d);
-    a = a ^ (a >> 15);
-    return a;
-}
+// fn fast_hash(a: i32) -> u32 {
+//     let mut a = a.abs() as u32;
+//     a = (a ^ 61) ^ (a >> 16);
+//     a = a + (a << 3);
+//     a = a ^ (a >> 4);
+//     a = a.wrapping_mul(0x27d4eb2d);
+//     a = a ^ (a >> 15);
+//     return a;
+// }
 
 struct NoiseGenerator {
     perlin: Perlin,
@@ -111,28 +111,25 @@ impl NoiseFn<i32, 3> for NoiseGenerator {
         let sample_x = x as f64 / self.scale + self.offset;
         let sample_y = y as f64 / self.scale + self.offset;
         let sample_z = z as f64 / self.scale + self.offset;
-        return self
-            .perlin
-            .get([sample_x, sample_y, sample_z])
-            * self.amplitude;
+        return self.perlin.get([sample_x, sample_y, sample_z]) * self.amplitude;
     }
 }
 
 /*
 value in [0, 1]
 amount in [1, ∞)
-*/
-fn sharpen_noise(value: f64, amount: f64) -> f64 {
-    if amount < 1.0 {
-        panic!();
-    }
-    let exaggerated = (value - 0.5) * amount;
-    return sigmoid(exaggerated);
-}
+// */
+// fn sharpen_noise(value: f64, amount: f64) -> f64 {
+//     if amount < 1.0 {
+//         panic!();
+//     }
+//     let exaggerated = (value - 0.5) * amount;
+//     return sigmoid(exaggerated);
+// }
 
-fn sigmoid(x: f64) -> f64 {
-    (1.0 + E.powf(-x)).recip()
-}
+// fn sigmoid(x: f64) -> f64 {
+//     (1.0 + E.powf(-x)).recip()
+// }
 
 pub struct StackedNoise(Vec<NoiseGenerator>);
 

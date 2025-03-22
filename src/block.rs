@@ -25,7 +25,7 @@ impl Block {
         match self {
             Self::Grass => Color::linear_rgb(0.2, 0.6, 0.0),
             Self::Leaves => Color::hsv(124.0, 0.9, 0.39),
-            Self::Water => Color::linear_rgb(0.247, 0.463, 0.894),
+            Self::Water => Color::srgba(0.247, 0.463, 0.894, 0.5),
             _ => Color::WHITE,
         }
     }
@@ -41,6 +41,13 @@ impl Block {
         match self {
             Self::Air => false,
             _ => true,
+        }
+    }
+
+    pub fn is_translucent(&self) -> bool {
+        match self {
+            Self::Water => true,
+            _ => false,
         }
     }
 }

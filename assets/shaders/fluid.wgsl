@@ -6,11 +6,14 @@
 
 #import bevy_pbr::prepass_utils
 
-struct TerrainMaterialExtension {
-    quantize_steps: u32,
+struct FluidMaterialExtension {
+    is_translucent: u32,
+    min_alpha: f32,
+    max_alpha: f32,
+    depth_to_max_alpha: f32,
 }
 
-@group(2) @binding(100) var<uniform> terrain_material: TerrainMaterialExtension;
+@group(2) @binding(100) var<uniform> fluid_material: FluidMaterialExtension;
 
 @fragment
 fn fragment(
