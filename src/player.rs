@@ -9,7 +9,11 @@ use crate::{
     },
     render_layer::WORLD_LAYER,
 };
-use bevy::{core_pipeline::tonemapping::DebandDither, prelude::*, render::view::RenderLayers};
+use bevy::{
+    core_pipeline::{prepass::DepthPrepass, tonemapping::DebandDither},
+    prelude::*,
+    render::view::RenderLayers,
+};
 use block_target::BlockTargetPlugin;
 use controls::target_velocity::TargetVelocity;
 use falling_state::FallingState;
@@ -61,6 +65,8 @@ pub struct Sneaking(pub bool);
 pub struct PlayerBundle {
     player: Player,
     camera: Camera3dBundle,
+    depth_prepass: DepthPrepass,
+    render_layers: RenderLayers,
     fog_settings: FogSettings,
     aabb: Aabb,
     collidable: Collidable,
@@ -77,7 +83,6 @@ pub struct PlayerBundle {
     inventory: Inventory,
     pick_up_range: PickUpRange,
     hotbar_selection: HotbarSelection,
-    render_layers: RenderLayers,
 }
 
 impl Default for PlayerBundle {
@@ -95,6 +100,7 @@ impl Default for PlayerBundle {
                 deband_dither: DebandDither::Enabled,
                 ..default()
             },
+            depth_prepass: DepthPrepass,
             fog_settings: FogSettings {
                 color: Color::WHITE,
                 falloff: FogFalloff::from_visibility_colors(
@@ -154,7 +160,9 @@ fn update_gravity(
             PlayerMode::Survival => commands
                 .entity(entity)
                 .insert((Gravity::default(), Collidable)),
-            PlayerMode::NoClip => commands.entity(entity).remove::<(Gravity, Collidable)>(),
+            PlayerMode::NoClip => commands
+                .entity(entity)
+                .remove::<(Gravity, Collidable)>(),
         };
     }
 }

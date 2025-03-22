@@ -10,6 +10,7 @@ pub enum Block {
     Grass,
     Wood,
     Leaves,
+    Water,
 }
 
 // Required for Block to work as a key in hashmap operations `entry_ref` + `or_insert_with`
@@ -24,6 +25,7 @@ impl Block {
         match self {
             Self::Grass => Color::linear_rgb(0.2, 0.6, 0.0),
             Self::Leaves => Color::hsv(124.0, 0.9, 0.39),
+            Self::Water => Color::linear_rgb(0.247, 0.463, 0.894),
             _ => Color::WHITE,
         }
     }
