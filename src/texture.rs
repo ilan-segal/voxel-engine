@@ -46,6 +46,7 @@ pub struct BlockMaterials {
     wood: Handle<TerrainMaterial>,
     wood_top: Handle<TerrainMaterial>,
     leaves: Handle<TerrainMaterial>,
+    water: Handle<TerrainMaterial>,
 }
 
 impl BlockMaterials {
@@ -57,6 +58,7 @@ impl BlockMaterials {
             (Block::Wood, BlockSide::Down) | (Block::Wood, BlockSide::Up) => Some(&self.wood_top),
             (Block::Wood, _) => Some(&self.wood),
             (Block::Leaves, _) => Some(&self.leaves),
+            (Block::Water, _) => Some(&self.water),
             _ => None,
         }
     }
@@ -77,6 +79,7 @@ fn setup(
         wood: get_material("textures/blocks/oak_log.png", Block::Wood.get_colour()),
         wood_top: get_material("textures/blocks/oak_log_top.png", Block::Wood.get_colour()),
         leaves: get_material("textures/blocks/oak_leaves.png", Block::Leaves.get_colour()),
+        water: get_material("textures/blocks/water.png", Block::Water.get_colour()),
     };
     commands.insert_resource(block_materials);
 }
