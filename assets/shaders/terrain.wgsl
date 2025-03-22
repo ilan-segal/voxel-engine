@@ -29,8 +29,8 @@ fn fragment(
     // note this does not include fullscreen postprocessing effects like bloom.
     out.color = main_pass_post_lighting_processing(pbr_input, out.color);
 
-    let depth = bevy_pbr::prepass_utils::prepass_depth(in.position, sample_index);
-    out.color = vec4(depth, depth, depth, 1.0);
+    // let depth = bevy_pbr::prepass_utils::prepass_depth(in.position, sample_index);
+    // out.color = vec4(depth, depth, depth, 1.0);
 
     return out;
 }

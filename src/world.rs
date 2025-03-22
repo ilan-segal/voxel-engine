@@ -261,13 +261,17 @@ fn generate_terrain_for_chunk(
 ) -> Blocks {
     const CONTINENT_SCALE: f32 = 60.0;
     const LAND_HEIGHT_SCALE: f32 = 50.0;
+    const SEA_LEVEL: i32 = 0;
     let chunk_pos = pos.0;
     Blocks::from_fn(|[x, y, z]| {
-        let y = (chunk_pos.y * CHUNK_SIZE_I32 + y as i32) as f32;
+        let yi = chunk_pos.y * CHUNK_SIZE_I32 + y as i32;
+        let y = yi as f32;
         let continent_noise = (continent.at_pos([x, z]) - 0.5) * 2.0;
         if continent_noise < 0.0 {
             return if y < continent_noise * CONTINENT_SCALE {
                 Block::Stone
+            } else if yi <= SEA_LEVEL {
+                Block::Water
             } else {
                 Block::Air
             };
