@@ -272,7 +272,7 @@ fn generate_terrain_for_chunk(
         let yi = chunk_pos.y * CHUNK_SIZE_I32 + y as i32;
         let y = yi as f32;
         let continent_noise = (continent.at_pos([x, z]) - 0.5) * 2.0;
-        if continent_noise < 0.0 {
+        if continent_noise <= 0.0 {
             return if y < continent_noise * CONTINENT_SCALE {
                 Block::Stone
             } else if yi <= SEA_LEVEL {
