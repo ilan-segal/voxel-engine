@@ -107,9 +107,6 @@ fn add_mesh(
     for (entity, item) in q_item.iter() {
         match item {
             Item::Block(block) => {
-                let Some(handles) = block_meshes.map.get(block) else {
-                    return;
-                };
                 commands
                     .entity(entity)
                     .insert(Meshed)
@@ -122,21 +119,39 @@ fn add_mesh(
                                 Age::default(),
                             ))
                             .with_children(|sub_builder| {
-                                for (mesh, material) in handles.iter() {
-                                    sub_builder.spawn((
-                                        MaterialMeshBundle {
-                                            material: material.clone(),
-                                            mesh: mesh.clone(),
-                                            transform: Transform::from_translation(
-                                                Vec3::new(-1.0, 1.0, -1.0)
-                                                    * DROPPED_ITEM_SCALE
-                                                    * 2.0,
-                                            ),
-                                            ..default()
-                                        },
-                                        RenderLayers::layer(WORLD_LAYER),
-                                    ));
-                                }
+                                if let Some(handles) = block_meshes.terrain.get(block) {
+                                    for (mesh, material) in handles.iter() {
+                                        sub_builder.spawn((
+                                            MaterialMeshBundle {
+                                                material: material.clone(),
+                                                mesh: mesh.clone(),
+                                                transform: Transform::from_translation(
+                                                    Vec3::new(-1.0, 1.0, -1.0)
+                                                        * DROPPED_ITEM_SCALE
+                                                        * 2.0,
+                                                ),
+                                                ..default()
+                                            },
+                                            RenderLayers::layer(WORLD_LAYER),
+                                        ));
+                                    }
+                                } else if let Some(handles) = block_meshes.fluid.get(block) {
+                                    for (mesh, material) in handles.iter() {
+                                        sub_builder.spawn((
+                                            MaterialMeshBundle {
+                                                material: material.clone(),
+                                                mesh: mesh.clone(),
+                                                transform: Transform::from_translation(
+                                                    Vec3::new(-1.0, 1.0, -1.0)
+                                                        * DROPPED_ITEM_SCALE
+                                                        * 2.0,
+                                                ),
+                                                ..default()
+                                            },
+                                            RenderLayers::layer(WORLD_LAYER),
+                                        ));
+                                    }
+                                };
                             });
                     });
             }

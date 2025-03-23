@@ -2,7 +2,7 @@ use crate::{
     block::Block,
     chunk::{data::Blocks, spatial::SpatiallyMapped, Chunk, NoChunkPosition},
     render_layer::BLOCK_ICON_LAYER,
-    texture::TerrainMaterial,
+    texture::{FluidMaterial, TerrainMaterial},
     world::stage::Stage,
 };
 use bevy::{
@@ -24,7 +24,7 @@ impl Plugin for BlockIconPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<BlockMeshes>()
             .add_systems(Startup, setup_rendered_icons)
-            .add_systems(Update, register_block_mesh);
+            .add_systems(Update, (register_block_mesh, register_fluid_mesh));
     }
 }
 
@@ -35,7 +35,8 @@ pub struct BlockIconMaterials {
 
 #[derive(Resource, Default)]
 pub struct BlockMeshes {
-    pub map: HashMap<Block, Vec<(Handle<Mesh>, Handle<TerrainMaterial>)>>,
+    pub terrain: HashMap<Block, Vec<(Handle<Mesh>, Handle<TerrainMaterial>)>>,
+    pub fluid: HashMap<Block, Vec<(Handle<Mesh>, Handle<FluidMaterial>)>>,
 }
 
 #[derive(Component)]
@@ -72,6 +73,7 @@ fn setup_rendered_icons(mut commands: Commands, mut images: ResMut<Assets<Image>
     const STEP_BETWEEN_BLOCKS: f32 = 10.0;
     const DISTANCE_FROM_BLOCK: f32 = 2.5;
     for (i, block) in Block::iter().enumerate() {
+        info!("{:?}: {:?}", i, block);
         // Rendering the block to this image
         let mut image = Image::new_fill(
             size,
@@ -166,7 +168,29 @@ fn register_block_mesh(
         };
         info!("Adding mesh to archetype for {:?}", block);
         meshes
-            .map
+            .terrain
+            .entry(*block)
+            .or_insert(vec![])
+            .push((mesh_handle.clone(), material_handle.clone()));
+    }
+}
+
+fn register_fluid_mesh(
+    q: Query<(Entity, &Handle<Mesh>, &Handle<FluidMaterial>, &Parent), Without<Checked>>,
+    q_parent: Query<&ArchetypalBlock>,
+    mut meshes: ResMut<BlockMeshes>,
+    mut commands: Commands,
+) {
+    for (entity, mesh_handle, material_handle, parent) in q.iter() {
+        commands
+            .entity(entity)
+            .try_insert(Checked);
+        let Ok(ArchetypalBlock(block)) = q_parent.get(parent.get()) else {
+            continue;
+        };
+        info!("Adding mesh to archetype for {:?}", block);
+        meshes
+            .fluid
             .entry(*block)
             .or_insert(vec![])
             .push((mesh_handle.clone(), material_handle.clone()));
