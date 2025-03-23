@@ -4,12 +4,12 @@ use bevy::prelude::*;
 pub enum Stage {
     #[default]
     Noise,
-    Terrain,
+    Sculpt,
     // Structures,
 }
 
 impl Stage {
     pub fn final_stage() -> Self {
-        Self::Terrain
+        Self::Sculpt
     }
 }

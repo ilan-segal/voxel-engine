@@ -52,7 +52,7 @@ impl Plugin for WorldPlugin {
             Update,
             (
                 (update_chunks, despawn_chunks, begin_noise_load_tasks).chain(),
-                begin_terrain_load_tasks,
+                begin_terrain_sculpt_tasks,
                 // begin_structure_load_tasks,
                 receive_chunk_load_tasks,
             )
@@ -236,7 +236,7 @@ struct TerrainGenerateData {
     height_noise: &'static HeightNoise,
 }
 
-fn begin_terrain_load_tasks(
+fn begin_terrain_sculpt_tasks(
     mut tasks: ResMut<ChunkLoadTasks>,
     q_chunk: Query<TerrainGenerateData, (With<Chunk>, Without<Blocks>, Changed<Stage>)>,
 ) {
@@ -249,17 +249,18 @@ fn begin_terrain_load_tasks(
         let height_noise = item.height_noise.clone();
         let cloned_pos = item.chunk_pos.clone();
         let task = task_pool.spawn(async move {
-            let blocks = generate_terrain_for_chunk(cloned_pos, continent_noise, height_noise);
+            let blocks =
+                generate_terrain_sculpt_for_chunk(cloned_pos, continent_noise, height_noise);
             ChunkLoadTaskData {
                 entity: item.entity,
-                added_data: AddedChunkData::Blocks(blocks, Stage::Terrain),
+                added_data: AddedChunkData::Blocks(blocks, Stage::Sculpt),
             }
         });
         tasks.0.insert(*item.chunk_pos, task);
     }
 }
 
-fn generate_terrain_for_chunk(
+fn generate_terrain_sculpt_for_chunk(
     pos: ChunkPosition,
     continent: ContinentNoise,
     height: HeightNoise,
