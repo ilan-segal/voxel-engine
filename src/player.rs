@@ -87,7 +87,7 @@ pub struct PlayerBundle {
 
 impl Default for PlayerBundle {
     fn default() -> Self {
-        let camera_pos = Transform::from_xyz(0.0, 80.0, 0.0);
+        let camera_pos = Transform::from_xyz(0.0, 2.0, 0.0);
         let max_health = 20;
         Self {
             player: Player,
@@ -115,7 +115,7 @@ impl Default for PlayerBundle {
             gravity: Gravity::default(),
             velocity: default(),
             falling_state: FallingState::Falling,
-            mode: PlayerMode::Survival,
+            mode: PlayerMode::NoClip,
             target_velocity: default(),
             sprinting: default(),
             jumping: default(),

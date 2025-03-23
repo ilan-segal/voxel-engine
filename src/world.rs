@@ -24,7 +24,7 @@ use stage::Stage;
 use std::collections::HashSet;
 use world_noise::{ContinentNoiseGenerator, HeightNoiseGenerator};
 
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 3;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 7;
 const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 3;
 
 pub mod block_update;
@@ -92,7 +92,10 @@ fn kill_tasks_for_unloaded_chunks(
     index: Res<ChunkIndex>,
     mut tasks: ResMut<ChunkLoadTasks>,
 ) {
-    if let Some(pos) = index.pos_by_entity.get(&trigger.entity()) {
+    if let Some(pos) = index
+        .pos_by_entity
+        .get(&trigger.entity())
+    {
         tasks.0.remove(&ChunkPosition(*pos));
     }
 }
@@ -124,7 +127,9 @@ fn update_chunks(
     for (entity, chunk_pos) in q_chunk_position.iter() {
         if !should_be_loaded_positions.remove(&chunk_pos.0) {
             // The chunk should be unloaded since it's not in our set
-            commands.entity(entity).insert(ToDespawn);
+            commands
+                .entity(entity)
+                .insert(ToDespawn);
         }
     }
     // Finally, load the new chunks

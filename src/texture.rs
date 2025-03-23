@@ -49,7 +49,10 @@ pub type FluidMaterial = ExtendedMaterial<StandardMaterial, FluidMaterialExtensi
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone, Default)]
 pub struct FluidMaterialExtension {
     #[uniform(100)]
-    quantize_steps: u32,
+    is_translucent: u32,
+    /// higher value -> "thicker" fluid which gets opaque faster
+    #[uniform(101)]
+    b: f32,
 }
 
 const FLUID_MATERIAL_SHADER_PATH: &str = "shaders/fluid.wgsl";
@@ -156,7 +159,10 @@ fn get_fluid_material(
         alpha_mode: AlphaMode::Blend,
         ..default()
     };
-    let extension = FluidMaterialExtension::default();
+    let extension = FluidMaterialExtension {
+        is_translucent: 1,
+        b: 0.25,
+    };
     return materials.add(ExtendedMaterial { base, extension });
 }
 
