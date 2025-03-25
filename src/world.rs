@@ -82,6 +82,7 @@ enum AddedChunkData {
         height_noise: HeightNoise,
     },
     Blocks(Blocks, Stage),
+    BlockUpdates(Vec<(Block, [usize; 3])>, Stage),
 }
 
 #[derive(Resource, Default)]
@@ -165,7 +166,11 @@ fn despawn_chunks(q_chunk: Query<(Entity, &ToDespawn, &CameraDistance)>, mut com
         .for_each(|(entity, _, _)| commands.entity(entity).despawn_recursive());
 }
 
-fn receive_chunk_load_tasks(mut commands: Commands, mut tasks: ResMut<ChunkLoadTasks>) {
+fn receive_chunk_load_tasks(
+    mut commands: Commands,
+    mut tasks: ResMut<ChunkLoadTasks>,
+    mut q_blocks: Query<&mut Blocks>,
+) {
     tasks.0.retain(|_, task| {
         let Some(data) = block_on(future::poll_once(task)) else {
             return true;
@@ -182,6 +187,18 @@ fn receive_chunk_load_tasks(mut commands: Commands, mut tasks: ResMut<ChunkLoadT
             }
             AddedChunkData::Blocks(blocks, stage) => {
                 entity.try_insert((blocks, stage));
+            }
+            AddedChunkData::BlockUpdates(block_updates, stage) => {
+                let Ok(blocks) = &mut q_blocks.get_mut(data.entity) else {
+                    log::warn!("Failed to get Blocks component during worldgen update");
+                    return false;
+                };
+                block_updates
+                    .iter()
+                    .for_each(|(block, pos)| {
+                        *blocks.at_pos_mut(*pos) = *block;
+                    });
+                entity.try_insert(stage);
             }
         }
         return false;
@@ -268,6 +285,7 @@ fn generate_terrain_sculpt_for_chunk(
     const CONTINENT_SCALE: f32 = 60.0;
     const LAND_HEIGHT_SCALE: f32 = 50.0;
     const SEA_LEVEL: i32 = 0;
+    const DIRT_DEPTH: i32 = 4;
     let chunk_pos = pos.0;
     Blocks::from_fn(|[x, y, z]| {
         let yi = chunk_pos.y * CHUNK_SIZE_I32 + y as i32;
@@ -284,8 +302,13 @@ fn generate_terrain_sculpt_for_chunk(
         }
         let coast_height_factor = stretch_range_onto_unit_interval(continent_noise, 0.0, 0.2);
         let height_noise = height.at_pos([x, z]);
-        if y < height_noise * coast_height_factor * LAND_HEIGHT_SCALE {
+        let land_height = height_noise * coast_height_factor * LAND_HEIGHT_SCALE;
+        if y < land_height - DIRT_DEPTH as f32 {
             Block::Stone
+        } else if y < land_height - 1.0 {
+            Block::Dirt
+        } else if y < land_height {
+            Block::Grass
         } else {
             Block::Air
         }

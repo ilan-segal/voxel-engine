@@ -138,7 +138,7 @@ fn get_material_with_colour(
         base_color_texture: Some(image),
         base_color: colour,
         reflectance: 0.0,
-        alpha_mode: AlphaMode::AlphaToCoverage,
+        alpha_mode: AlphaMode::Mask(0.5),
         ..default()
     };
     let extension = TerrainMaterialExtension::default();

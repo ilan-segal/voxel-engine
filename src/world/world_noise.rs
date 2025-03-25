@@ -26,6 +26,24 @@ impl ContinentNoiseGenerator {
                 amplitude: 0.25,
                 offset: 20.0,
             },
+            NoiseGenerator {
+                perlin: Perlin::new(seed.rotate_left(4)),
+                scale: 125.0,
+                amplitude: 0.125,
+                offset: 20.0,
+            },
+            NoiseGenerator {
+                perlin: Perlin::new(seed.rotate_left(5)),
+                scale: 62.5,
+                amplitude: 0.0625,
+                offset: 20.0,
+            },
+            NoiseGenerator {
+                perlin: Perlin::new(seed.rotate_left(6)),
+                scale: 31.25,
+                amplitude: 0.03125,
+                offset: 20.0,
+            },
         ]);
         Self(Arc::new(noise))
     }
@@ -111,7 +129,10 @@ impl NoiseFn<i32, 3> for NoiseGenerator {
         let sample_x = x as f64 / self.scale + self.offset;
         let sample_y = y as f64 / self.scale + self.offset;
         let sample_z = z as f64 / self.scale + self.offset;
-        return self.perlin.get([sample_x, sample_y, sample_z]) * self.amplitude;
+        return self
+            .perlin
+            .get([sample_x, sample_y, sample_z])
+            * self.amplitude;
     }
 }
 
