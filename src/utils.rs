@@ -23,3 +23,21 @@ impl<T: Step> Iterator for VolumetricRange<T> {
             .map(|((x, y), z)| (x, y, z))
     }
 }
+
+pub fn fast_hash_i32(a: i32) -> u32 {
+    fast_hash(u32::from_be_bytes(a.to_be_bytes()))
+}
+
+pub fn fast_hash_f32(a: f32) -> u32 {
+    fast_hash(u32::from_be_bytes(a.to_be_bytes()))
+}
+
+pub fn fast_hash(a: u32) -> u32 {
+    const START: u32 = 0x27d4eb2d;
+    let mut a = a;
+    a ^= START;
+    a ^= a.rotate_left(21);
+    a ^= a.rotate_right(35);
+    a ^= a.rotate_left(4);
+    return a;
+}

@@ -5,11 +5,11 @@ pub enum Stage {
     #[default]
     Noise,
     Sculpt,
-    // Structures,
+    Structures,
 }
 
 impl Stage {
     pub fn final_stage() -> Self {
-        Self::Sculpt
+        Self::Structures
     }
 }

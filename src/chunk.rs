@@ -9,6 +9,7 @@ pub mod spatial;
 pub const CHUNK_SIZE: usize = 32;
 pub const CHUNK_LENGTH: usize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 pub const CHUNK_SIZE_I32: i32 = CHUNK_SIZE as i32;
+pub const CHUNK_SIZE_U32: u32 = CHUNK_SIZE as u32;
 
 pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {

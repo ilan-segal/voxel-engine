@@ -10,6 +10,7 @@ use crate::{
     player::Player,
     render_layer::WORLD_LAYER,
     state::GameState,
+    structure::StructureType,
 };
 use bevy::{
     ecs::query::QueryData,
@@ -19,13 +20,14 @@ use bevy::{
     utils::HashMap,
 };
 use index::ChunkIndex;
+use neighborhood::Neighborhood;
 use seed::{LoadSeed, WorldSeed};
 use stage::Stage;
 use std::collections::HashSet;
-use world_noise::{ContinentNoiseGenerator, HeightNoiseGenerator};
+use world_noise::{ContinentNoiseGenerator, HeightNoiseGenerator, WhiteNoise};
 
 const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 7;
-const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 3;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 4;
 
 pub mod block_update;
 pub mod index;
@@ -53,7 +55,7 @@ impl Plugin for WorldPlugin {
             (
                 (update_chunks, despawn_chunks, begin_noise_load_tasks).chain(),
                 begin_terrain_sculpt_tasks,
-                // begin_structure_load_tasks,
+                begin_structure_load_tasks,
                 receive_chunk_load_tasks,
             )
                 .in_set(WorldSet)
@@ -66,6 +68,7 @@ impl Plugin for WorldPlugin {
 fn init_noise(mut commands: Commands, seed: Res<WorldSeed>) {
     commands.insert_resource(ContinentNoiseGenerator::new(seed.0));
     commands.insert_resource(HeightNoiseGenerator::new(seed.0));
+    commands.insert_resource(WhiteNoise::new(seed.0));
 }
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -80,6 +83,7 @@ enum AddedChunkData {
     Noise {
         continent_noise: ContinentNoise,
         height_noise: HeightNoise,
+        noise_3d: Noise3d,
     },
     Blocks(Blocks, Stage),
     BlockUpdates(Vec<(Block, [usize; 3])>, Stage),
@@ -182,8 +186,9 @@ fn receive_chunk_load_tasks(
             AddedChunkData::Noise {
                 continent_noise,
                 height_noise,
+                noise_3d,
             } => {
-                entity.try_insert((continent_noise, height_noise, Stage::Noise));
+                entity.try_insert((continent_noise, height_noise, noise_3d, Stage::Noise));
             }
             AddedChunkData::Blocks(blocks, stage) => {
                 entity.try_insert((blocks, stage));
@@ -193,6 +198,7 @@ fn receive_chunk_load_tasks(
                     log::warn!("Failed to get Blocks component during worldgen update");
                     return false;
                 };
+                blocks.set_changed();
                 block_updates
                     .iter()
                     .for_each(|(block, pos)| {
@@ -210,6 +216,7 @@ fn begin_noise_load_tasks(
     q_chunk: Query<(Entity, &ChunkPosition), (With<Chunk>, Without<ContinentNoise>)>,
     continent_noise_generator: Res<ContinentNoiseGenerator>,
     height_noise_generator: Res<HeightNoiseGenerator>,
+    white_noise: Res<WhiteNoise>,
 ) {
     for (entity, pos) in q_chunk.iter() {
         if tasks.0.contains_key(pos) {
@@ -218,15 +225,21 @@ fn begin_noise_load_tasks(
         let task_pool = AsyncComputeTaskPool::get();
         let continent_noise_generator = continent_noise_generator.clone();
         let height_noise_generator = height_noise_generator.clone();
+        let white_noise = white_noise.clone();
         let pos_ivec = pos.0;
         let task = task_pool.spawn(async move {
-            let (continent_noise, height_noise) =
-                generate_chunk_noise(pos_ivec, continent_noise_generator, height_noise_generator);
+            let (continent_noise, height_noise, noise_3d) = generate_chunk_noise(
+                pos_ivec,
+                continent_noise_generator,
+                height_noise_generator,
+                white_noise,
+            );
             ChunkLoadTaskData {
                 entity,
                 added_data: AddedChunkData::Noise {
                     continent_noise,
                     height_noise,
+                    noise_3d,
                 },
             }
         });
@@ -238,10 +251,12 @@ fn generate_chunk_noise(
     chunk_pos: IVec3,
     continent_noise: ContinentNoiseGenerator,
     height_noise: HeightNoiseGenerator,
-) -> (ContinentNoise, HeightNoise) {
+    white_noise: WhiteNoise,
+) -> (ContinentNoise, HeightNoise, Noise3d) {
     let continent = ContinentNoise::from((continent_noise.0.as_ref(), chunk_pos));
     let height = HeightNoise::from((height_noise.0.as_ref(), chunk_pos));
-    (continent, height)
+    let noise = Noise3d::from((white_noise, chunk_pos));
+    (continent, height, noise)
 }
 
 #[derive(QueryData)]
@@ -325,34 +340,60 @@ fn clamp(value: f32, a: f32, b: f32) -> f32 {
     value.max(a).min(b)
 }
 
-// fn begin_structure_load_tasks(
-//     mut tasks: ResMut<ChunkLoadTasks>,
-//     index: Res<ChunkIndex>,
-//     q_chunk: Query<(Entity, &ChunkPosition, &Stage), With<Chunk>>,
-// ) {
-//     for (entity, pos, stage) in q_chunk.iter() {
-//         if tasks.0.contains_key(pos) || stage != &Stage::Terrain {
-//             continue;
-//         }
-//         let neighborhood = index.get_neighborhood(&pos.0);
-//         if neighborhood.get_lowest_stage() < Stage::Terrain
-//             || neighborhood
-//                 .iter_chunks()
-//                 .any(|c| c.is_none())
-//         {
-//             continue;
-//         }
-//         let task_pool = AsyncComputeTaskPool::get();
-//         let task = task_pool.spawn(async move {
-//             let blocks = generate_structures(neighborhood);
-//             ChunkLoadTaskData {
-//                 entity,
-//                 added_data: AddedChunkData::Blocks(blocks, Stage::Structures),
-//             }
-//         });
-//         tasks.0.insert(*pos, task);
-//     }
-// }
+#[derive(QueryData)]
+struct StructureQueryData {
+    entity: Entity,
+    pos: &'static ChunkPosition,
+    stage: &'static Stage,
+    stage_neighborhood: &'static Neighborhood<Stage>,
+    blocks_neighborhood: &'static Neighborhood<Blocks>,
+    noise_neighborhood: &'static Neighborhood<Noise3d>,
+}
+
+fn begin_structure_load_tasks(
+    mut tasks: ResMut<ChunkLoadTasks>,
+    q_chunk: Query<StructureQueryData, With<Chunk>>,
+) {
+    for item in q_chunk.iter() {
+        if tasks.0.contains_key(item.pos) || item.stage != &Stage::Sculpt {
+            continue;
+        }
+        let surroundings_arent_ready = item
+            .stage_neighborhood
+            .min()
+            .unwrap()
+            .as_ref()
+            < &Stage::Sculpt;
+        let surroundings_arent_complete = item.blocks_neighborhood.is_incomplete();
+        if surroundings_arent_ready || surroundings_arent_complete {
+            continue;
+        }
+        let task_pool = AsyncComputeTaskPool::get();
+        let blocks = item.blocks_neighborhood.clone();
+        let noise = item.noise_neighborhood.clone();
+        let entity = item.entity;
+        let task = task_pool.spawn(async move {
+            let added_data = generate_structures(blocks, noise);
+            ChunkLoadTaskData { entity, added_data }
+        });
+        tasks.0.insert(*item.pos, task);
+    }
+}
+
+fn generate_structures(
+    blocks: Neighborhood<Blocks>,
+    noise: Neighborhood<Noise3d>,
+) -> AddedChunkData {
+    // TODO: Vary structure type by biome
+    // let structure = StructureType::Tree;
+    // let updates = structure.get_structures(&blocks, &noise);
+
+    // TODO
+    AddedChunkData::BlockUpdates(
+        StructureType::Tree.get_structure_blocks(&blocks, &noise),
+        Stage::Structures,
+    )
+}
 
 // fn generate_structures(blocks: &Neighborhood<Blocks>, noise: &Neighborhood<Noise3d>) -> Blocks {
 //     let mut middle_blocks_chunk = blocks

@@ -94,6 +94,21 @@ impl<T> Neighborhood<T> {
     fn get_chunk_index(x: i32, y: i32, z: i32) -> usize {
         (9 * (x + 1) + 3 * (y + 1) + (z + 1)) as usize
     }
+
+    pub fn is_incomplete(&self) -> bool {
+        self.0
+            .iter()
+            .any(|maybe| maybe.is_none())
+    }
+}
+
+impl<T: Ord> Neighborhood<T> {
+    pub fn min(&self) -> Option<Arc<T>> {
+        self.0
+            .iter()
+            .filter_map(|x| x.clone())
+            .min()
+    }
 }
 
 impl<T: SpatiallyMapped<3>> Neighborhood<T> {
