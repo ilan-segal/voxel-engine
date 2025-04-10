@@ -8,7 +8,9 @@ define_spatial!(Blocks, 3, Block);
 
 impl Blocks {
     pub fn is_meshable(&self) -> bool {
-        self.0.par_iter().any(|b| b.is_meshable())
+        self.0
+            .par_iter()
+            .any(|b| b.is_meshable())
     }
 }
 
@@ -25,3 +27,5 @@ define_spatial!(ContinentNoise, 2, f32);
 map_from_noise_2d!(ContinentNoise);
 define_spatial!(HeightNoise, 2, f32);
 map_from_noise_2d!(HeightNoise);
+define_spatial!(CaveNetworkNoise, 3, f32);
+map_from_noise_3d!(CaveNetworkNoise);

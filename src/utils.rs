@@ -24,9 +24,9 @@ impl<T: Step> Iterator for VolumetricRange<T> {
     }
 }
 
-pub fn fast_hash_i32(a: i32) -> u32 {
-    fast_hash(u32::from_be_bytes(a.to_be_bytes()))
-}
+// pub fn fast_hash_i32(a: i32) -> u32 {
+//     fast_hash(u32::from_be_bytes(a.to_be_bytes()))
+// }
 
 pub fn fast_hash_f32(a: f32) -> u32 {
     fast_hash(u32::from_be_bytes(a.to_be_bytes()))
