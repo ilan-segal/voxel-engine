@@ -158,6 +158,12 @@ impl Worley {
     }
 
     fn distance_to_border(&self, point: [f64; 3]) -> f64 {
+        /*
+        TODO
+        This is a decent approximation but it's not perfect
+        We want a perfect measure of the distance to the edges
+        Use this for guidance https://www.ronja-tutorials.com/post/028-voronoi-noise/#getting-the-distance-to-the-border
+         */
         let (a, b, c) = self
             .points_in_neighborhood(point)
             .map(|cur_point| euclidean_distance(&cur_point, &point))
