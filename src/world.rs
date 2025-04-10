@@ -28,7 +28,7 @@ use world_noise::{
     CaveNetworkNoiseGenerator, ContinentNoiseGenerator, HeightNoiseGenerator, WhiteNoise,
 };
 
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 3;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 7;
 const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 4;
 
 pub mod block_update;

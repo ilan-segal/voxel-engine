@@ -11,44 +11,7 @@ pub struct ContinentNoiseGenerator(pub Arc<StackedNoise>);
 
 impl ContinentNoiseGenerator {
     pub fn new(seed: u32) -> Self {
-        let noise = StackedNoise(vec![
-            NoiseGenerator {
-                perlin: Perlin::new(seed.rotate_left(1)),
-                scale: 1000.0,
-                amplitude: 1.0,
-                offset: 0.0,
-            },
-            NoiseGenerator {
-                perlin: Perlin::new(seed.rotate_left(2)),
-                scale: 500.0,
-                amplitude: 0.5,
-                offset: 10.0,
-            },
-            NoiseGenerator {
-                perlin: Perlin::new(seed.rotate_left(3)),
-                scale: 250.0,
-                amplitude: 0.25,
-                offset: 20.0,
-            },
-            NoiseGenerator {
-                perlin: Perlin::new(seed.rotate_left(4)),
-                scale: 125.0,
-                amplitude: 0.125,
-                offset: 20.0,
-            },
-            NoiseGenerator {
-                perlin: Perlin::new(seed.rotate_left(5)),
-                scale: 62.5,
-                amplitude: 0.0625,
-                offset: 20.0,
-            },
-            NoiseGenerator {
-                perlin: Perlin::new(seed.rotate_left(6)),
-                scale: 31.25,
-                amplitude: 0.03125,
-                offset: 20.0,
-            },
-        ]);
+        let noise = StackedNoise::new(seed, 6, 1000.0);
         Self(Arc::new(noise))
     }
 }
@@ -101,20 +64,53 @@ impl NoiseFn<i32, 3> for WhiteNoise {
         // let z = fast_hash_i32(z ^ self.seed.wrapping_shl(16) as i32);
         let result = self
             .permutation_table
-            .hash(&[x as isize, y as isize, z as isize]) as u32;
-        const MAXIMUM: u32 = 0xFF;
+            .hash(&[x as isize, y as isize, z as isize]) as u8;
+        const MAXIMUM: u8 = 0xFF;
         return (result % MAXIMUM) as f64 / (MAXIMUM as f64);
     }
 }
 
 #[derive(Resource, Clone)]
 pub struct CaveNetworkNoiseGenerator {
-    white_noise: Arc<[WhiteNoise; 3]>,
-    scale: f64,
+    worley: Arc<Worley>,
+    displacement: Arc<[StackedNoise; 3]>,
+    displacement_strength: f64,
 }
 
 impl CaveNetworkNoiseGenerator {
     pub fn new(seed: u32) -> Self {
+        let worley = Arc::new(Worley::new(seed));
+        let displacement_x = StackedNoise::new(seed.wrapping_add(1), 3, 100.);
+        let displacement_y = StackedNoise::new(seed.wrapping_add(2), 3, 10000.);
+        let displacement_z = StackedNoise::new(seed.wrapping_add(3), 3, 100.);
+        let displacement = Arc::new([displacement_x, displacement_y, displacement_z]);
+        let displacement_strength = 300.0;
+        Self {
+            worley,
+            displacement,
+            displacement_strength,
+        }
+    }
+}
+
+impl NoiseFn<i32, 3> for CaveNetworkNoiseGenerator {
+    fn get(&self, point: [i32; 3]) -> f64 {
+        let x = point[0] as f64 + self.displacement[0].get(point) * self.displacement_strength;
+        let y = point[1] as f64 + self.displacement[1].get(point) * self.displacement_strength;
+        let z = point[2] as f64 + self.displacement[2].get(point) * self.displacement_strength;
+        // let point = point.map(|x| x as f64);
+        self.worley.get([x, y, z])
+    }
+}
+
+#[derive(Clone)]
+struct Worley {
+    white_noise: Arc<[WhiteNoise; 3]>,
+    scale: f64,
+}
+
+impl Worley {
+    fn new(seed: u32) -> Self {
         let white_noise = [
             WhiteNoise::new(seed),
             WhiteNoise::new(seed.rotate_left(1)),
@@ -142,9 +138,6 @@ impl CaveNetworkNoiseGenerator {
     ) -> impl Iterator<Item = [f64; 3]> + use<'_> {
         let size = 3;
         let [x0, y0, z0] = center_cell;
-        // let [x_offset, y_offset, z_offset] = center_cell
-        //     .map(|x| x - x.floor())
-        //     .map(|x| if x < 0.5 { -1 } else { 0 });
         let [x_offset, y_offset, z_offset] = [-1, -1, -1];
         (0..size * size * size)
             .map(move |i| {
@@ -172,9 +165,9 @@ impl CaveNetworkNoiseGenerator {
             .take(3)
             .collect_tuple()
             .unwrap();
-        let d = (a - b).powi(2);
-        let e = (a - c).powi(2);
-        let f = (b - c).powi(2);
+        let d = ((a - b) / c).powi(2);
+        let e = ((a - c) / b).powi(2);
+        let f = ((b - a) / a).powi(2);
         return (d + e + f).sqrt();
     }
 }
@@ -188,13 +181,13 @@ fn euclidean_distance(a: &[f64; 3], b: &[f64; 3]) -> f64 {
     return (x + y + z).sqrt();
 }
 
-impl NoiseFn<i32, 3> for CaveNetworkNoiseGenerator {
-    fn get(&self, [x, y, z]: [i32; 3]) -> f64 {
+impl NoiseFn<f64, 3> for Worley {
+    fn get(&self, [x, y, z]: [f64; 3]) -> f64 {
         // 3-dimensional Worley noise
         // The noise crate has an implementation but it's !Send so we need to implement our own
-        let x = (x as f64) / self.scale;
-        let y = (y as f64) / self.scale;
-        let z = (z as f64) / self.scale;
+        let x = x / self.scale;
+        let y = y / self.scale;
+        let z = z / self.scale;
         self.distance_to_border([x, y, z])
     }
 }
@@ -243,6 +236,26 @@ amount in [1, ∞)
 // }
 
 pub struct StackedNoise(Vec<NoiseGenerator>);
+
+impl StackedNoise {
+    fn new(seed: u32, num_layers: u32, starting_scale: f64) -> Self {
+        let noises = (0..num_layers)
+            .map(|i| {
+                let amplitude = 0.5_f64.powi(i as i32);
+                let scale = starting_scale * amplitude;
+                let offset = starting_scale * i as f64;
+                let perlin = Perlin::new(seed.rotate_left(i));
+                return NoiseGenerator {
+                    perlin,
+                    scale,
+                    amplitude,
+                    offset,
+                };
+            })
+            .collect();
+        Self(noises)
+    }
+}
 
 impl NoiseFn<i32, 2> for StackedNoise {
     fn get(&self, point: [i32; 2]) -> f64 {
