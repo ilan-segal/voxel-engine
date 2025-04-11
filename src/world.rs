@@ -326,7 +326,7 @@ fn generate_terrain_sculpt_for_chunk(
     const LAND_HEIGHT_SCALE: f32 = 50.0;
     const SEA_LEVEL: i32 = 0;
     const DIRT_DEPTH: i32 = 4;
-    const CAVE_THRESHOLD: f32 = 0.1;
+    const CAVE_THRESHOLD: f32 = 0.2;
     let chunk_pos = pos.0;
     Blocks::from_fn(|pos| {
         let is_cave = cave_network_noise.at_pos(pos) < &CAVE_THRESHOLD;

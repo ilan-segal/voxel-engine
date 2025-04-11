@@ -106,7 +106,7 @@ impl NoiseFn<i32, 3> for CaveNetworkNoiseGenerator {
 #[derive(Clone)]
 struct Worley {
     white_noise: Arc<[WhiteNoise; 3]>,
-    scale: f64,
+    scale: f32,
 }
 
 impl Worley {
@@ -123,41 +123,33 @@ impl Worley {
         }
     }
 
-    fn pos_in_cell(&self, cell: [i32; 3]) -> [f64; 3] {
-        let [x, y, z] = cell;
+    fn pos_in_cell(&self, cell: IVec3) -> Vec3 {
+        let arr = cell.to_array();
+        let Vec3 { x, y, z } = cell.as_vec3();
         [
-            self.white_noise[0].get(cell) + x as f64,
-            self.white_noise[1].get(cell) + y as f64,
-            self.white_noise[2].get(cell) + z as f64,
+            self.white_noise[0].get(arr) as f32 + x,
+            self.white_noise[1].get(arr) as f32 + y,
+            self.white_noise[2].get(arr) as f32 + z,
         ]
+        .into()
     }
 
-    fn points_in_neighborhood(
-        &self,
-        center_cell: [f64; 3],
-    ) -> impl Iterator<Item = [f64; 3]> + use<'_> {
+    fn points_in_neighborhood(&self, center_cell: Vec3) -> impl Iterator<Item = Vec3> + use<'_> {
         let size = 3;
-        let [x0, y0, z0] = center_cell;
-        let [x_offset, y_offset, z_offset] = [-1, -1, -1];
         (0..size * size * size)
             .map(move |i| {
                 // Offset from center
                 let x = i % size;
                 let y = (i / size) % size;
                 let z = (i / (size * size)) % size;
-                (x + x_offset, y + y_offset, z + z_offset)
+                IVec3 { x, y, z }
             })
-            .map(move |(x, y, z)| {
-                [
-                    x0.floor() as i32 + x,
-                    y0.floor() as i32 + y,
-                    z0.floor() as i32 + z,
-                ]
-            })
+            .map(|p| p - IVec3::ONE)
+            .map(move |p| center_cell.floor().as_ivec3() + p)
             .map(|cell| self.pos_in_cell(cell))
     }
 
-    fn distance_to_border(&self, point: [f64; 3]) -> f64 {
+    fn distance_to_border(&self, point: Vec3) -> f32 {
         /*
         TODO
         This is a decent approximation but it's not perfect
@@ -166,7 +158,7 @@ impl Worley {
          */
         let (a, b, c) = self
             .points_in_neighborhood(point)
-            .map(|cur_point| euclidean_distance(&cur_point, &point))
+            .map(|cur_point| distance(cur_point, point))
             .sorted_by(|a, b| a.partial_cmp(b).unwrap())
             .take(3)
             .collect_tuple()
@@ -178,23 +170,18 @@ impl Worley {
     }
 }
 
-fn euclidean_distance(a: &[f64; 3], b: &[f64; 3]) -> f64 {
-    let [xa, ya, za] = a;
-    let [xb, yb, zb] = b;
-    let x = (xa - xb).powi(2);
-    let y = (ya - yb).powi(2);
-    let z = (za - zb).powi(2);
-    return (x + y + z).sqrt();
+fn distance(a: Vec3, b: Vec3) -> f32 {
+    (a - b).length()
 }
 
 impl NoiseFn<f64, 3> for Worley {
     fn get(&self, [x, y, z]: [f64; 3]) -> f64 {
         // 3-dimensional Worley noise
         // The noise crate has an implementation but it's !Send so we need to implement our own
-        let x = x / self.scale;
-        let y = y / self.scale;
-        let z = z / self.scale;
-        self.distance_to_border([x, y, z])
+        let x = x as f32 / self.scale;
+        let y = y as f32 / self.scale;
+        let z = z as f32 / self.scale;
+        self.distance_to_border([x, y, z].into()) as f64
     }
 }
 
