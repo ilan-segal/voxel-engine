@@ -31,8 +31,8 @@ use world_noise::{
 const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 7;
 const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 4;
 const CAVE_GRID_SIZE: f64 = 64.0;
-const CAVE_RADIUS: f64 = 16.0;
-const CAVE_DISPLACEMENT_STRENGTH: f64 = 25.0;
+const CAVE_RADIUS: f64 = 10.0;
+const CAVE_DISPLACEMENT_STRENGTH: f64 = 12.0;
 
 pub mod block_update;
 pub mod index;

@@ -5,7 +5,7 @@ use bevy::{
 use core::f64;
 use noise::{
     permutationtable::{NoiseHasher, PermutationTable},
-    NoiseFn, Perlin,
+    NoiseFn, Simplex,
 };
 use std::sync::Arc;
 
@@ -63,9 +63,9 @@ type CaveNoise = Displace3d<GridNoise, StackedNoise>;
 
 impl CaveNetworkNoiseGenerator {
     pub fn new(seed: u32, grid_size: f64, displacement_strength: f64) -> Self {
-        let x = StackedNoise::new(seed.rotate_left(1), 7, 500.);
-        let y = StackedNoise::new(seed.rotate_left(2), 7, 1000.);
-        let z = StackedNoise::new(seed.rotate_left(3), 7, 500.);
+        let x = StackedNoise::new(seed.rotate_left(1), 4, 500.);
+        let y = StackedNoise::new(seed.rotate_left(2), 4, 1000.);
+        let z = StackedNoise::new(seed.rotate_left(3), 4, 500.);
         let source = GridNoise {
             size: grid_size,
             dropout_rate_y: 0.75,
@@ -180,7 +180,7 @@ impl GridNoise {
 }
 
 struct NoiseGenerator {
-    perlin: Perlin,
+    perlin: Simplex,
     scale: f64,
     amplitude: f64,
     offset: f64,
@@ -233,7 +233,7 @@ impl StackedNoise {
                 let amplitude = 0.5_f64.powi(i as i32);
                 let scale = starting_scale * amplitude;
                 let offset = starting_scale * i as f64;
-                let perlin = Perlin::new(seed.rotate_left(i));
+                let perlin = Simplex::new(seed.rotate_left(i));
                 return NoiseGenerator {
                     perlin,
                     scale,
