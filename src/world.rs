@@ -30,6 +30,9 @@ use world_noise::{
 
 const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 7;
 const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 4;
+const CAVE_GRID_SIZE: f64 = 64.0;
+const CAVE_RADIUS: f64 = 16.0;
+const CAVE_DISPLACEMENT_STRENGTH: f64 = 25.0;
 
 pub mod block_update;
 pub mod index;
@@ -71,7 +74,11 @@ fn init_noise(mut commands: Commands, seed: Res<WorldSeed>) {
     commands.insert_resource(ContinentNoiseGenerator::new(seed.0));
     commands.insert_resource(HeightNoiseGenerator::new(seed.0));
     commands.insert_resource(WhiteNoise::new(seed.0));
-    commands.insert_resource(CaveNetworkNoiseGenerator::new(seed.0));
+    commands.insert_resource(CaveNetworkNoiseGenerator::new(
+        seed.0,
+        CAVE_GRID_SIZE,
+        CAVE_DISPLACEMENT_STRENGTH * CAVE_GRID_SIZE,
+    ));
 }
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -326,7 +333,7 @@ fn generate_terrain_sculpt_for_chunk(
     const LAND_HEIGHT_SCALE: f32 = 50.0;
     const SEA_LEVEL: i32 = 0;
     const DIRT_DEPTH: i32 = 4;
-    const CAVE_THRESHOLD: f32 = 0.2;
+    const CAVE_THRESHOLD: f32 = (CAVE_RADIUS / CAVE_GRID_SIZE) as f32;
     let chunk_pos = pos.0;
     Blocks::from_fn(|pos| {
         let is_cave = cave_network_noise.at_pos(pos) < &CAVE_THRESHOLD;
@@ -429,43 +436,3 @@ fn generate_structures(
         Stage::Structures,
     )
 }
-
-// fn generate_structures(blocks: &Neighborhood<Blocks>, noise: &Neighborhood<Noise3d>) -> Blocks {
-//     let mut middle_blocks_chunk = blocks
-//         .middle_chunk()
-//         .clone()
-//         .expect("Middle chunk")
-//         .as_ref()
-//         .clone();
-//     let structure_types = vec![StructureType::Tree];
-//     let structure_blocks = structure_types
-//         .iter()
-//         .flat_map(|s| s.get_structures(blocks, noise))
-//         .flat_map(|(structure, [x0, y0, z0])| {
-//             structure
-//                 .get_blocks()
-//                 .iter()
-//                 .map(move |(block, [x1, y1, z1])| (*block, [x0 + x1, y0 + y1, z0 + z1]))
-//                 .collect::<Vec<_>>()
-//         })
-//         .filter(|(_, [x, y, z])| {
-//             let x = *x;
-//             let y = *y;
-//             let z = *z;
-//             0 <= x
-//                 && x < CHUNK_SIZE as i32
-//                 && 0 <= y
-//                 && y < CHUNK_SIZE as i32
-//                 && 0 <= z
-//                 && z < CHUNK_SIZE as i32
-//         })
-//         .collect::<Vec<_>>();
-//     // TODO: Vary available structure types by looking at local data
-//     for (block, [x, y, z]) in structure_blocks.iter().copied() {
-//         let x = x as usize;
-//         let y = y as usize;
-//         let z = z as usize;
-//         *middle_blocks_chunk.at_pos_mut([x, y, z]) = block;
-//     }
-//     return middle_blocks_chunk;
-// }

@@ -1,5 +1,8 @@
-use bevy::prelude::*;
-use itertools::Itertools;
+use bevy::{
+    math::{DVec2, DVec3},
+    prelude::*,
+};
+use core::f64;
 use noise::{
     permutationtable::{NoiseHasher, PermutationTable},
     NoiseFn, Perlin,
@@ -21,26 +24,7 @@ pub struct HeightNoiseGenerator(pub Arc<StackedNoise>);
 
 impl HeightNoiseGenerator {
     pub fn new(seed: u32) -> Self {
-        let noise = StackedNoise(vec![
-            NoiseGenerator {
-                perlin: Perlin::new(seed.rotate_left(4)),
-                scale: 100.0,
-                amplitude: 1.0,
-                offset: 0.0,
-            },
-            NoiseGenerator {
-                perlin: Perlin::new(seed.rotate_left(5)),
-                scale: 50.0,
-                amplitude: 0.5,
-                offset: 10.0,
-            },
-            NoiseGenerator {
-                perlin: Perlin::new(seed.rotate_left(6)),
-                scale: 25.0,
-                amplitude: 0.25,
-                offset: 20.0,
-            },
-        ]);
+        let noise = StackedNoise::new(seed, 3, 100.0);
         Self(Arc::new(noise))
     }
 }
@@ -72,116 +56,126 @@ impl NoiseFn<i32, 3> for WhiteNoise {
 
 #[derive(Resource, Clone)]
 pub struct CaveNetworkNoiseGenerator {
-    worley: Arc<Worley>,
-    displacement: Arc<[StackedNoise; 3]>,
-    displacement_strength: f64,
+    noise: Arc<CaveNoise>,
 }
 
+type CaveNoise = Displace3d<GridNoise, StackedNoise>;
+
 impl CaveNetworkNoiseGenerator {
-    pub fn new(seed: u32) -> Self {
-        let worley = Arc::new(Worley::new(seed));
-        let displacement_x = StackedNoise::new(seed.wrapping_add(1), 3, 100.);
-        let displacement_y = StackedNoise::new(seed.wrapping_add(2), 3, 10000.);
-        let displacement_z = StackedNoise::new(seed.wrapping_add(3), 3, 100.);
-        let displacement = Arc::new([displacement_x, displacement_y, displacement_z]);
-        let displacement_strength = 300.0;
-        Self {
-            worley,
-            displacement,
+    pub fn new(seed: u32, grid_size: f64, displacement_strength: f64) -> Self {
+        let x = StackedNoise::new(seed.rotate_left(1), 7, 500.);
+        let y = StackedNoise::new(seed.rotate_left(2), 7, 1000.);
+        let z = StackedNoise::new(seed.rotate_left(3), 7, 500.);
+        let source = GridNoise {
+            size: grid_size,
+            dropout_rate_y: 0.75,
+            dropout_rate_xz: 0.5,
+            permutation_table: PermutationTable::new(seed),
+        };
+        let displaced = Displace3d {
+            source,
             displacement_strength,
-        }
+            x,
+            y,
+            z,
+        };
+        let noise = Arc::new(displaced);
+        Self { noise }
     }
 }
 
 impl NoiseFn<i32, 3> for CaveNetworkNoiseGenerator {
     fn get(&self, point: [i32; 3]) -> f64 {
-        let x = point[0] as f64 + self.displacement[0].get(point) * self.displacement_strength;
-        let y = point[1] as f64 + self.displacement[1].get(point) * self.displacement_strength;
-        let z = point[2] as f64 + self.displacement[2].get(point) * self.displacement_strength;
-        // let point = point.map(|x| x as f64);
-        self.worley.get([x, y, z])
+        self.noise.get(point)
     }
 }
 
-#[derive(Clone)]
-struct Worley {
-    white_noise: Arc<[WhiteNoise; 3]>,
-    scale: f32,
+struct Displace3d<Source, Displacer>
+where
+    Source: NoiseFn<f64, 3>,
+    Displacer: NoiseFn<i32, 3>,
+{
+    source: Source,
+    x: Displacer,
+    y: Displacer,
+    z: Displacer,
+    displacement_strength: f64,
 }
 
-impl Worley {
-    fn new(seed: u32) -> Self {
-        let white_noise = [
-            WhiteNoise::new(seed),
-            WhiteNoise::new(seed.rotate_left(1)),
-            WhiteNoise::new(seed.rotate_left(2)),
+impl<Source, Displacer> NoiseFn<i32, 3> for Displace3d<Source, Displacer>
+where
+    Source: NoiseFn<f64, 3>,
+    Displacer: NoiseFn<i32, 3>,
+{
+    fn get(&self, point: [i32; 3]) -> f64 {
+        let dx = self.x.get(point) * self.displacement_strength;
+        let dy = self.y.get(point) * self.displacement_strength;
+        let dz = self.z.get(point) * self.displacement_strength;
+        let [x0, y0, z0] = point.map(|x| x as f64);
+        let new_point = [x0 + dx, y0 + dy, z0 + dz];
+        return self.source.get(new_point);
+    }
+}
+
+struct GridNoise {
+    size: f64,
+    dropout_rate_xz: f32,
+    dropout_rate_y: f32,
+    permutation_table: PermutationTable,
+}
+
+impl NoiseFn<f64, 3> for GridNoise {
+    fn get(&self, point: [f64; 3]) -> f64 {
+        let p = (DVec3::from(point) / self.size).fract_gl();
+        let midline = DVec2::ONE * 0.5;
+
+        let [x, y, z] = self
+            .get_dropouts(DVec3::from(point) / self.size)
+            .map(|drop_segment| if drop_segment { f64::INFINITY } else { 1. });
+
+        let distances = [
+            (p.xy() - midline).length() * z,
+            (p.xz() - midline).length() * y,
+            (p.yz() - midline).length() * x,
         ];
-        let scale = 100.0;
-        Self {
-            white_noise: Arc::new(white_noise),
-            scale,
-        }
-    }
-
-    fn pos_in_cell(&self, cell: IVec3) -> Vec3 {
-        let arr = cell.to_array();
-        let Vec3 { x, y, z } = cell.as_vec3();
-        [
-            self.white_noise[0].get(arr) as f32 + x,
-            self.white_noise[1].get(arr) as f32 + y,
-            self.white_noise[2].get(arr) as f32 + z,
-        ]
-        .into()
-    }
-
-    fn points_in_neighborhood(&self, center_cell: Vec3) -> impl Iterator<Item = Vec3> + use<'_> {
-        let size = 3;
-        (0..size * size * size)
-            .map(move |i| {
-                // Offset from center
-                let x = i % size;
-                let y = (i / size) % size;
-                let z = (i / (size * size)) % size;
-                IVec3 { x, y, z }
+        let distance_to_midline = distances
+            .iter()
+            .min_by(|a, b| {
+                a.partial_cmp(b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
-            .map(|p| p - IVec3::ONE)
-            .map(move |p| center_cell.floor().as_ivec3() + p)
-            .map(|cell| self.pos_in_cell(cell))
-    }
-
-    fn distance_to_border(&self, point: Vec3) -> f32 {
-        /*
-        TODO
-        This is a decent approximation but it's not perfect
-        We want a perfect measure of the distance to the edges
-        Use this for guidance https://www.ronja-tutorials.com/post/028-voronoi-noise/#getting-the-distance-to-the-border
-         */
-        let (a, b, c) = self
-            .points_in_neighborhood(point)
-            .map(|cur_point| distance(cur_point, point))
-            .sorted_by(|a, b| a.partial_cmp(b).unwrap())
-            .take(3)
-            .collect_tuple()
             .unwrap();
-        let d = ((a - b) / c).powi(2);
-        let e = ((a - c) / b).powi(2);
-        let f = ((b - a) / a).powi(2);
-        return (d + e + f).sqrt();
+        return *distance_to_midline;
     }
 }
 
-fn distance(a: Vec3, b: Vec3) -> f32 {
-    (a - b).length()
-}
-
-impl NoiseFn<f64, 3> for Worley {
-    fn get(&self, [x, y, z]: [f64; 3]) -> f64 {
-        // 3-dimensional Worley noise
-        // The noise crate has an implementation but it's !Send so we need to implement our own
-        let x = x as f32 / self.scale;
-        let y = y as f32 / self.scale;
-        let z = z as f32 / self.scale;
-        self.distance_to_border([x, y, z].into()) as f64
+impl GridNoise {
+    fn get_dropouts<T>(&self, p: T) -> [bool; 3]
+    where
+        DVec3: From<T>,
+    {
+        let [x, y, z] = DVec3::from(p)
+            .abs()
+            .as_ivec3()
+            .to_array();
+        let seed = x ^ y.rotate_left(1) ^ z.rotate_left(2);
+        let x_dropout = self
+            .permutation_table
+            .hash(&[seed as isize]) as f32
+            / 255.;
+        let y_dropout = self
+            .permutation_table
+            .hash(&[seed.rotate_left(1) as isize]) as f32
+            / 255.;
+        let z_dropout = self
+            .permutation_table
+            .hash(&[seed.rotate_left(2) as isize]) as f32
+            / 255.;
+        [
+            x_dropout < self.dropout_rate_xz,
+            y_dropout < self.dropout_rate_y,
+            z_dropout < self.dropout_rate_xz,
+        ]
     }
 }
 
@@ -228,7 +222,9 @@ amount in [1, ∞)
 //     (1.0 + E.powf(-x)).recip()
 // }
 
-pub struct StackedNoise(Vec<NoiseGenerator>);
+pub struct StackedNoise {
+    noises: Vec<NoiseGenerator>,
+}
 
 impl StackedNoise {
     fn new(seed: u32, num_layers: u32, starting_scale: f64) -> Self {
@@ -246,32 +242,30 @@ impl StackedNoise {
                 };
             })
             .collect();
-        Self(noises)
+        Self { noises }
     }
 }
 
 impl NoiseFn<i32, 2> for StackedNoise {
     fn get(&self, point: [i32; 2]) -> f64 {
-        let mut total_sample = 0.;
-        let mut total_amplitude = 0.;
-        for g in &self.0 {
-            total_sample += g.get(point);
-            total_amplitude += g.amplitude;
-        }
-        total_sample /= total_amplitude;
-        return 0.5 + 0.5 * total_sample;
+        let (amp, sample) = self
+            .noises
+            .iter()
+            .map(|n| (n.amplitude, n.get(point)))
+            .reduce(|(agg_amp, agg_sample), (amp, sample)| ((agg_amp + amp), (agg_sample + sample)))
+            .unwrap_or((1., 0.));
+        (sample / amp) * 0.5 + 0.5
     }
 }
 
 impl NoiseFn<i32, 3> for StackedNoise {
     fn get(&self, point: [i32; 3]) -> f64 {
-        let mut total_sample = 0.;
-        let mut total_amplitude = 0.;
-        for g in &self.0 {
-            total_sample += g.get(point);
-            total_amplitude += g.amplitude;
-        }
-        total_sample /= total_amplitude;
-        return 0.5 + 0.5 * total_sample;
+        let (amp, sample) = self
+            .noises
+            .iter()
+            .map(|n| (n.amplitude, n.get(point)))
+            .reduce(|(agg_amp, agg_sample), (amp, sample)| ((agg_amp + amp), (agg_sample + sample)))
+            .unwrap_or((1., 0.));
+        (sample / amp) * 0.5 + 0.5
     }
 }
