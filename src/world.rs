@@ -2,7 +2,7 @@ use crate::{
     block::Block,
     camera_distance::CameraDistance,
     chunk::{
-        data::{Blocks, CaveNetworkNoise, ContinentNoise, HeightNoise, Noise3d},
+        data::{Blocks, ContinentNoise, HeightNoise, Noise3d},
         position::ChunkPosition,
         spatial::SpatiallyMapped,
         Chunk, CHUNK_SIZE, CHUNK_SIZE_I32,
@@ -21,6 +21,7 @@ use bevy::{
 };
 use index::ChunkIndex;
 use neighborhood::Neighborhood;
+use noise::NoiseFn;
 use seed::{LoadSeed, WorldSeed};
 use stage::Stage;
 use std::collections::HashSet;
@@ -30,9 +31,6 @@ use world_noise::{
 
 const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 7;
 const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 4;
-const CAVE_GRID_SIZE: f64 = 64.0;
-const CAVE_RADIUS: f64 = 10.0;
-const CAVE_DISPLACEMENT_STRENGTH: f64 = 12.0;
 
 pub mod block_update;
 pub mod index;
@@ -74,11 +72,7 @@ fn init_noise(mut commands: Commands, seed: Res<WorldSeed>) {
     commands.insert_resource(ContinentNoiseGenerator::new(seed.0));
     commands.insert_resource(HeightNoiseGenerator::new(seed.0));
     commands.insert_resource(WhiteNoise::new(seed.0));
-    commands.insert_resource(CaveNetworkNoiseGenerator::new(
-        seed.0,
-        CAVE_GRID_SIZE,
-        CAVE_DISPLACEMENT_STRENGTH * CAVE_GRID_SIZE,
-    ));
+    commands.insert_resource(CaveNetworkNoiseGenerator::new(seed.0));
 }
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -90,12 +84,7 @@ struct ChunkLoadTaskData {
 }
 
 enum AddedChunkData {
-    Noise {
-        continent_noise: ContinentNoise,
-        height_noise: HeightNoise,
-        noise_3d: Noise3d,
-        cave_network_noise: CaveNetworkNoise,
-    },
+    Noise(NoiseBundle),
     Blocks(Blocks, Stage),
     BlockUpdates(Vec<(Block, [usize; 3])>, Stage),
 }
@@ -194,19 +183,8 @@ fn receive_chunk_load_tasks(
             return false;
         };
         match data.added_data {
-            AddedChunkData::Noise {
-                continent_noise,
-                height_noise,
-                noise_3d,
-                cave_network_noise,
-            } => {
-                entity.try_insert((
-                    Stage::Noise,
-                    continent_noise,
-                    height_noise,
-                    noise_3d,
-                    cave_network_noise,
-                ));
+            AddedChunkData::Noise(bundle) => {
+                entity.try_insert((Stage::Noise, bundle));
             }
             AddedChunkData::Blocks(blocks, stage) => {
                 entity.try_insert((blocks, stage));
@@ -231,13 +209,16 @@ fn receive_chunk_load_tasks(
 
 fn begin_noise_load_tasks(
     mut tasks: ResMut<ChunkLoadTasks>,
-    q_chunk: Query<(Entity, &ChunkPosition), (With<Chunk>, Without<ContinentNoise>)>,
+    q_chunk: Query<
+        (Entity, &ChunkPosition, &CameraDistance),
+        (With<Chunk>, Without<ContinentNoise>),
+    >,
     continent_noise_generator: Res<ContinentNoiseGenerator>,
     height_noise_generator: Res<HeightNoiseGenerator>,
     white_noise: Res<WhiteNoise>,
-    cave_noise_generator: Res<CaveNetworkNoiseGenerator>,
+    // cave_noise_generator: Res<CaveNetworkNoiseGenerator>,
 ) {
-    for (entity, pos) in q_chunk.iter() {
+    for (entity, pos, _) in q_chunk.iter().sort::<&CameraDistance>() {
         if tasks.0.contains_key(pos) {
             continue;
         }
@@ -245,29 +226,31 @@ fn begin_noise_load_tasks(
         let continent_noise_generator = continent_noise_generator.clone();
         let height_noise_generator = height_noise_generator.clone();
         let white_noise = white_noise.clone();
-        let cave_noise_generator = cave_noise_generator.clone();
+        // let cave_noise_generator = cave_noise_generator.clone();
         let pos_ivec = pos.0;
         let task = task_pool.spawn(async move {
-            let (continent_noise, height_noise, noise_3d, cave_network_noise) =
-                generate_chunk_noise(
-                    pos_ivec,
-                    continent_noise_generator,
-                    height_noise_generator,
-                    white_noise,
-                    cave_noise_generator,
-                );
+            let bundle = generate_chunk_noise(
+                pos_ivec,
+                continent_noise_generator,
+                height_noise_generator,
+                white_noise,
+                // cave_noise_generator,
+            );
             ChunkLoadTaskData {
                 entity,
-                added_data: AddedChunkData::Noise {
-                    continent_noise,
-                    height_noise,
-                    noise_3d,
-                    cave_network_noise,
-                },
+                added_data: AddedChunkData::Noise(bundle),
             }
         });
         tasks.0.insert(*pos, task);
     }
+}
+
+#[derive(Bundle)]
+struct NoiseBundle {
+    continent: ContinentNoise,
+    height: HeightNoise,
+    white: Noise3d,
+    // cave: CaveNetworkNoise,
 }
 
 fn generate_chunk_noise(
@@ -275,13 +258,18 @@ fn generate_chunk_noise(
     continent_noise: ContinentNoiseGenerator,
     height_noise: HeightNoiseGenerator,
     white_noise: WhiteNoise,
-    cave_noise_generator: CaveNetworkNoiseGenerator,
-) -> (ContinentNoise, HeightNoise, Noise3d, CaveNetworkNoise) {
+    // cave_noise_generator: CaveNetworkNoiseGenerator,
+) -> NoiseBundle {
     let continent = ContinentNoise::from((continent_noise.0.as_ref(), chunk_pos));
     let height = HeightNoise::from((height_noise.0.as_ref(), chunk_pos));
-    let noise = Noise3d::from((white_noise, chunk_pos));
-    let cave = CaveNetworkNoise::from((cave_noise_generator, chunk_pos));
-    (continent, height, noise, cave)
+    let white = Noise3d::from((white_noise, chunk_pos));
+    // let cave = CaveNetworkNoise::from((cave_noise_generator, chunk_pos));
+    NoiseBundle {
+        continent,
+        height,
+        white,
+        // cave,
+    }
 }
 
 #[derive(QueryData)]
@@ -291,12 +279,13 @@ struct TerrainGenerateData {
     stage: &'static Stage,
     continent_noise: &'static ContinentNoise,
     height_noise: &'static HeightNoise,
-    cave_network_noise: &'static CaveNetworkNoise,
+    // cave_network_noise: &'static CaveNetworkNoise,
 }
 
 fn begin_terrain_sculpt_tasks(
     mut tasks: ResMut<ChunkLoadTasks>,
     q_chunk: Query<TerrainGenerateData, (With<Chunk>, Without<Blocks>, Changed<Stage>)>,
+    cave_noise: Res<CaveNetworkNoiseGenerator>,
 ) {
     for item in q_chunk.iter() {
         if tasks.0.contains_key(item.chunk_pos) || item.stage != &Stage::Noise {
@@ -305,14 +294,15 @@ fn begin_terrain_sculpt_tasks(
         let task_pool = AsyncComputeTaskPool::get();
         let continent_noise = item.continent_noise.clone();
         let height_noise = item.height_noise.clone();
-        let cave_network_noise = item.cave_network_noise.clone();
+        // let cave_network_noise = item.cave_network_noise.clone();
         let cloned_pos = item.chunk_pos.clone();
+        let cloned_cave_noise = cave_noise.clone();
         let task = task_pool.spawn(async move {
             let blocks = generate_terrain_sculpt_for_chunk(
                 cloned_pos,
                 continent_noise,
                 height_noise,
-                cave_network_noise,
+                cloned_cave_noise,
             );
             ChunkLoadTaskData {
                 entity: item.entity,
@@ -327,20 +317,21 @@ fn generate_terrain_sculpt_for_chunk(
     pos: ChunkPosition,
     continent: ContinentNoise,
     height: HeightNoise,
-    cave_network_noise: CaveNetworkNoise,
+    cave_noise: CaveNetworkNoiseGenerator,
+    // cave_network_noise: CaveNetworkNoise,
 ) -> Blocks {
     const CONTINENT_SCALE: f32 = 60.0;
     const LAND_HEIGHT_SCALE: f32 = 50.0;
     const SEA_LEVEL: i32 = 0;
     const DIRT_DEPTH: i32 = 4;
-    const CAVE_THRESHOLD: f32 = (CAVE_RADIUS / CAVE_GRID_SIZE) as f32;
     let chunk_pos = pos.0;
     Blocks::from_fn(|pos| {
-        let is_cave = cave_network_noise.at_pos(pos) < &CAVE_THRESHOLD;
-        let [x, y, z] = pos;
-        let yi = chunk_pos.y * CHUNK_SIZE_I32 + y as i32;
-        let y = yi as f32;
+        let [x, _, z] = pos;
+        let world_pos = chunk_pos * CHUNK_SIZE_I32 + IVec3::from(pos.map(|x| x as i32));
+        let y = world_pos.y as f32;
         let continent_noise = (continent.at_pos([x, z]) - 0.5) * 2.0;
+        let cave_noise = cave_noise.get(world_pos.into());
+        let is_cave = cave_noise == 0.;
         if continent_noise <= 0.0 {
             return if y < continent_noise * CONTINENT_SCALE {
                 if is_cave {
@@ -348,7 +339,7 @@ fn generate_terrain_sculpt_for_chunk(
                 } else {
                     Block::Stone
                 }
-            } else if yi <= SEA_LEVEL {
+            } else if world_pos.y <= SEA_LEVEL {
                 Block::Water
             } else {
                 Block::Air

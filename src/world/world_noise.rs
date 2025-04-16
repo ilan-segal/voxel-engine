@@ -1,13 +1,10 @@
-use bevy::{
-    math::{DVec2, DVec3},
-    prelude::*,
-};
+use bevy::prelude::*;
 use core::f64;
 use noise::{
     permutationtable::{NoiseHasher, PermutationTable},
-    NoiseFn, Simplex,
+    NoiseFn, ScalePoint, Simplex,
 };
-use std::sync::Arc;
+use std::{ops::Mul, sync::Arc};
 
 #[derive(Resource, Clone)]
 pub struct ContinentNoiseGenerator(pub Arc<StackedNoise>);
@@ -43,9 +40,6 @@ impl WhiteNoise {
 
 impl NoiseFn<i32, 3> for WhiteNoise {
     fn get(&self, [x, y, z]: [i32; 3]) -> f64 {
-        // let x = fast_hash_i32(x + self.seed as i32);
-        // let y = fast_hash_i32(y ^ self.seed as i32);
-        // let z = fast_hash_i32(z ^ self.seed.wrapping_shl(16) as i32);
         let result = self
             .permutation_table
             .hash(&[x as isize, y as isize, z as isize]) as u8;
@@ -56,126 +50,38 @@ impl NoiseFn<i32, 3> for WhiteNoise {
 
 #[derive(Resource, Clone)]
 pub struct CaveNetworkNoiseGenerator {
-    noise: Arc<CaveNoise>,
+    noise_a: Arc<ScalePoint<Simplex>>,
+    noise_b: Arc<ScalePoint<Simplex>>,
 }
 
-type CaveNoise = Displace3d<GridNoise, StackedNoise>;
+const SCALE_A: f64 = 0.01;
 
 impl CaveNetworkNoiseGenerator {
-    pub fn new(seed: u32, grid_size: f64, displacement_strength: f64) -> Self {
-        let x = StackedNoise::new(seed.rotate_left(1), 4, 500.);
-        let y = StackedNoise::new(seed.rotate_left(2), 4, 1000.);
-        let z = StackedNoise::new(seed.rotate_left(3), 4, 500.);
-        let source = GridNoise {
-            size: grid_size,
-            dropout_rate_y: 0.75,
-            dropout_rate_xz: 0.5,
-            permutation_table: PermutationTable::new(seed),
-        };
-        let displaced = Displace3d {
-            source,
-            displacement_strength,
-            x,
-            y,
-            z,
-        };
-        let noise = Arc::new(displaced);
-        Self { noise }
+    pub fn new(seed: u32) -> Self {
+        Self {
+            noise_a: Arc::new(
+                ScalePoint::new(Simplex::new(seed.rotate_left(0))).set_scale(SCALE_A * 0.9),
+            ),
+            noise_b: Arc::new(
+                ScalePoint::new(Simplex::new(seed.rotate_left(1))).set_scale(SCALE_A * 1.1),
+            ),
+        }
     }
 }
+
+const NOISE_A_MAX: f64 = 0.075;
 
 impl NoiseFn<i32, 3> for CaveNetworkNoiseGenerator {
     fn get(&self, point: [i32; 3]) -> f64 {
-        self.noise.get(point)
-    }
-}
-
-struct Displace3d<Source, Displacer>
-where
-    Source: NoiseFn<f64, 3>,
-    Displacer: NoiseFn<i32, 3>,
-{
-    source: Source,
-    x: Displacer,
-    y: Displacer,
-    z: Displacer,
-    displacement_strength: f64,
-}
-
-impl<Source, Displacer> NoiseFn<i32, 3> for Displace3d<Source, Displacer>
-where
-    Source: NoiseFn<f64, 3>,
-    Displacer: NoiseFn<i32, 3>,
-{
-    fn get(&self, point: [i32; 3]) -> f64 {
-        let dx = self.x.get(point) * self.displacement_strength;
-        let dy = self.y.get(point) * self.displacement_strength;
-        let dz = self.z.get(point) * self.displacement_strength;
-        let [x0, y0, z0] = point.map(|x| x as f64);
-        let new_point = [x0 + dx, y0 + dy, z0 + dz];
-        return self.source.get(new_point);
-    }
-}
-
-struct GridNoise {
-    size: f64,
-    dropout_rate_xz: f32,
-    dropout_rate_y: f32,
-    permutation_table: PermutationTable,
-}
-
-impl NoiseFn<f64, 3> for GridNoise {
-    fn get(&self, point: [f64; 3]) -> f64 {
-        let p = (DVec3::from(point) / self.size).fract_gl();
-        let midline = DVec2::ONE * 0.5;
-
-        let [x, y, z] = self
-            .get_dropouts(DVec3::from(point) / self.size)
-            .map(|drop_segment| if drop_segment { f64::INFINITY } else { 1. });
-
-        let distances = [
-            (p.xy() - midline).length() * z,
-            (p.xz() - midline).length() * y,
-            (p.yz() - midline).length() * x,
-        ];
-        let distance_to_midline = distances
-            .iter()
-            .min_by(|a, b| {
-                a.partial_cmp(b)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .unwrap();
-        return *distance_to_midline;
-    }
-}
-
-impl GridNoise {
-    fn get_dropouts<T>(&self, p: T) -> [bool; 3]
-    where
-        DVec3: From<T>,
-    {
-        let [x, y, z] = DVec3::from(p)
-            .abs()
-            .as_ivec3()
-            .to_array();
-        let seed = x ^ y.rotate_left(1) ^ z.rotate_left(2);
-        let x_dropout = self
-            .permutation_table
-            .hash(&[seed as isize]) as f32
-            / 255.;
-        let y_dropout = self
-            .permutation_table
-            .hash(&[seed.rotate_left(1) as isize]) as f32
-            / 255.;
-        let z_dropout = self
-            .permutation_table
-            .hash(&[seed.rotate_left(2) as isize]) as f32
-            / 255.;
-        [
-            x_dropout < self.dropout_rate_xz,
-            y_dropout < self.dropout_rate_y,
-            z_dropout < self.dropout_rate_xz,
-        ]
+        let point = point.map(|x| x as f64);
+        let sample_a = self.noise_a.get(point).abs() + 1.0;
+        let sample_b = self.noise_b.get(point).abs() + 1.0;
+        let sample = sample_a.mul(sample_b) - 1.0;
+        if sample > NOISE_A_MAX {
+            1.
+        } else {
+            0.
+        }
     }
 }
 
