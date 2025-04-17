@@ -332,12 +332,13 @@ fn generate_terrain_sculpt_for_chunk(
         let continent_noise = (continent.at_pos([x, z]) - 0.5) * 2.0;
         let cave_noise = cave_noise.get(world_pos.into());
         let is_cave = cave_noise == 0.;
+        // Ocean
         if continent_noise <= 0.0 {
             return if y < continent_noise * CONTINENT_SCALE {
                 if is_cave {
                     Block::Air
                 } else {
-                    Block::Stone
+                    Block::Sand
                 }
             } else if world_pos.y <= SEA_LEVEL {
                 Block::Water
@@ -345,9 +346,11 @@ fn generate_terrain_sculpt_for_chunk(
                 Block::Air
             };
         }
+        // Land
         let coast_height_factor = stretch_range_onto_unit_interval(continent_noise, 0.0, 0.2);
         let height_noise = height.at_pos([x, z]);
         let land_height = height_noise * coast_height_factor * LAND_HEIGHT_SCALE;
+        let is_coast = land_height <= 2.0;
         if y < land_height && is_cave {
             return Block::Air;
         }
@@ -356,7 +359,11 @@ fn generate_terrain_sculpt_for_chunk(
         } else if y < land_height - 1.0 {
             Block::Dirt
         } else if y < land_height {
-            Block::Grass
+            if is_coast {
+                Block::Sand
+            } else {
+                Block::Grass
+            }
         } else {
             Block::Air
         }

@@ -8,6 +8,7 @@ pub enum Block {
     Stone,
     Dirt,
     Grass,
+    Sand,
     Wood,
     Leaves,
     Water,

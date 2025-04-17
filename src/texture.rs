@@ -72,6 +72,7 @@ pub struct BlockMaterials {
     stone: Handle<TerrainMaterial>,
     dirt: Handle<TerrainMaterial>,
     grass: Handle<TerrainMaterial>,
+    sand: Handle<TerrainMaterial>,
     wood: Handle<TerrainMaterial>,
     wood_top: Handle<TerrainMaterial>,
     leaves: Handle<TerrainMaterial>,
@@ -84,6 +85,7 @@ impl BlockMaterials {
             (Block::Stone, _) => MaterialHandle::Terrain(&self.stone),
             (Block::Dirt, _) => MaterialHandle::Terrain(&self.dirt),
             (Block::Grass, _) => MaterialHandle::Terrain(&self.grass),
+            (Block::Sand, _) => MaterialHandle::Terrain(&self.sand),
             (Block::Wood, BlockSide::Down) | (Block::Wood, BlockSide::Up) => {
                 MaterialHandle::Terrain(&self.wood_top)
             }
@@ -114,6 +116,7 @@ fn setup(
         stone: get_material("textures/blocks/stone.png", Block::Stone.get_colour()),
         dirt: get_material("textures/blocks/dirt.png", Block::Dirt.get_colour()),
         grass: get_material("textures/blocks/grass.png", Block::Grass.get_colour()),
+        sand: get_material("textures/blocks/sand.png", Block::Sand.get_colour()),
         wood: get_material("textures/blocks/oak_log.png", Block::Wood.get_colour()),
         wood_top: get_material("textures/blocks/oak_log_top.png", Block::Wood.get_colour()),
         leaves: get_material("textures/blocks/oak_leaves.png", Block::Leaves.get_colour()),
