@@ -7,6 +7,7 @@ use crate::{
 };
 use bevy::{ecs::query::QueryData, prelude::*};
 
+mod dirt;
 mod grass;
 
 pub struct BlockPlugin;
@@ -18,7 +19,7 @@ impl Plugin for BlockPlugin {
             .init_resource::<RandomTickSpeed>()
             .add_systems(Update, set_block.in_set(WorldSet))
             .add_systems(FixedUpdate, do_random_block_updates)
-            .add_plugins(grass::GrassUpdatePlugin);
+            .add_plugins((dirt::DirtUpdatePlugin, grass::GrassUpdatePlugin));
     }
 }
 
@@ -62,7 +63,7 @@ pub struct RandomTickSpeed(pub u8);
 
 impl Default for RandomTickSpeed {
     fn default() -> Self {
-        Self(3)
+        Self(24)
     }
 }
 
