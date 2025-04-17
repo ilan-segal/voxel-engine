@@ -120,6 +120,14 @@ impl<T: SpatiallyMapped<3>> Neighborhood<T> {
             .map(|blocks| blocks.at_pos([x, y, z]))
     }
 
+    pub fn at_pos<Pos>(&self, p: Pos) -> Option<&T::Item>
+    where
+        Pos: Into<[i32; 3]>,
+    {
+        let [x, y, z] = p.into();
+        self.at(x, y, z)
+    }
+
     pub fn at_layer(&self, side: &BlockSide, layer: i32, row: i32, col: i32) -> Option<&T::Item> {
         let (x, y, z) = layer_to_xyz(side, layer, row, col);
         self.at(x, y, z)

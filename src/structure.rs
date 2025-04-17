@@ -44,6 +44,7 @@ impl Structure {
                 .for_each(|(x, y, z)| {
                     blocks.push((Block::Leaves, [x, y, z]));
                 });
+                blocks.push((Block::Dirt, [0, -1, 0]));
                 return blocks;
             }
         }

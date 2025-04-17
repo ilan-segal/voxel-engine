@@ -39,6 +39,7 @@ mod world;
 
 const BLOCK_SIZE: f32 = 1.0;
 const SKY_COLOUR: Color = Color::linear_rgb(0.25, 0.60, 0.92);
+const TICKS_PER_SECOND: u8 = 20;
 
 fn main() {
     App::new()
@@ -68,6 +69,7 @@ fn main() {
             item::ItemPlugin,
         ))
         .insert_state(GameState::Init)
+        .insert_resource(Time::<Fixed>::from_hz(TICKS_PER_SECOND as f64))
         .add_systems(OnEnter(GameState::InGame), setup_game)
         .add_systems(
             Update,
