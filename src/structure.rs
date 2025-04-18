@@ -157,9 +157,19 @@ fn generate_tree_spots_xz(noise: &Noise3d) -> impl Iterator<Item = [u32; 2]> + u
 }
 
 fn find_grass_block([x, z]: [u32; 2], blocks: &Blocks) -> Option<[u32; 3]> {
-    (0..=CHUNK_SIZE_U32 - 1)
+    let x = x as usize;
+    let z = z as usize;
+    (0..CHUNK_SIZE - 1)
         .rev()
-        .filter(|y| blocks.at_pos([x as usize, *y as usize, z as usize]) == &Block::Grass)
+        .skip_while(|y| blocks.at_pos([x, *y, z]) == &Block::Air)
         .next()
-        .map(|y| [x, y, z])
+        .filter(|y| blocks.at_pos([x, *y + 1, z]) == &Block::Air)
+        .filter(|y| {
+            let block = blocks.at_pos([x, *y, z]);
+            match block {
+                &Block::Grass | &Block::Dirt => true,
+                _ => false,
+            }
+        })
+        .map(|y| [x as u32, y as u32, z as u32])
 }
