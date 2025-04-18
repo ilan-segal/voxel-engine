@@ -3,6 +3,7 @@ use core::f32;
 use aabb::Aabb;
 use bevy::{ecs::query::QueryData, prelude::*};
 use collision::{Collidable, Collision};
+use falling_state::FallingState;
 use friction::Friction;
 use gravity::Gravity;
 use velocity::Velocity;
@@ -15,6 +16,7 @@ use crate::{
 
 pub mod aabb;
 pub mod collision;
+pub mod falling_state;
 pub mod friction;
 pub mod gravity;
 pub mod velocity;
@@ -41,6 +43,9 @@ impl Plugin for PhysicsPlugin {
                         .chain()
                         .in_set(PhysicsSystemSet::Act),
                     stop_velocity_from_collisions.in_set(PhysicsSystemSet::React),
+                    update_grounded_state
+                        .after(PhysicsSystemSet::Act)
+                        .before(PhysicsSystemSet::React),
                 ),
             );
     }
@@ -240,4 +245,25 @@ fn solid_block_is_in_range(
             Some(block) => block.is_solid(),
         }
     })
+}
+
+fn update_grounded_state(
+    mut q_state: Query<(&mut FallingState, &Velocity)>,
+    mut collisions: EventReader<Collision>,
+) {
+    for (mut state, v) in q_state.iter_mut() {
+        if v.0.y != 0.0 {
+            *state = FallingState::Falling;
+        } else {
+            *state = FallingState::Grounded;
+        }
+    }
+    for Collision { entity, normal } in collisions.read() {
+        let Ok((mut state, ..)) = q_state.get_mut(*entity) else {
+            continue;
+        };
+        if normal.y > 0.0 {
+            *state = FallingState::Grounded;
+        }
+    }
 }

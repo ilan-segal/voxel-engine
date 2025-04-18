@@ -1,11 +1,8 @@
 use crate::{
     chunk::CHUNK_SIZE,
     physics::{
-        aabb::Aabb,
-        collision::{Collidable, Collision},
-        gravity::Gravity,
+        aabb::Aabb, collision::Collidable, falling_state::FallingState, gravity::Gravity,
         velocity::Velocity,
-        PhysicsSystemSet,
     },
     render_layer::WORLD_LAYER,
 };
@@ -16,14 +13,12 @@ use bevy::{
 };
 use block_target::BlockTargetPlugin;
 use controls::target_velocity::TargetVelocity;
-use falling_state::FallingState;
 use health::{Health, MaxHealth};
 use inventory::{HotbarSelection, Inventory, PickUpRange};
 use mode::PlayerMode;
 
 pub mod block_target;
 mod controls;
-pub mod falling_state;
 pub mod health;
 pub mod inventory;
 pub mod mode;
@@ -37,15 +32,7 @@ impl Plugin for PlayerPlugin {
             controls::ControlsPlugin,
             inventory::InventoryPlugin,
         ))
-        .add_systems(
-            Update,
-            (
-                update_grounded_state
-                    .after(PhysicsSystemSet::Act)
-                    .before(PhysicsSystemSet::React),
-                update_gravity,
-            ),
-        );
+        .add_systems(Update, update_gravity);
     }
 }
 
@@ -126,27 +113,6 @@ impl Default for PlayerBundle {
             pick_up_range: PickUpRange { meters: 2.0 },
             hotbar_selection: default(),
             render_layers: RenderLayers::layer(WORLD_LAYER),
-        }
-    }
-}
-
-fn update_grounded_state(
-    mut q_state: Query<(&mut FallingState, &Velocity), With<Player>>,
-    mut collisions: EventReader<Collision>,
-) {
-    for (mut state, v) in q_state.iter_mut() {
-        if v.0.y != 0.0 {
-            *state = FallingState::Falling;
-        } else {
-            *state = FallingState::Grounded;
-        }
-    }
-    for Collision { entity, normal } in collisions.read() {
-        let Ok((mut state, ..)) = q_state.get_mut(*entity) else {
-            continue;
-        };
-        if normal.y > 0.0 {
-            *state = FallingState::Grounded;
         }
     }
 }

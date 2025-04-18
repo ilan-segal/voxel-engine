@@ -1,6 +1,8 @@
-use super::{falling_state::FallingState, mode::PlayerMode, Jumping, Player, Sneaking, Sprinting};
+use super::{mode::PlayerMode, Jumping, Player, Sneaking, Sprinting};
 use crate::{
-    physics::{gravity::Gravity, velocity::Velocity, PhysicsSystemSet},
+    physics::{
+        falling_state::FallingState, gravity::Gravity, velocity::Velocity, PhysicsSystemSet,
+    },
     state::GameState,
 };
 use bevy::{ecs::query::QueryData, prelude::*};
