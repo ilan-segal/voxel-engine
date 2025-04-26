@@ -428,7 +428,10 @@ fn generate_structures(
     // let structure = StructureType::Tree;
     // let updates = structure.get_structures(&blocks, &noise);
 
-    // TODO
+    /*
+    TODO: Separate neighborhood for pre-structure blocks (e.g. Neighborhood<Terrain>)
+    This fixes issues with structures conflicting with themselves across chunk boundaries
+     */
     AddedChunkData::BlockUpdates(
         StructureType::Tree.get_structure_blocks(&blocks, &noise),
         Stage::Structures,

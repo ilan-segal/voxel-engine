@@ -4,7 +4,7 @@ use noise::{
     permutationtable::{NoiseHasher, PermutationTable},
     NoiseFn, ScalePoint, Simplex,
 };
-use std::{ops::Mul, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Resource, Clone)]
 pub struct ContinentNoiseGenerator(pub Arc<StackedNoise>);
@@ -52,9 +52,11 @@ impl NoiseFn<i32, 3> for WhiteNoise {
 pub struct CaveNetworkNoiseGenerator {
     noise_a: Arc<ScalePoint<Simplex>>,
     noise_b: Arc<ScalePoint<Simplex>>,
+    exclusion_noise: Arc<ScalePoint<Simplex>>,
 }
 
-const SCALE_A: f64 = 0.01;
+const SCALE_A: f64 = 0.02;
+const EXCLUSION_SCALE: f64 = 0.005;
 
 impl CaveNetworkNoiseGenerator {
     pub fn new(seed: u32) -> Self {
@@ -65,18 +67,25 @@ impl CaveNetworkNoiseGenerator {
             noise_b: Arc::new(
                 ScalePoint::new(Simplex::new(seed.rotate_left(1))).set_scale(SCALE_A * 1.1),
             ),
+            exclusion_noise: Arc::new(
+                ScalePoint::new(Simplex::new(seed.rotate_left(2))).set_scale(EXCLUSION_SCALE),
+            ),
         }
     }
 }
 
-const NOISE_A_MAX: f64 = 0.075;
+const NOISE_A_MAX: f64 = 0.095;
+const EXCLUSION_THRESHOLD: f64 = 0.25;
 
 impl NoiseFn<i32, 3> for CaveNetworkNoiseGenerator {
     fn get(&self, point: [i32; 3]) -> f64 {
         let point = point.map(|x| x as f64);
-        let sample_a = self.noise_a.get(point).abs() + 1.0;
-        let sample_b = self.noise_b.get(point).abs() + 1.0;
-        let sample = sample_a.mul(sample_b) - 1.0;
+        if self.exclusion_noise.get(point).abs() < EXCLUSION_THRESHOLD {
+            return 1.;
+        }
+        let sample_a = self.noise_a.get(point).abs();
+        let sample_b = self.noise_b.get(point).abs();
+        let sample = sample_a.max(sample_b);
         if sample > NOISE_A_MAX {
             1.
         } else {
