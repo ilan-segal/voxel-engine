@@ -83,7 +83,7 @@ pub struct ItemBundle {
 #[derive(Bundle)]
 pub struct DroppedItemBundle {
     pub item: ItemBundle,
-    pub spatial: SpatialBundle,
+    pub transform: Transform,
     pub chunk_position: ChunkPosition,
     pub aabb: Aabb,
     pub collidable: Collidable,
@@ -115,39 +115,33 @@ fn add_mesh(
                             .spawn((
                                 ItemMeshRoot,
                                 InheritedVisibility::VISIBLE,
-                                TransformBundle::default(),
+                                Transform::default(),
                                 Age::default(),
                             ))
                             .with_children(|sub_builder| {
                                 if let Some(handles) = block_meshes.terrain.get(block) {
                                     for (mesh, material) in handles.iter() {
                                         sub_builder.spawn((
-                                            MaterialMeshBundle {
-                                                material: material.clone(),
-                                                mesh: mesh.clone(),
-                                                transform: Transform::from_translation(
-                                                    Vec3::new(-1.0, 1.0, -1.0)
-                                                        * DROPPED_ITEM_SCALE
-                                                        * 2.0,
-                                                ),
-                                                ..default()
-                                            },
+                                            mesh.clone(),
+                                            material.clone(),
+                                            Transform::from_translation(
+                                                Vec3::new(-1.0, 1.0, -1.0)
+                                                    * DROPPED_ITEM_SCALE
+                                                    * 2.0,
+                                            ),
                                             RenderLayers::layer(WORLD_LAYER),
                                         ));
                                     }
                                 } else if let Some(handles) = block_meshes.fluid.get(block) {
                                     for (mesh, material) in handles.iter() {
                                         sub_builder.spawn((
-                                            MaterialMeshBundle {
-                                                material: material.clone(),
-                                                mesh: mesh.clone(),
-                                                transform: Transform::from_translation(
-                                                    Vec3::new(-1.0, 1.0, -1.0)
-                                                        * DROPPED_ITEM_SCALE
-                                                        * 2.0,
-                                                ),
-                                                ..default()
-                                            },
+                                            mesh.clone(),
+                                            material.clone(),
+                                            Transform::from_translation(
+                                                Vec3::new(-1.0, 1.0, -1.0)
+                                                    * DROPPED_ITEM_SCALE
+                                                    * 2.0,
+                                            ),
                                             RenderLayers::layer(WORLD_LAYER),
                                         ));
                                     }

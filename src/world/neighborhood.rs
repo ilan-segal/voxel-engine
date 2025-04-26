@@ -32,8 +32,8 @@ impl<T: Component + Clone> Plugin for NeighborhoodPlugin<T> {
                     .chain()
                     .in_set(NeighborhoodSet),
             )
-            .observe(add_to_index::<T>)
-            .observe(remove_from_index::<T>);
+            .add_observer(add_to_index::<T>)
+            .add_observer(remove_from_index::<T>);
     }
 }
 

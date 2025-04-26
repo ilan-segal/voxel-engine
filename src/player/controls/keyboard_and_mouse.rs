@@ -39,8 +39,7 @@ impl Plugin for KeyboardMousePlugin {
                 rotate_camera_with_mouse,
                 process_keyboard_inputs,
                 delete_targeted_block.run_if(
-                    input_just_pressed(MouseButton::Left)
-                        .and_then(player_in_mode(PlayerMode::NoClip)),
+                    input_just_pressed(MouseButton::Left).and(player_in_mode(PlayerMode::NoClip)),
                 ),
                 place_block.run_if(input_just_pressed(MouseButton::Right)),
                 drop_item.run_if(input_just_pressed(KeyCode::KeyQ)),
@@ -49,7 +48,7 @@ impl Plugin for KeyboardMousePlugin {
             )
                 .run_if(in_state(GameState::InGame)),
         )
-        .observe(toggle_player_mode);
+        .add_observer(toggle_player_mode);
     }
 }
 
@@ -198,7 +197,7 @@ fn track_new_press(
 const DOUBLE_TAP_DURATION_SECONDS: f32 = 0.5;
 
 fn age_presses(mut q_tracker: Query<&mut SecondsSinceLastPress>, time: Res<Time>) {
-    let dt = time.delta_seconds();
+    let dt = time.delta_secs();
     for mut q_tracker in q_tracker.iter_mut() {
         q_tracker.0.retain(|_, duration_s| {
             *duration_s += dt;
@@ -293,11 +292,11 @@ fn drop_item(
                 item: Item::Block(block),
                 quantity,
             },
-            spatial: SpatialBundle::from_transform(Transform {
+            transform: Transform {
                 translation: player_transform.translation,
                 scale: Vec3::ONE * DROPPED_ITEM_SCALE,
                 ..default()
-            }),
+            },
             chunk_position: default(),
             gravity: default(),
             velocity: (player_transform.rotation * Vec3::NEG_Z * 5.0).into(),

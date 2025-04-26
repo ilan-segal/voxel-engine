@@ -43,7 +43,7 @@ impl PerfUiEntry for PerfUiCameraPosition {
 
     fn format_value(&self, value: &Self::Value) -> String {
         format!(
-            "X: {:.3$}, Y: {:.3$}, Z: {:.3$}",
+            "{:.3$}/{:.3$}/{:.3$}",
             value.x, value.y, value.z, self.precision
         )
     }

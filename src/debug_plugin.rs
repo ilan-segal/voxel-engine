@@ -6,7 +6,7 @@ use bevy::{
     input::common_conditions::input_just_pressed,
     prelude::*,
 };
-use iyes_perf_ui::{entries::PerfUiBundle, prelude::*};
+use iyes_perf_ui::prelude::*;
 use perf_ui_camera_facing::PerfUiCameraFacing;
 use perf_ui_camera_pos::PerfUiCameraPosition;
 use perf_ui_targeted_block::PerfUiTargetedBlock;
@@ -43,7 +43,7 @@ impl Plugin for DebugPlugin {
 
 fn setup(mut commands: Commands) {
     commands.spawn((
-        PerfUiBundle::default(),
+        PerfUiEntryFPS::default(),
         PerfUiCameraPosition::default(),
         PerfUiCameraFacing::default(),
         PerfUiTargetedBlock::default(),

@@ -1,5 +1,5 @@
 use bevy::{color::palettes::css::BLUE, input::common_conditions::input_just_pressed, prelude::*};
-use bevy_polyline::prelude::{PolylineBundle, PolylineMaterial};
+use bevy_polyline::prelude::{PolylineBundle, PolylineMaterial, PolylineMaterialHandle};
 
 use crate::{
     chunk::{position::ChunkPosition, CHUNK_SIZE},
@@ -29,17 +29,17 @@ fn setup(
     mut polyline_materials: ResMut<Assets<PolylineMaterial>>,
     mesh: Res<CubeFrameMeshHandle>,
 ) {
-    let material = polyline_materials.add(PolylineMaterial {
+    let material = PolylineMaterialHandle(polyline_materials.add(PolylineMaterial {
         width: 2.0,
         color: BLUE.into(),
         perspective: false,
         depth_bias: -0.001,
         ..default()
-    });
+    }));
     commands.spawn((
         ChunkBorder,
         PolylineBundle {
-            polyline: mesh.0.clone_weak(),
+            polyline: mesh.0.clone(),
             material,
             transform: Transform::from_scale(CHUNK_SIZE as f32 * Vec3::ONE),
             visibility: Visibility::Hidden,

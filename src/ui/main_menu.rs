@@ -51,38 +51,29 @@ fn setup_main_menu(
             builder
                 .spawn((
                     MainMenu,
-                    NodeBundle {
-                        style: Style {
-                            width: HUNDRED_PERCENT,
-                            height: HUNDRED_PERCENT,
-                            flex_direction: FlexDirection::Column,
-                            justify_content: JustifyContent::SpaceEvenly,
-                            align_items: AlignItems::Center,
-                            ..default()
-                        },
+                    Node {
+                        width: HUNDRED_PERCENT,
+                        height: HUNDRED_PERCENT,
+                        flex_direction: FlexDirection::Column,
+                        justify_content: JustifyContent::SpaceEvenly,
+                        align_items: AlignItems::Center,
                         ..default()
                     },
                 ))
                 .with_children(|builder2| {
                     // Logo
                     builder2.spawn((
-                        NodeBundle {
-                            style: Style {
-                                width: LOGO_WIDTH * LOGO_SCALE,
-                                height: LOGO_HEIGHT * LOGO_SCALE,
-                                ..Default::default()
-                            },
-                            ..Default::default()
+                        ImageNode::new(assets.logo.clone()),
+                        Node {
+                            width: LOGO_WIDTH * LOGO_SCALE,
+                            height: LOGO_HEIGHT * LOGO_SCALE,
+                            ..default()
                         },
-                        UiImage::new(assets.logo.clone()),
                     ));
                     builder2
-                        .spawn(NodeBundle {
-                            style: Style {
-                                flex_direction: FlexDirection::Column,
-                                row_gap: BUTTON_SPACING,
-                                ..default()
-                            },
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Column,
+                            row_gap: BUTTON_SPACING,
                             ..default()
                         })
                         .with_children(|buttons| {
@@ -90,59 +81,49 @@ fn setup_main_menu(
                             buttons
                                 .spawn((
                                     PlayButton,
-                                    ButtonBundle {
-                                        style: Style {
-                                            width: BUTTON_WIDTH,
-                                            height: BUTTON_HEIGHT,
-                                            ..Default::default()
-                                        },
+                                    Node {
+                                        width: BUTTON_WIDTH,
+                                        height: BUTTON_HEIGHT,
                                         ..Default::default()
                                     },
                                 ))
                                 .with_children(|text_builder| {
-                                    text_builder.spawn(
-                                        TextBundle::from_section(
-                                            "Play",
-                                            TextStyle {
-                                                font: font.0.clone(),
-                                                ..default()
-                                            },
-                                        )
-                                        .with_text_justify(JustifyText::Center)
-                                        .with_style(Style {
+                                    text_builder.spawn((
+                                        Text::new("Play"),
+                                        TextFont {
+                                            font: font.0.clone(),
+                                            ..default()
+                                        },
+                                        TextLayout::new_with_justify(JustifyText::Center),
+                                        Node {
                                             width: HUNDRED_PERCENT,
                                             ..default()
-                                        }),
-                                    );
+                                        },
+                                    ));
                                 });
                             // Quit button
                             buttons
                                 .spawn((
                                     QuitButton,
-                                    ButtonBundle {
-                                        style: Style {
-                                            width: BUTTON_WIDTH,
-                                            height: BUTTON_HEIGHT,
-                                            ..Default::default()
-                                        },
+                                    Node {
+                                        width: BUTTON_WIDTH,
+                                        height: BUTTON_HEIGHT,
                                         ..Default::default()
                                     },
                                 ))
                                 .with_children(|text_builder| {
-                                    text_builder.spawn(
-                                        TextBundle::from_section(
-                                            "Quit",
-                                            TextStyle {
-                                                font: font.0.clone(),
-                                                ..default()
-                                            },
-                                        )
-                                        .with_text_justify(JustifyText::Center)
-                                        .with_style(Style {
+                                    text_builder.spawn((
+                                        Text::new("Quit"),
+                                        TextFont {
+                                            font: font.0.clone(),
+                                            ..default()
+                                        },
+                                        TextLayout::new_with_justify(JustifyText::Center),
+                                        Node {
                                             width: HUNDRED_PERCENT,
                                             ..default()
-                                        }),
-                                    );
+                                        },
+                                    ));
                                 });
                         });
                 });
@@ -158,6 +139,7 @@ fn tear_down_main_menu(q_root: Query<Entity, With<MainMenu>>, mut commands: Comm
 }
 
 #[derive(Component)]
+#[require(Button)]
 struct PlayButton;
 
 fn play_button(
@@ -172,6 +154,7 @@ fn play_button(
 }
 
 #[derive(Component)]
+#[require(Button)]
 struct QuitButton;
 
 fn quit_button(

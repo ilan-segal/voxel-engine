@@ -1,6 +1,6 @@
 use bevy::{color::palettes::css::RED, input::common_conditions::input_just_pressed, prelude::*};
 use bevy_polyline::{
-    prelude::{PolylineBundle, PolylineMaterial},
+    prelude::{PolylineBundle, PolylineMaterial, PolylineMaterialHandle},
     PolylinePlugin,
 };
 
@@ -26,18 +26,18 @@ impl Plugin for AabbWireframePlugin {
 }
 
 fn setup(mut commands: Commands, mut polyline_materials: ResMut<Assets<PolylineMaterial>>) {
-    let material = polyline_materials.add(PolylineMaterial {
+    let material = PolylineMaterialHandle(polyline_materials.add(PolylineMaterial {
         width: 5.0,
         color: RED.into(),
         perspective: false,
         depth_bias: -0.001,
-    });
+    }));
     commands.insert_resource(HitboxFrameAssets { material });
 }
 
 #[derive(Resource)]
 struct HitboxFrameAssets {
-    material: Handle<PolylineMaterial>,
+    material: PolylineMaterialHandle,
 }
 
 #[derive(Component)]
@@ -58,7 +58,9 @@ fn add_hitbox_frame(
     is_visible: ResMut<IsVisible>,
 ) {
     for (e, aabb) in query.iter() {
-        commands.entity(e).try_insert(HasHitboxFrame);
+        commands
+            .entity(e)
+            .try_insert(HasHitboxFrame);
         commands.spawn((
             HitboxFrame {
                 parent: e,
@@ -66,8 +68,8 @@ fn add_hitbox_frame(
                 scale: aabb.get_dimensions(),
             },
             PolylineBundle {
-                polyline: mesh.0.clone_weak(),
-                material: assets.material.clone_weak(),
+                polyline: mesh.0.clone(),
+                material: assets.material.clone(),
                 visibility: if is_visible.0 {
                     Visibility::Visible
                 } else {

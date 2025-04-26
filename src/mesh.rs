@@ -47,7 +47,7 @@ impl Plugin for MeshPlugin {
                     .after(WorldSet)
                     .in_set(MeshSet),
             )
-            .observe(end_mesh_tasks_for_unloaded_chunks);
+            .add_observer(end_mesh_tasks_for_unloaded_chunks);
     }
 }
 
@@ -71,9 +71,14 @@ fn update_mesh_status(
 ) {
     for (e, stage) in q.iter() {
         if stage == &Stage::final_stage() {
-            commands.entity(e).remove::<Meshed>().insert(CheckedForMesh);
+            commands
+                .entity(e)
+                .remove::<Meshed>()
+                .insert(CheckedForMesh);
         } else {
-            commands.entity(e).insert((CheckedForMesh, Meshed));
+            commands
+                .entity(e)
+                .insert((CheckedForMesh, Meshed));
         }
     }
 }
@@ -84,7 +89,9 @@ fn mark_mesh_as_stale(
     mut tasks: ResMut<MeshGenTasks>,
 ) {
     for entity in q_changed_neighborhood.iter() {
-        commands.entity(entity).remove::<CheckedForMesh>();
+        commands
+            .entity(entity)
+            .remove::<CheckedForMesh>();
         tasks.0.remove(&entity);
     }
 }
@@ -185,21 +192,15 @@ fn receive_mesh_gen_tasks(
                 match materials.get(&block, &side) {
                     MaterialHandle::Terrain(handle) => {
                         builder.spawn((
-                            MaterialMeshBundle {
-                                mesh: meshes.add(mesh),
-                                material: handle.clone_weak(),
-                                ..default()
-                            },
+                            Mesh3d(meshes.add(mesh)),
+                            MeshMaterial3d(handle.clone_weak()),
                             render_layer.clone(),
                         ));
                     }
                     MaterialHandle::Fluid(handle) => {
                         builder.spawn((
-                            MaterialMeshBundle {
-                                mesh: meshes.add(mesh),
-                                material: handle.clone_weak(),
-                                ..default()
-                            },
+                            Mesh3d(meshes.add(mesh)),
+                            MeshMaterial3d(handle.clone_weak()),
                             render_layer.clone(),
                         ));
                     }
@@ -256,7 +257,10 @@ fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Vec<(Block, BlockSide, M
 // TODO: Replace slow implementation with binary mesher
 fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let middle = chunk.middle_chunk().clone().expect("Already checked");
+    let middle = chunk
+        .middle_chunk()
+        .clone()
+        .expect("Already checked");
     let mut blocks = middle.as_ref().clone();
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {
@@ -614,7 +618,10 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
         })
         .map(|c| c.to_linear().to_f32_array())
         .collect::<Vec<_>>();
-    let uv = quads.iter().flat_map(|q| q.uvs).collect::<Vec<_>>();
+    let uv = quads
+        .iter()
+        .flat_map(|q| q.uvs)
+        .collect::<Vec<_>>();
     let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD,

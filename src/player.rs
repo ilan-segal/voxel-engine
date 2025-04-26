@@ -6,11 +6,7 @@ use crate::{
     },
     render_layer::WORLD_LAYER,
 };
-use bevy::{
-    core_pipeline::{prepass::DepthPrepass, tonemapping::DebandDither},
-    prelude::*,
-    render::view::RenderLayers,
-};
+use bevy::{core_pipeline::prepass::DepthPrepass, prelude::*, render::view::RenderLayers};
 use block_target::BlockTargetPlugin;
 use controls::target_velocity::TargetVelocity;
 use health::{Health, MaxHealth};
@@ -51,10 +47,13 @@ pub struct Sneaking(pub bool);
 #[derive(Bundle)]
 pub struct PlayerBundle {
     player: Player,
-    camera: Camera3dBundle,
+    transform: Transform,
+    camera_3d: Camera3d,
+    projection: Projection,
+    msaa: Msaa,
     depth_prepass: DepthPrepass,
     render_layers: RenderLayers,
-    fog_settings: FogSettings,
+    distance_fog: DistanceFog,
     aabb: Aabb,
     collidable: Collidable,
     gravity: Gravity,
@@ -78,17 +77,16 @@ impl Default for PlayerBundle {
         let max_health = 20;
         Self {
             player: Player,
-            camera: Camera3dBundle {
-                transform: camera_pos.looking_to(Vec3::X, Vec3::Y),
-                projection: Projection::Perspective(PerspectiveProjection {
-                    fov: 70_f32.to_radians(),
-                    ..default()
-                }),
-                deband_dither: DebandDither::Enabled,
+            camera_3d: Camera3d::default(),
+            projection: PerspectiveProjection {
+                fov: 70_f32.to_radians(),
                 ..default()
-            },
+            }
+            .into(),
+            msaa: Msaa::Sample8,
+            transform: camera_pos.looking_to(Vec3::X, Vec3::Y),
             depth_prepass: DepthPrepass,
-            fog_settings: FogSettings {
+            distance_fog: DistanceFog {
                 color: Color::WHITE,
                 falloff: FogFalloff::from_visibility_colors(
                     CHUNK_SIZE as f32 * 5.0, // distance in world units up to which objects retain visibility (>= 5% contrast)

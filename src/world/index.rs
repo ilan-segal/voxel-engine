@@ -15,8 +15,8 @@ impl Plugin for ChunkIndexPlugin {
                     .before(MeshSet)
                     .before(WorldSet),
             )
-            .observe(on_chunk_loaded)
-            .observe(on_chunk_unloaded);
+            .add_observer(on_chunk_loaded)
+            .add_observer(on_chunk_unloaded);
     }
 }
 

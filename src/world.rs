@@ -64,7 +64,7 @@ impl Plugin for WorldPlugin {
                 .in_set(WorldSet)
                 .run_if(in_state(GameState::InGame)),
         )
-        .observe(kill_tasks_for_unloaded_chunks);
+        .add_observer(kill_tasks_for_unloaded_chunks);
     }
 }
 
@@ -142,15 +142,12 @@ fn update_chunks(
         commands.spawn((
             Chunk,
             ChunkPosition(pos),
-            SpatialBundle {
-                transform: Transform {
-                    translation: (pos * CHUNK_SIZE as i32).as_vec3() + Vec3::Y,
-                    scale: Vec3::ONE * super::BLOCK_SIZE,
-                    ..Default::default()
-                },
-                visibility: Visibility::Visible,
-                ..default()
+            Transform {
+                translation: (pos * CHUNK_SIZE as i32).as_vec3() + Vec3::Y,
+                scale: Vec3::ONE * super::BLOCK_SIZE,
+                ..Default::default()
             },
+            Visibility::Visible,
             RenderLayers::layer(WORLD_LAYER),
         ));
     }

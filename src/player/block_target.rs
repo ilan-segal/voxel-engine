@@ -31,16 +31,16 @@ fn setup(
     cube_frame_mesh: Res<CubeFrameMeshHandle>,
     mut polyline_materials: ResMut<Assets<PolylineMaterial>>,
 ) {
-    let material = polyline_materials.add(PolylineMaterial {
+    let material = PolylineMaterialHandle(polyline_materials.add(PolylineMaterial {
         width: 1.5,
         color: LinearRgba::BLACK,
         depth_bias: -0.001,
         perspective: false,
-    });
+    }));
     commands.spawn((
         TargetedBlockOutline,
         PolylineBundle {
-            polyline: cube_frame_mesh.0.clone_weak(),
+            polyline: cube_frame_mesh.0.clone(),
             material,
             visibility: Visibility::Hidden,
             ..default()

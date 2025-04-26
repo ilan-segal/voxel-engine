@@ -13,7 +13,7 @@ impl Plugin for FramePlugin {
 pub struct CubeFrameSetup;
 
 #[derive(Resource)]
-pub struct CubeFrameMeshHandle(pub Handle<Polyline>);
+pub struct CubeFrameMeshHandle(pub PolylineHandle);
 
 fn setup(mut commands: Commands, mut polylines: ResMut<Assets<Polyline>>) {
     /*
@@ -43,5 +43,5 @@ fn setup(mut commands: Commands, mut polylines: ResMut<Assets<Polyline>>) {
             .map(|v| *v - Vec3::ONE * 0.5)
             .collect::<_>(),
     });
-    commands.insert_resource(CubeFrameMeshHandle(cube_frame));
+    commands.insert_resource(CubeFrameMeshHandle(PolylineHandle(cube_frame)));
 }

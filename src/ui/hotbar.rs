@@ -16,7 +16,7 @@ impl Plugin for HotbarUiPlugin {
                 (update_selected_slot, update_item_display).run_if(in_state(GameState::InGame)),
             )
             .add_systems(OnEnter(GameState::InGame), spawn_hotbar)
-            .observe(add_slots);
+            .add_observer(add_slots);
     }
 }
 
@@ -25,8 +25,8 @@ pub struct HotbarDisplayRoot;
 
 #[derive(Resource)]
 struct HotbarSprites {
-    slot: UiImage,
-    selected_slot: UiImage,
+    slot: Handle<Image>,
+    selected_slot: Handle<Image>,
 }
 
 #[derive(Component)]
@@ -34,8 +34,8 @@ struct HotbarIndex(usize);
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let sprites = HotbarSprites {
-        slot: UiImage::new(asset_server.load("ui/hud/inventory/slot.png")),
-        selected_slot: UiImage::new(asset_server.load("ui/hud/inventory/selected_slot.png")),
+        slot: asset_server.load("ui/hud/inventory/slot.png"),
+        selected_slot: asset_server.load("ui/hud/inventory/selected_slot.png"),
     };
     commands.insert_resource(sprites);
 }
@@ -50,28 +50,22 @@ fn spawn_hotbar(mut commands: Commands) {
         .spawn((
             Ui,
             UiHotbar,
-            NodeBundle {
-                style: Style {
-                    height: Val::Percent(100.0),
-                    justify_content: JustifyContent::End,
-                    justify_self: JustifySelf::Center,
-                    flex_direction: FlexDirection::Column,
-                    ..default()
-                },
+            Node {
+                height: Val::Percent(100.0),
+                justify_content: JustifyContent::End,
+                justify_self: JustifySelf::Center,
+                flex_direction: FlexDirection::Column,
                 ..default()
             },
         ))
         .with_children(|builder| {
-            builder.spawn((Ui, HealthDisplayRoot, NodeBundle::default()));
+            builder.spawn((Ui, HealthDisplayRoot, Node::default()));
             builder.spawn((
                 Ui,
                 HotbarDisplayRoot,
-                NodeBundle {
-                    style: Style {
-                        width: Val::Percent(100.0),
-                        align_content: AlignContent::Start,
-                        ..default()
-                    },
+                Node {
+                    width: Val::Percent(100.0),
+                    align_content: AlignContent::Start,
                     ..default()
                 },
             ));
@@ -99,14 +93,11 @@ fn add_slots(
                 Ui,
                 HotbarSlot,
                 HotbarIndex(i),
-                sprites.slot.clone(),
-                NodeBundle {
-                    style: Style {
-                        width,
-                        height,
-                        margin,
-                        ..default()
-                    },
+                ImageNode::new(sprites.slot.clone()),
+                Node {
+                    width,
+                    height,
+                    margin,
                     ..default()
                 },
             ));
@@ -116,14 +107,14 @@ fn add_slots(
 
 fn update_selected_slot(
     selection: Query<&HotbarSelection, Changed<HotbarSelection>>,
-    mut hotbar_display: Query<(&mut UiImage, &HotbarIndex), With<HotbarSlot>>,
+    mut hotbar_display: Query<(&mut ImageNode, &HotbarIndex), With<HotbarSlot>>,
     sprites: Res<HotbarSprites>,
 ) {
     let Ok(HotbarSelection { index }) = selection.get_single() else {
         return;
     };
     for (mut image, hotbar_index) in hotbar_display.iter_mut() {
-        *image = if hotbar_index.0 as u8 == *index {
+        image.image = if hotbar_index.0 as u8 == *index {
             sprites.selected_slot.clone()
         } else {
             sprites.slot.clone()
@@ -159,31 +150,26 @@ fn update_item_display(
             .spawn((
                 Ui,
                 HotbarIndex(*index),
-                UiImage::new(material.clone_weak()),
-                NodeBundle {
-                    style: Style {
-                        width: Val::Px(SLOT_SPRITE_SIZE),
-                        height: Val::Px(SLOT_SPRITE_SIZE),
-                        justify_content: JustifyContent::End,
-                        align_content: AlignContent::FlexEnd,
-                        ..default()
-                    },
+                ImageNode::new(material.clone_weak()),
+                Node {
+                    width: Val::Px(SLOT_SPRITE_SIZE),
+                    height: Val::Px(SLOT_SPRITE_SIZE),
+                    justify_content: JustifyContent::End,
+                    align_content: AlignContent::FlexEnd,
                     ..default()
                 },
             ))
             .with_children(|builder| {
                 builder.spawn((
                     Ui,
-                    TextBundle::from_section(
-                        item.quantity,
-                        TextStyle {
-                            font: font.0.clone_weak(),
-                            font_size: quantity_font_size,
-                            color: Color::WHITE,
-                        },
-                    )
-                    .with_text_justify(JustifyText::Right)
-                    .with_style(Style {
+                    Text::new(item.quantity),
+                    TextFont {
+                        font: font.0.clone_weak(),
+                        font_size: quantity_font_size,
+                        ..default()
+                    },
+                    TextLayout::new_with_justify(JustifyText::Right),
+                    Node {
                         /*
                         Sorry for the ugly equation, it just calculates a good position
                         for the text.
@@ -194,12 +180,12 @@ fn update_item_display(
                         top: Val::Px(SLOT_SPRITE_SIZE * (quantity_font_size / -120.0 + 0.7)),
                         right: Val::Px(8.0),
                         ..default()
-                    }),
+                    },
                 ));
             })
             .id();
         commands
             .entity(entity)
-            .push_children(&[item_icon_id]);
+            .add_child(item_icon_id);
     }
 }

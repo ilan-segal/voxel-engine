@@ -72,7 +72,7 @@ fn update_velocity_for_survival_mode(
             };
         let v_actual = player.velocity.0.with_y(0.0);
         let diff = v_target - v_actual;
-        let dv_length = GROUND_ACCELERATION * time.delta_seconds();
+        let dv_length = GROUND_ACCELERATION * time.delta_secs();
         if diff.length() <= dv_length {
             player.velocity.0.x = v_target.x;
             player.velocity.0.z = v_target.z;

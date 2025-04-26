@@ -24,9 +24,9 @@ impl Plugin for HealthUiPlugin {
 
 #[derive(Resource)]
 struct SpriteHandles {
-    full_heart: UiImage,
-    half_heart: UiImage,
-    container: UiImage,
+    full_heart: Handle<Image>,
+    half_heart: Handle<Image>,
+    container: Handle<Image>,
 }
 
 #[derive(Component)]
@@ -34,9 +34,9 @@ pub struct HealthDisplayRoot;
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let handles = SpriteHandles {
-        full_heart: UiImage::new(asset_server.load("ui/hud/heart/full.png")),
-        half_heart: UiImage::new(asset_server.load("ui/hud/heart/half.png")),
-        container: UiImage::new(asset_server.load("ui/hud/heart/container.png")),
+        full_heart: asset_server.load("ui/hud/heart/full.png"),
+        half_heart: asset_server.load("ui/hud/heart/half.png"),
+        container: asset_server.load("ui/hud/heart/container.png"),
     };
     commands.insert_resource(handles);
 }
@@ -70,15 +70,12 @@ fn update_health_display(
                 builder
                     .spawn((
                         Ui,
-                        NodeBundle {
-                            style: Style {
-                                width,
-                                height,
-                                ..default()
-                            },
+                        Node {
+                            width,
+                            height,
                             ..default()
                         },
-                        sprites.container.clone(),
+                        ImageNode::new(sprites.container.clone()),
                     ))
                     .with_children(|builder_2| {
                         let heart_sprite = if health >= &(i * 2) {
@@ -91,15 +88,12 @@ fn update_health_display(
                         if let Some(sprite) = heart_sprite {
                             builder_2.spawn((
                                 Ui,
-                                NodeBundle {
-                                    style: Style {
-                                        width,
-                                        height,
-                                        ..default()
-                                    },
+                                Node {
+                                    width,
+                                    height,
                                     ..default()
                                 },
-                                sprite,
+                                ImageNode::new(sprite),
                             ));
                         }
                     });

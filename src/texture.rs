@@ -1,10 +1,8 @@
 use bevy::{
+    image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
     pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
-    render::{
-        render_resource::{AsBindGroup, ShaderRef},
-        texture::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
-    },
+    render::render_resource::{AsBindGroup, ShaderRef},
 };
 
 use crate::block::{Block, BlockSide};

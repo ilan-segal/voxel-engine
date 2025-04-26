@@ -48,13 +48,10 @@ fn create_ui_root(mut commands: Commands) {
     commands.spawn((
         Ui,
         UiRoot,
-        NodeBundle {
-            style: Style {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            justify_content: JustifyContent::Center,
             ..default()
         },
     ));
@@ -64,7 +61,7 @@ fn create_ui_root(mut commands: Commands) {
 struct UiCamera;
 
 fn spawn_ui_camera(mut commands: Commands) {
-    commands.spawn((Camera2dBundle::default(), IsDefaultUiCamera, UiCamera));
+    commands.spawn((Camera2d, IsDefaultUiCamera, UiCamera));
 }
 
 fn despawn_ui_camera(mut commands: Commands, q_camera: Query<Entity, With<UiCamera>>) {

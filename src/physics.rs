@@ -61,7 +61,7 @@ pub enum PhysicsSystemSet {
 
 fn apply_gravity(mut q_object: Query<(&Gravity, &mut Velocity)>, time: Res<Time>) {
     for (g, mut v) in q_object.iter_mut() {
-        v.0 += g.0 * time.delta_seconds();
+        v.0 += g.0 * time.delta_secs();
     }
 }
 
@@ -103,7 +103,7 @@ fn apply_velocity_without_collision(
     mut q: Query<(&Velocity, &mut Transform), Without<Collidable>>,
     time: Res<Time>,
 ) {
-    let dt = time.delta_seconds();
+    let dt = time.delta_secs();
     for (v, mut p) in q.iter_mut() {
         p.translation += v.0 * dt;
     }
@@ -126,7 +126,7 @@ fn apply_velocity_with_terrain_collision(
     mut collisions: EventWriter<Collision>,
 ) {
     for mut object in q_object.iter_mut() {
-        let full_displacement = object.v.0 * time.delta_seconds();
+        let full_displacement = object.v.0 * time.delta_secs();
         let adjusted_aabb = object
             .aabb
             .with_scale(object.transform.scale);

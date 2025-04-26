@@ -35,8 +35,8 @@ pub struct BlockIconMaterials {
 
 #[derive(Resource, Default)]
 pub struct BlockMeshes {
-    pub terrain: HashMap<Block, Vec<(Handle<Mesh>, Handle<TerrainMaterial>)>>,
-    pub fluid: HashMap<Block, Vec<(Handle<Mesh>, Handle<FluidMaterial>)>>,
+    pub terrain: HashMap<Block, Vec<(Mesh3d, MeshMaterial3d<TerrainMaterial>)>>,
+    pub fluid: HashMap<Block, Vec<(Mesh3d, MeshMaterial3d<FluidMaterial>)>>,
 }
 
 #[derive(Component)]
@@ -44,21 +44,18 @@ struct ArchetypalBlock(Block);
 
 fn setup_rendered_icons(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     commands.spawn((
-        DirectionalLightBundle {
-            directional_light: DirectionalLight {
-                illuminance: -800.0,
-                ..default()
-            },
-            transform: Transform::default().looking_to(
-                Vec3 {
-                    x: -1.0,
-                    y: -0.00,
-                    z: -0.25,
-                },
-                Vec3::Y,
-            ),
+        DirectionalLight {
+            illuminance: -800.0,
             ..default()
         },
+        Transform::default().looking_to(
+            Vec3 {
+                x: -1.0,
+                y: -0.00,
+                z: -0.25,
+            },
+            Vec3::Y,
+        ),
         RenderLayers::layer(BLOCK_ICON_LAYER),
     ));
     let mut block_icon_materials = BlockIconMaterials {
@@ -101,11 +98,8 @@ fn setup_rendered_icons(mut commands: Commands, mut images: ResMut<Assets<Image>
             Stage::final_stage(),
             icon_layer.clone(),
             blocks,
-            SpatialBundle {
-                visibility: Visibility::Visible,
-                transform: chunk_transform,
-                ..default()
-            },
+            Visibility::Visible,
+            chunk_transform,
         ));
 
         // Camera looking at block
@@ -123,21 +117,21 @@ fn setup_rendered_icons(mut commands: Commands, mut images: ResMut<Assets<Image>
                 },
             Vec3::Y,
         );
+
         commands.spawn((
-            Camera3dBundle {
-                projection: OrthographicProjection {
-                    scaling_mode: ScalingMode::FixedVertical(2.25),
-                    ..default()
-                }
-                .into(),
-                transform: camera_transform,
-                camera: Camera {
-                    target: image_handle.clone().into(),
-                    clear_color: ClearColorConfig::None,
-                    ..default()
-                },
+            Camera3d::default(),
+            Camera {
+                target: image_handle.clone().into(),
+                clear_color: ClearColorConfig::None,
                 ..default()
             },
+            Projection::from(OrthographicProjection {
+                scaling_mode: ScalingMode::FixedVertical {
+                    viewport_height: 2.25,
+                },
+                ..OrthographicProjection::default_3d()
+            }),
+            camera_transform,
             DepthPrepass,
             icon_layer.clone(),
         ));
@@ -154,7 +148,7 @@ fn setup_rendered_icons(mut commands: Commands, mut images: ResMut<Assets<Image>
 struct Checked;
 
 fn register_block_mesh(
-    q: Query<(Entity, &Handle<Mesh>, &Handle<TerrainMaterial>, &Parent), Without<Checked>>,
+    q: Query<(Entity, &Mesh3d, &MeshMaterial3d<TerrainMaterial>, &Parent), Without<Checked>>,
     q_parent: Query<&ArchetypalBlock>,
     mut meshes: ResMut<BlockMeshes>,
     mut commands: Commands,
@@ -176,7 +170,7 @@ fn register_block_mesh(
 }
 
 fn register_fluid_mesh(
-    q: Query<(Entity, &Handle<Mesh>, &Handle<FluidMaterial>, &Parent), Without<Checked>>,
+    q: Query<(Entity, &Mesh3d, &MeshMaterial3d<FluidMaterial>, &Parent), Without<Checked>>,
     q_parent: Query<&ArchetypalBlock>,
     mut meshes: ResMut<BlockMeshes>,
     mut commands: Commands,

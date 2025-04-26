@@ -14,7 +14,7 @@ pub struct Age {
 }
 
 fn update_age(mut q: Query<&mut Age>, time: Res<Time>) {
-    let delta_seconds = time.delta_seconds();
+    let delta_seconds = time.delta_secs();
     for mut age in q.iter_mut() {
         age.seconds += delta_seconds;
     }

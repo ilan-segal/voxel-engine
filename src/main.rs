@@ -6,7 +6,6 @@
 #![feature(step_trait)]
 
 use bevy::{
-    core_pipeline::smaa::SmaaSettings,
     pbr::{
         light_consts::lux::CLEAR_SUNRISE,
         wireframe::{WireframeConfig, WireframePlugin},
@@ -79,7 +78,6 @@ fn main() {
             ),
         )
         .insert_resource(ClearColor(SKY_COLOUR))
-        .insert_resource(Msaa::Sample8)
         .run();
 }
 
@@ -89,20 +87,19 @@ fn go_to_main_menu(mut next_state: ResMut<NextState<GameState>>) {
 
 fn setup_game(mut commands: Commands, mut windows: Query<&mut Window>) {
     let mut window = windows.single_mut();
-    window.cursor.visible = false;
-    window.cursor.grab_mode = CursorGrabMode::Locked;
+    window.cursor_options.visible = false;
+    window.cursor_options.grab_mode = CursorGrabMode::Locked;
 
-    commands.spawn((PlayerBundle::default(), SmaaSettings::default(), GpuCulling));
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
+    commands.spawn((PlayerBundle::default(), GpuCulling));
+    commands.spawn((
+        DirectionalLight {
             color: Color::WHITE,
             illuminance: CLEAR_SUNRISE,
             shadows_enabled: false,
             ..default()
         },
-        transform: Transform::default().looking_to(Vec3::NEG_Y, Vec3::Y),
-        ..default()
-    });
+        Transform::default().looking_to(Vec3::NEG_Y, Vec3::Y),
+    ));
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
         brightness: 750.,

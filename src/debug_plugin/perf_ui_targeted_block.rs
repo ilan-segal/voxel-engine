@@ -51,7 +51,7 @@ impl PerfUiEntry for PerfUiTargetedBlock {
         match value {
             None => String::new(),
             Some((pos, block)) => {
-                format!("X: {:}, Y: {:}, Z: {:} ({:?})", pos.x, pos.y, pos.z, block,)
+                format!("{:}/{:}/{:} ({:?})", pos.x, pos.y, pos.z, block,)
             }
         }
     }

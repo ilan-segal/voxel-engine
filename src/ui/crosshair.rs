@@ -26,19 +26,16 @@ fn spawn_crosshair(
     let crosshair_node = commands
         .spawn((
             Ui,
-            NodeBundle {
-                style: Style {
-                    width: Val::Px(CROSSHAIR_WIDTH),
-                    height: Val::Px(CROSSHAIR_WIDTH),
-                    align_self: AlignSelf::Center,
-                    ..default()
-                },
+            Node {
+                width: Val::Px(CROSSHAIR_WIDTH),
+                height: Val::Px(CROSSHAIR_WIDTH),
+                align_self: AlignSelf::Center,
                 ..default()
             },
-            UiImage::new(asset_server.load("ui/crosshair.png")),
+            ImageNode::new(asset_server.load("ui/crosshair.png")),
         ))
         .id();
     commands
         .entity(entity)
-        .push_children(&[crosshair_node]);
+        .add_child(crosshair_node);
 }
