@@ -304,6 +304,7 @@ fn drop_item(
             collidable: Collidable,
             friction: Friction { coefficient: 0.1 },
             lifespan: ITEM_LIFESPAN,
+            visibility: Visibility::Visible,
         });
     }
 }

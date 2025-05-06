@@ -96,6 +96,7 @@ pub struct DroppedItemBundle {
     pub velocity: Velocity,
     pub friction: Friction,
     pub lifespan: Lifespan,
+    pub visibility: Visibility,
 }
 
 #[derive(Component)]

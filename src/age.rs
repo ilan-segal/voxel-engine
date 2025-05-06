@@ -29,7 +29,7 @@ pub struct Lifespan {
 fn despawn_at_end_of_lifespan(mut commands: Commands, q: Query<(Entity, &Age, &Lifespan)>) {
     q.iter()
         .filter_map(|(entity, age, lifespan)| {
-            if age.seconds < lifespan.seconds {
+            if age.seconds > lifespan.seconds {
                 Some(entity)
             } else {
                 None
