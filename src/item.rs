@@ -6,7 +6,7 @@ use std::{
 use bevy::{prelude::*, render::view::RenderLayers};
 
 use crate::{
-    age::Age,
+    age::{Age, Lifespan},
     block::Block,
     chunk::position::ChunkPosition,
     physics::{
@@ -80,6 +80,11 @@ pub struct ItemBundle {
     pub quantity: Quantity,
 }
 
+pub const ITEM_LIFESPAN: Lifespan = Lifespan {
+    // One hour
+    seconds: 3600.0,
+};
+
 #[derive(Bundle)]
 pub struct DroppedItemBundle {
     pub item: ItemBundle,
@@ -90,7 +95,7 @@ pub struct DroppedItemBundle {
     pub gravity: Gravity,
     pub velocity: Velocity,
     pub friction: Friction,
-    pub age: Age,
+    pub lifespan: Lifespan,
 }
 
 #[derive(Component)]

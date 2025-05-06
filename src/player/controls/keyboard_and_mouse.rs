@@ -14,7 +14,7 @@ use bevy::{
 use super::{target_velocity::TargetVelocity, Sprinting};
 use crate::{
     block::Block,
-    item::{DroppedItemBundle, Item, ItemBundle, Quantity, DROPPED_ITEM_SCALE},
+    item::{DroppedItemBundle, Item, ItemBundle, Quantity, DROPPED_ITEM_SCALE, ITEM_LIFESPAN},
     physics::{aabb::Aabb, collision::Collidable, friction::Friction},
     player::{
         block_target::{TargetedBlock, TargetedSpace},
@@ -303,7 +303,7 @@ fn drop_item(
             aabb: Aabb::cube(1.0),
             collidable: Collidable,
             friction: Friction { coefficient: 0.1 },
-            age: default(),
+            lifespan: ITEM_LIFESPAN,
         });
     }
 }
