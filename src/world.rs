@@ -2,7 +2,7 @@ use crate::{
     block::Block,
     camera_distance::CameraDistance,
     chunk::{
-        data::{Blocks, ContinentNoise, HeightNoise, Noise3d},
+        data::{Blocks, ContinentNoise, HeightNoise, Noise3d, Terrain},
         position::ChunkPosition,
         spatial::SpatiallyMapped,
         Chunk, CHUNK_SIZE, CHUNK_SIZE_I32,
@@ -47,6 +47,7 @@ impl Plugin for WorldPlugin {
             seed::SeedPlugin,
             index::ChunkIndexPlugin,
             block_update::BlockPlugin,
+            neighborhood::NeighborhoodPlugin::<Terrain>::new(),
             neighborhood::NeighborhoodPlugin::<Blocks>::new(),
             neighborhood::NeighborhoodPlugin::<Stage>::new(),
             neighborhood::NeighborhoodPlugin::<Noise3d>::new(),
@@ -85,7 +86,8 @@ struct ChunkLoadTaskData {
 
 enum AddedChunkData {
     Noise(NoiseBundle),
-    Blocks(Blocks, Stage),
+    Terrain(Terrain),
+    // Blocks(Blocks, Stage),
     BlockUpdates(Vec<(Block, [usize; 3])>, Stage),
 }
 
@@ -183,9 +185,12 @@ fn receive_chunk_load_tasks(
             AddedChunkData::Noise(bundle) => {
                 entity.try_insert((Stage::Noise, bundle));
             }
-            AddedChunkData::Blocks(blocks, stage) => {
-                entity.try_insert((blocks, stage));
+            AddedChunkData::Terrain(terrain) => {
+                entity.try_insert((terrain.clone(), Stage::Sculpt, Blocks(terrain.0)));
             }
+            // AddedChunkData::Blocks(blocks, stage) => {
+            //     entity.try_insert((blocks, stage));
+            // }
             AddedChunkData::BlockUpdates(block_updates, stage) => {
                 let Ok(blocks) = &mut q_blocks.get_mut(data.entity) else {
                     log::warn!("Failed to get Blocks component during worldgen update");
@@ -303,7 +308,7 @@ fn begin_terrain_sculpt_tasks(
             );
             ChunkLoadTaskData {
                 entity: item.entity,
-                added_data: AddedChunkData::Blocks(blocks, Stage::Sculpt),
+                added_data: AddedChunkData::Terrain(blocks),
             }
         });
         tasks.0.insert(*item.chunk_pos, task);
@@ -316,13 +321,13 @@ fn generate_terrain_sculpt_for_chunk(
     height: HeightNoise,
     cave_noise: CaveNetworkNoiseGenerator,
     // cave_network_noise: CaveNetworkNoise,
-) -> Blocks {
+) -> Terrain {
     const CONTINENT_SCALE: f32 = 60.0;
     const LAND_HEIGHT_SCALE: f32 = 50.0;
     const SEA_LEVEL: i32 = 0;
     const DIRT_DEPTH: i32 = 4;
     let chunk_pos = pos.0;
-    Blocks::from_fn(|pos| {
+    Terrain::from_fn(|pos| {
         let [x, _, z] = pos;
         let world_pos = chunk_pos * CHUNK_SIZE_I32 + IVec3::from(pos.map(|x| x as i32));
         let y = world_pos.y as f32;
@@ -383,7 +388,7 @@ struct StructureQueryData {
     pos: &'static ChunkPosition,
     stage: &'static Stage,
     stage_neighborhood: &'static Neighborhood<Stage>,
-    blocks_neighborhood: &'static Neighborhood<Blocks>,
+    terrain_neighborhood: &'static Neighborhood<Terrain>,
     noise_neighborhood: &'static Neighborhood<Noise3d>,
 }
 
@@ -401,12 +406,14 @@ fn begin_structure_load_tasks(
             .unwrap()
             .as_ref()
             < &Stage::Sculpt;
-        let surroundings_arent_complete = item.blocks_neighborhood.is_incomplete();
+        let surroundings_arent_complete = item
+            .terrain_neighborhood
+            .is_incomplete();
         if surroundings_arent_ready || surroundings_arent_complete {
             continue;
         }
         let task_pool = AsyncComputeTaskPool::get();
-        let blocks = item.blocks_neighborhood.clone();
+        let blocks = item.terrain_neighborhood.clone();
         let noise = item.noise_neighborhood.clone();
         let entity = item.entity;
         let task = task_pool.spawn(async move {
@@ -418,17 +425,13 @@ fn begin_structure_load_tasks(
 }
 
 fn generate_structures(
-    blocks: Neighborhood<Blocks>,
+    blocks: Neighborhood<Terrain>,
     noise: Neighborhood<Noise3d>,
 ) -> AddedChunkData {
     // TODO: Vary structure type by biome
     // let structure = StructureType::Tree;
     // let updates = structure.get_structures(&blocks, &noise);
 
-    /*
-    TODO: Separate neighborhood for pre-structure blocks (e.g. Neighborhood<Terrain>)
-    This fixes issues with structures conflicting with themselves across chunk boundaries
-     */
     AddedChunkData::BlockUpdates(
         StructureType::Tree.get_structure_blocks(&blocks, &noise),
         Stage::Structures,

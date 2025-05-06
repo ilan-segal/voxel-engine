@@ -3,7 +3,7 @@ use itertools::Itertools;
 use crate::{
     block::Block,
     chunk::{
-        data::{Blocks, Noise3d},
+        data::{Noise3d, Terrain},
         spatial::SpatiallyMapped,
         CHUNK_SIZE, CHUNK_SIZE_I32, CHUNK_SIZE_U32,
     },
@@ -58,7 +58,7 @@ pub enum StructureType {
 impl StructureType {
     pub fn get_structure_blocks(
         &self,
-        blocks: &Neighborhood<Blocks>,
+        blocks: &Neighborhood<Terrain>,
         noise: &Neighborhood<Noise3d>,
     ) -> Vec<(Block, [usize; 3])> {
         self.get_structures(blocks, noise)
@@ -88,7 +88,7 @@ impl StructureType {
 
     fn get_structures<'a>(
         &self,
-        blocks: &'a Neighborhood<Blocks>,
+        blocks: &'a Neighborhood<Terrain>,
         noise: &'a Neighborhood<Noise3d>,
     ) -> impl Iterator<Item = (Structure, [i32; 3])> + use<'a> {
         match self {
@@ -137,7 +137,7 @@ impl StructureType {
 fn generate_tree_spots_xyz<'a>(
     count: usize,
     noise: &'a Noise3d,
-    blocks: &'a Blocks,
+    blocks: &'a Terrain,
 ) -> impl Iterator<Item = [u32; 3]> + use<'a> {
     generate_tree_spots_xz(noise)
         .take(count)
@@ -156,7 +156,7 @@ fn generate_tree_spots_xz(noise: &Noise3d) -> impl Iterator<Item = [u32; 2]> + u
         })
 }
 
-fn find_grass_block([x, z]: [u32; 2], blocks: &Blocks) -> Option<[u32; 3]> {
+fn find_grass_block([x, z]: [u32; 2], blocks: &Terrain) -> Option<[u32; 3]> {
     let x = x as usize;
     let z = z as usize;
     (0..CHUNK_SIZE - 1)

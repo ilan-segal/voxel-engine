@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use noise::NoiseFn;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
+define_spatial!(Terrain, 3, Block);
 define_spatial!(Blocks, 3, Block);
 
 impl Blocks {
