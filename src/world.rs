@@ -333,7 +333,8 @@ fn generate_terrain_sculpt_for_chunk(
         let y = world_pos.y as f32;
         let continent_noise = (continent.at_pos([x, z]) - 0.5) * 2.0;
         let cave_noise = cave_noise.get(world_pos.into());
-        let is_cave = cave_noise == 0.;
+        let cave_threshold = get_cave_threshold(world_pos.y);
+        let is_cave = cave_noise <= cave_threshold;
         // Ocean
         if continent_noise <= 0.0 {
             return if y < continent_noise * CONTINENT_SCALE {
@@ -370,6 +371,16 @@ fn generate_terrain_sculpt_for_chunk(
             Block::Air
         }
     })
+}
+
+fn get_cave_threshold(height: i32) -> f64 {
+    const MIN_DEPTH_THRESHOLD: f64 = 0.095;
+    const MAX_DEPTH_THRESHOLD: f64 = 0.250;
+    const DEPTH_START: i32 = -CHUNK_SIZE_I32;
+    const DEPTH_END: i32 = -CHUNK_SIZE_I32 * 8;
+    let t = stretch_range_onto_unit_interval(height as f32, DEPTH_END as f32, DEPTH_START as f32)
+        as f64;
+    return MAX_DEPTH_THRESHOLD.lerp(MIN_DEPTH_THRESHOLD, t);
 }
 
 fn stretch_range_onto_unit_interval(value: f32, a: f32, b: f32) -> f32 {

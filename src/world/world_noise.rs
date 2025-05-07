@@ -74,7 +74,6 @@ impl CaveNetworkNoiseGenerator {
     }
 }
 
-const NOISE_A_MAX: f64 = 0.095;
 const EXCLUSION_THRESHOLD: f64 = 0.25;
 
 impl NoiseFn<i32, 3> for CaveNetworkNoiseGenerator {
@@ -85,12 +84,7 @@ impl NoiseFn<i32, 3> for CaveNetworkNoiseGenerator {
         }
         let sample_a = self.noise_a.get(point).abs();
         let sample_b = self.noise_b.get(point).abs();
-        let sample = sample_a.max(sample_b);
-        if sample > NOISE_A_MAX {
-            1.
-        } else {
-            0.
-        }
+        return sample_a.max(sample_b);
     }
 }
 
