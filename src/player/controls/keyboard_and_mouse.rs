@@ -267,8 +267,8 @@ fn change_hotbar_selection_from_scrollbar(
         };
         match delta {
             0 => {}
-            1 => selection.increase(),
-            -1 => selection.decrease(),
+            1 => selection.decrease(),
+            -1 => selection.increase(),
             _ => unreachable!(),
         }
     }
