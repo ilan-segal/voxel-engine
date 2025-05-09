@@ -12,6 +12,7 @@ pub enum Block {
     Wood,
     Leaves,
     Water,
+    Bedrock,
 }
 
 // Required for Block to work as a key in hashmap operations `entry_ref` + `or_insert_with`

@@ -74,12 +74,14 @@ pub struct BlockMaterials {
     wood: Handle<TerrainMaterial>,
     wood_top: Handle<TerrainMaterial>,
     leaves: Handle<TerrainMaterial>,
+    bedrock: Handle<TerrainMaterial>,
     water: Handle<FluidMaterial>,
 }
 
 impl BlockMaterials {
     pub fn get(&self, block: &Block, side: &BlockSide) -> MaterialHandle {
         match (block, side) {
+            (Block::Air, _) => MaterialHandle::None,
             (Block::Stone, _) => MaterialHandle::Terrain(&self.stone),
             (Block::Dirt, _) => MaterialHandle::Terrain(&self.dirt),
             (Block::Grass, _) => MaterialHandle::Terrain(&self.grass),
@@ -90,7 +92,7 @@ impl BlockMaterials {
             (Block::Wood, _) => MaterialHandle::Terrain(&self.wood),
             (Block::Leaves, _) => MaterialHandle::Terrain(&self.leaves),
             (Block::Water, _) => MaterialHandle::Fluid(&self.water),
-            _ => MaterialHandle::None,
+            (Block::Bedrock, _) => MaterialHandle::Terrain(&self.bedrock),
         }
     }
 }
@@ -118,6 +120,7 @@ fn setup(
         wood: get_material("textures/blocks/oak_log.png", Block::Wood.get_colour()),
         wood_top: get_material("textures/blocks/oak_log_top.png", Block::Wood.get_colour()),
         leaves: get_material("textures/blocks/oak_leaves.png", Block::Leaves.get_colour()),
+        bedrock: get_material("textures/blocks/bedrock.png", Block::Bedrock.get_colour()),
         water: get_fluid_material(
             "textures/blocks/water.png",
             &asset_server,
