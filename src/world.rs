@@ -158,15 +158,18 @@ fn update_chunks(
 #[derive(Component)]
 struct ToDespawn;
 
-const CHUNKS_DESPAWNED_PER_FRAME: usize = 10;
+const CHUNKS_DESPAWNED_PER_FRAME: usize = 1;
 
-fn despawn_chunks(q_chunk: Query<(Entity, &ToDespawn, &CameraDistance)>, mut commands: Commands) {
+fn despawn_chunks(
+    q_chunk: Query<(Entity, &CameraDistance), (With<ToDespawn>, With<Chunk>)>,
+    mut commands: Commands,
+) {
     q_chunk
         .iter()
         // Descending order (highest distance first)
         .sort_by::<&CameraDistance>(|a, b| b.0.partial_cmp(&a.0).unwrap())
         .take(CHUNKS_DESPAWNED_PER_FRAME)
-        .for_each(|(entity, _, _)| commands.entity(entity).despawn_recursive());
+        .for_each(|(entity, _)| commands.entity(entity).despawn_recursive());
 }
 
 fn receive_chunk_load_tasks(
