@@ -5,7 +5,7 @@ use crate::{
         data::{Blocks, ContinentNoise, HeightNoise, Noise3d, Terrain},
         position::ChunkPosition,
         spatial::SpatiallyMapped,
-        Chunk, CHUNK_SIZE, CHUNK_SIZE_I32,
+        Chunk, CHUNK_LENGTH, CHUNK_SIZE, CHUNK_SIZE_I32,
     },
     player::Player,
     render_layer::WORLD_LAYER,
@@ -281,6 +281,7 @@ struct TerrainGenerateData {
     stage: &'static Stage,
     continent_noise: &'static ContinentNoise,
     height_noise: &'static HeightNoise,
+    noise: &'static Noise3d,
     // cave_network_noise: &'static CaveNetworkNoise,
 }
 
@@ -299,12 +300,14 @@ fn begin_terrain_sculpt_tasks(
         // let cave_network_noise = item.cave_network_noise.clone();
         let cloned_pos = item.chunk_pos.clone();
         let cloned_cave_noise = cave_noise.clone();
+        let cloned_noise = item.noise.clone();
         let task = task_pool.spawn(async move {
             let blocks = generate_terrain_sculpt_for_chunk(
                 cloned_pos,
                 continent_noise,
                 height_noise,
                 cloned_cave_noise,
+                cloned_noise,
             );
             ChunkLoadTaskData {
                 entity: item.entity,
@@ -315,13 +318,21 @@ fn begin_terrain_sculpt_tasks(
     }
 }
 
+const BEDROCK_DEPTH_CHUNKS: i32 = -5;
+const MAX_DEPTH: i32 = BEDROCK_DEPTH_CHUNKS * CHUNK_SIZE_I32;
+
 fn generate_terrain_sculpt_for_chunk(
     pos: ChunkPosition,
     continent: ContinentNoise,
     height: HeightNoise,
     cave_noise: CaveNetworkNoiseGenerator,
+    noise: Noise3d,
     // cave_network_noise: CaveNetworkNoise,
 ) -> Terrain {
+    if pos.0.y < BEDROCK_DEPTH_CHUNKS {
+        return Terrain(vec![Block::Air; CHUNK_LENGTH]);
+    }
+
     const CONTINENT_SCALE: f32 = 60.0;
     const LAND_HEIGHT_SCALE: f32 = 50.0;
     const SEA_LEVEL: i32 = 0;
@@ -330,11 +341,17 @@ fn generate_terrain_sculpt_for_chunk(
     Terrain::from_fn(|pos| {
         let [x, _, z] = pos;
         let world_pos = chunk_pos * CHUNK_SIZE_I32 + IVec3::from(pos.map(|x| x as i32));
+        let bedrock_offset = if noise.at_pos([x, 0, z]) < &0.5 { 0 } else { 1 };
+        if world_pos.y < MAX_DEPTH {
+            return Block::Air;
+        } else if world_pos.y <= MAX_DEPTH + bedrock_offset {
+            return Block::Bedrock;
+        }
         let y = world_pos.y as f32;
         let continent_noise = (continent.at_pos([x, z]) - 0.5) * 2.0;
         let cave_noise = cave_noise.get(world_pos.into());
         let cave_threshold = get_cave_threshold(world_pos.y);
-        let is_cave = cave_noise <= cave_threshold;
+        let is_cave = cave_noise < cave_threshold;
         // Ocean
         if continent_noise <= 0.0 {
             return if y < continent_noise * CONTINENT_SCALE {
@@ -375,22 +392,29 @@ fn generate_terrain_sculpt_for_chunk(
 
 fn get_cave_threshold(height: i32) -> f64 {
     const MIN_DEPTH_THRESHOLD: f64 = 0.095;
-    const MAX_DEPTH_THRESHOLD: f64 = 0.250;
+    const MAX_DEPTH_THRESHOLD: f64 = 0.100;
     const DEPTH_START: i32 = -CHUNK_SIZE_I32;
     const DEPTH_END: i32 = -CHUNK_SIZE_I32 * 8;
+    const BUFFER_BEFORE_BEDROCK: i32 = 4;
+    const CAVE_TAPER_THICKNESS: i32 = 4;
+    const CAVE_TAPER_END: i32 = MAX_DEPTH + BUFFER_BEFORE_BEDROCK;
+    const CAVE_TAPER_START: i32 = CAVE_TAPER_END + CAVE_TAPER_THICKNESS;
+
+    let buffer_t = stretch_range_onto_unit_interval(
+        height as f32,
+        CAVE_TAPER_END as f32,
+        CAVE_TAPER_START as f32,
+    );
+
     let t = stretch_range_onto_unit_interval(height as f32, DEPTH_END as f32, DEPTH_START as f32)
         as f64;
-    return MAX_DEPTH_THRESHOLD.lerp(MIN_DEPTH_THRESHOLD, t);
+    return MAX_DEPTH_THRESHOLD.lerp(MIN_DEPTH_THRESHOLD, t) * buffer_t as f64;
 }
 
 fn stretch_range_onto_unit_interval(value: f32, a: f32, b: f32) -> f32 {
     let range_size = b - a;
     let scaled_value = (value - a) / range_size;
-    return clamp(scaled_value, 0., 1.);
-}
-
-fn clamp(value: f32, a: f32, b: f32) -> f32 {
-    value.max(a).min(b)
+    return scaled_value.clamp(0., 1.);
 }
 
 #[derive(QueryData)]
