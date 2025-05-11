@@ -22,7 +22,6 @@ mod age;
 mod block;
 mod camera_distance;
 mod chunk;
-mod cube_frame;
 mod debug_plugin;
 mod item;
 mod mesh;
@@ -57,7 +56,6 @@ fn main() {
             age::AgePlugin,
             camera_distance::CameraDistancePlugin,
             chunk::ChunkPlugin,
-            cube_frame::FramePlugin,
             debug_plugin::DebugPlugin,
             mesh::MeshPlugin,
             physics::PhysicsPlugin,

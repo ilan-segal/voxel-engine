@@ -16,7 +16,7 @@ impl Plugin for ChunkBorderPlugin {
                 (
                     // update_border_position,
                     update_visibility.run_if(input_just_pressed(KeyCode::F5)),
-                    draw_border.run_if(resource_equals::<DrawChunkBorder>(DrawChunkBorder(true))),
+                    draw_border.run_if(resource_equals(DrawChunkBorder(true))),
                 ),
             );
     }
