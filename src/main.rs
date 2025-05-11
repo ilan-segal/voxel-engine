@@ -85,7 +85,11 @@ fn go_to_main_menu(mut next_state: ResMut<NextState<GameState>>) {
     next_state.set(GameState::MainMenu);
 }
 
-fn setup_game(mut commands: Commands, mut windows: Query<&mut Window>) {
+fn setup_game(
+    mut commands: Commands,
+    mut windows: Query<&mut Window>,
+    mut gizmos_config_store: ResMut<GizmoConfigStore>,
+) {
     let mut window = windows.single_mut();
     window.cursor_options.visible = false;
     window.cursor_options.grab_mode = CursorGrabMode::Locked;
@@ -105,6 +109,10 @@ fn setup_game(mut commands: Commands, mut windows: Query<&mut Window>) {
         brightness: 750.,
         ..default()
     });
+
+    for (_, config, _) in gizmos_config_store.iter_mut() {
+        config.depth_bias = -0.001;
+    }
 }
 
 fn toggle_wireframe(
