@@ -163,7 +163,7 @@ fn apply_velocity_with_terrain_collision(
             collision_normal.z = 0.;
         }
         if collision_normal != Vec3::ZERO {
-            collisions.send(Collision {
+            collisions.write(Collision {
                 normal: Dir3::new(collision_normal).expect("Already checked for non-zero"),
                 entity: object.entity,
             });

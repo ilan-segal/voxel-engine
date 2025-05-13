@@ -49,10 +49,10 @@ fn update_health_display(
     q_display_root: Query<Entity, With<HealthDisplayRoot>>,
     sprites: Res<SpriteHandles>,
 ) {
-    let Ok((Health(health), max_health)) = q_health.get_single() else {
+    let Ok((Health(health), max_health)) = q_health.single() else {
         return;
     };
-    let Ok(display_root_entity) = q_display_root.get_single() else {
+    let Ok(display_root_entity) = q_display_root.single() else {
         warn!("Could not find health display root");
         return;
     };
@@ -62,7 +62,7 @@ fn update_health_display(
     };
     commands
         .entity(display_root_entity)
-        .despawn_descendants()
+        .despawn_related::<Children>()
         .with_children(|builder| {
             for i in 1..=num_containers {
                 let width = Val::Px(HEART_SPRITE_SIZE);

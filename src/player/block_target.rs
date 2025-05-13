@@ -39,7 +39,7 @@ fn update_targeted_block(
     index: Res<ComponentIndex<Blocks>>,
 ) {
     let Some(transform) = q_camera
-        .get_single()
+        .single()
         .ok()
         .map(GlobalTransform::compute_transform)
     else {
@@ -84,11 +84,11 @@ fn update_targeted_block(
             let space_pos = (camera_pos + camera_direction * t1.next_down())
                 .floor()
                 .as_ivec3();
-            targeted_block_change.send(TargetBlockChange(Some((space_pos, block_pos))));
+            targeted_block_change.write(TargetBlockChange(Some((space_pos, block_pos))));
             return;
         }
     }
-    targeted_block_change.send(TargetBlockChange(None));
+    targeted_block_change.write(TargetBlockChange(None));
 }
 
 fn get_plane_distances(s: f32, ds: f32, max_t: f32) -> impl Iterator<Item = f32> {

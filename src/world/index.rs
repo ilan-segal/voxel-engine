@@ -1,6 +1,7 @@
 use crate::chunk::{data::Blocks, position::ChunkPosition, Chunk};
 use crate::mesh::MeshSet;
-use bevy::{ecs::query::QueryData, prelude::*, utils::HashMap};
+use bevy::ecs::entity::EntityHashMap;
+use bevy::{ecs::query::QueryData, platform::collections::HashMap, prelude::*};
 
 use super::WorldSet;
 
@@ -57,7 +58,7 @@ pub fn on_blocks_changed(
 // }
 
 fn on_chunk_unloaded(trigger: Trigger<OnRemove, Blocks>, mut index: ResMut<ChunkIndex>) {
-    index.remove_entity(&trigger.entity());
+    index.remove_entity(&trigger.target());
 }
 
 fn on_chunk_loaded(
@@ -65,7 +66,7 @@ fn on_chunk_loaded(
     q_pos: Query<&ChunkPosition>,
     mut index: ResMut<ChunkIndex>,
 ) {
-    let entity = trigger.entity();
+    let entity = trigger.target();
     let Ok(pos) = q_pos.get(entity) else {
         return;
     };
@@ -82,7 +83,7 @@ pub struct ChunkIndex {
     // chunk_map: HashMap<IVec3, Arc<ChunkBundle>>,
     // blocks_by_pos: HashMap<IVec3, Arc<Blocks>>,
     pub entity_by_pos: HashMap<IVec3, Entity>,
-    pub pos_by_entity: HashMap<Entity, IVec3>,
+    pub pos_by_entity: EntityHashMap<IVec3>,
 }
 
 impl ChunkIndex {

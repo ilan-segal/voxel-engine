@@ -35,9 +35,5 @@ fn despawn_at_end_of_lifespan(mut commands: Commands, q: Query<(Entity, &Age, &L
                 None
             }
         })
-        .for_each(|entity| {
-            commands
-                .entity(entity)
-                .try_despawn_recursive()
-        });
+        .for_each(|entity| commands.entity(entity).try_despawn());
 }

@@ -32,7 +32,7 @@ impl PerfUiEntry for PerfUiCameraFacing {
         transform: &mut <Self::SystemParam as bevy::ecs::system::SystemParam>::Item<'_, '_>,
     ) -> Option<Self::Value> {
         transform
-            .get_single()
+            .single()
             .ok()
             .map(Transform::forward)
     }

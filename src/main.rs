@@ -11,7 +11,6 @@ use bevy::{
         wireframe::{WireframeConfig, WireframePlugin},
     },
     prelude::*,
-    render::view::GpuCulling,
     window::CursorGrabMode,
 };
 use player::PlayerBundle;
@@ -52,7 +51,7 @@ fn main() {
                     ..default()
                 })
                 .set(ImagePlugin::default_nearest()),
-            WireframePlugin,
+            WireframePlugin::default(),
             age::AgePlugin,
             camera_distance::CameraDistancePlugin,
             chunk::ChunkPlugin,
@@ -88,11 +87,13 @@ fn setup_game(
     mut windows: Query<&mut Window>,
     mut gizmos_config_store: ResMut<GizmoConfigStore>,
 ) {
-    let mut window = windows.single_mut();
+    let mut window = windows
+        .single_mut()
+        .expect("Window component");
     window.cursor_options.visible = false;
     window.cursor_options.grab_mode = CursorGrabMode::Locked;
 
-    commands.spawn((PlayerBundle::default(), GpuCulling));
+    commands.spawn(PlayerBundle::default());
     commands.spawn((
         DirectionalLight {
             color: Color::WHITE,

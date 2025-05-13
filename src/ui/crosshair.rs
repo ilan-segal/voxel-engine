@@ -20,7 +20,7 @@ fn spawn_crosshair(
     q_ui_root: Query<Entity, With<UiRoot>>,
 ) {
     let entity = q_ui_root
-        .get_single()
+        .single()
         .ok()
         .expect("Should be exactly one UiRoot component");
     let crosshair_node = commands

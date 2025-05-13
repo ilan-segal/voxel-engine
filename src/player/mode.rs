@@ -15,7 +15,7 @@ pub fn player_in_mode(
 }
 
 fn player_is_in_mode(q_player_mode: Query<&PlayerMode, With<Player>>, mode: PlayerMode) -> bool {
-    let Ok(player_mode) = q_player_mode.get_single() else {
+    let Ok(player_mode) = q_player_mode.single() else {
         return false;
     };
     return mode == *player_mode;

@@ -47,7 +47,7 @@ fn assign_chunk_position(
     >,
 ) {
     q.iter().for_each(|(e, t)| {
-        if let Some(mut entity_commands) = commands.get_entity(e) {
+        if let Ok(mut entity_commands) = commands.get_entity(e) {
             entity_commands.insert(ChunkPosition::from_world_position(&t.translation));
         }
     });

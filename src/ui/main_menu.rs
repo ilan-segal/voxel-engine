@@ -43,7 +43,7 @@ fn setup_main_menu(
     font: Res<UiFont>,
 ) {
     let root = q_root
-        .get_single()
+        .single()
         .expect("Menu root should exist");
     commands
         .entity(root)
@@ -132,9 +132,7 @@ fn setup_main_menu(
 
 fn tear_down_main_menu(q_root: Query<Entity, With<MainMenu>>, mut commands: Commands) {
     for entity in q_root.iter() {
-        commands
-            .entity(entity)
-            .despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 
@@ -163,7 +161,7 @@ fn quit_button(
 ) {
     for interaction in q_button.iter() {
         if let Interaction::Pressed = interaction {
-            quit_events.send(AppExit::Success);
+            quit_events.write(AppExit::Success);
         }
     }
 }

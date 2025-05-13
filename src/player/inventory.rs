@@ -89,9 +89,7 @@ fn pick_up_dropped_items(
 
             let new_quantity = *item.quantity - pickup_spec.quantity;
             if new_quantity.0 == 0 {
-                commands
-                    .entity(item.entity)
-                    .despawn_recursive()
+                commands.entity(item.entity).despawn()
             } else {
                 *item.quantity = new_quantity;
             }

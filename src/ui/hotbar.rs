@@ -80,7 +80,7 @@ fn add_slots(
     mut commands: Commands,
     sprites: Res<HotbarSprites>,
 ) {
-    let entity = trigger.entity();
+    let entity = trigger.target();
     let mut entity_commands = commands
         .get_entity(entity)
         .expect("Triggered hotbar root");
@@ -110,7 +110,7 @@ fn update_selected_slot(
     mut hotbar_display: Query<(&mut ImageNode, &HotbarIndex), With<HotbarSlot>>,
     sprites: Res<HotbarSprites>,
 ) {
-    let Ok(HotbarSelection { index }) = selection.get_single() else {
+    let Ok(HotbarSelection { index }) = selection.single() else {
         return;
     };
     for (mut image, hotbar_index) in hotbar_display.iter_mut() {
@@ -129,13 +129,13 @@ fn update_item_display(
     block_icons: Res<BlockIconMaterials>,
     font: Res<UiFont>,
 ) {
-    let Ok(inventory) = q_inventory.get_single() else {
+    let Ok(inventory) = q_inventory.single() else {
         return;
     };
     for (entity, HotbarIndex(index)) in q_hotbar_display.iter() {
         commands
             .entity(entity)
-            .despawn_descendants();
+            .despawn_related::<Children>();
         let Some(item) = inventory.hotbar[*index] else {
             continue;
         };

@@ -7,8 +7,8 @@ use bevy::{
         keyboard::KeyboardInput,
         mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
     },
+    platform::collections::{hash_map::Entry, HashMap},
     prelude::*,
-    utils::{Entry, HashMap},
 };
 
 use super::{target_velocity::TargetVelocity, Sprinting};
@@ -57,7 +57,7 @@ fn rotate_camera_with_mouse(
     mut q_camera: Query<&mut Transform, (With<Player>, With<Camera3d>)>,
 ) {
     let mut transform = q_camera
-        .get_single_mut()
+        .single_mut()
         .ok()
         .expect("There should be exactly one player camera");
     const CAMERA_MOUSE_SENSITIVITY_X: f32 = 0.004;
@@ -93,7 +93,7 @@ fn process_keyboard_inputs(
     keys: Res<ButtonInput<KeyCode>>,
     mut q_velocity: Query<KeyboardInputQuery, With<Player>>,
 ) {
-    let Ok(mut object) = q_velocity.get_single_mut() else {
+    let Ok(mut object) = q_velocity.single_mut() else {
         return;
     };
     object.target_v.0 = Vec3::ZERO;
@@ -129,7 +129,7 @@ fn delete_targeted_block(
     mut set_block_events: EventWriter<SetBlockEvent>,
 ) {
     if let Some(pos) = targeted_block.0 {
-        set_block_events.send(SetBlockEvent {
+        set_block_events.write(SetBlockEvent {
             block: Block::Air,
             world_pos: pos.to_array(),
         });
@@ -153,7 +153,7 @@ fn place_block(
         if mode == &PlayerMode::Survival {
             item.quantity.decrease(1);
         }
-        set_block_events.send(SetBlockEvent {
+        set_block_events.write(SetBlockEvent {
             block,
             world_pos: space_pos.to_array(),
         });
@@ -213,7 +213,7 @@ fn toggle_player_mode(trigger: Trigger<DoubleTap>, mut q_mode: Query<&mut Player
     if event.0 != NO_CLIP_TOGGLE {
         return;
     }
-    let entity = trigger.entity();
+    let entity = trigger.target();
     let Ok(mut mode) = q_mode.get_mut(entity) else {
         return;
     };
@@ -228,7 +228,7 @@ fn change_hotbar_selection_from_keys(
     mut q_hotbar_selection: Query<&mut HotbarSelection>,
     mut key_presses: EventReader<KeyboardInput>,
 ) {
-    let Ok(mut selection) = q_hotbar_selection.get_single_mut() else {
+    let Ok(mut selection) = q_hotbar_selection.single_mut() else {
         warn!("Failed to find editable selection");
         return;
     };
@@ -256,7 +256,7 @@ fn change_hotbar_selection_from_scrollbar(
     mut q_hotbar_selection: Query<&mut HotbarSelection>,
     mut key_presses: EventReader<MouseWheel>,
 ) {
-    let Ok(mut selection) = q_hotbar_selection.get_single_mut() else {
+    let Ok(mut selection) = q_hotbar_selection.single_mut() else {
         warn!("Failed to find editable selection");
         return;
     };

@@ -14,10 +14,10 @@ use crate::{
 };
 use bevy::{
     ecs::query::QueryData,
+    platform::collections::HashMap,
     prelude::*,
     render::view::RenderLayers,
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
-    utils::HashMap,
 };
 use index::ChunkIndex;
 use neighborhood::Neighborhood;
@@ -101,7 +101,7 @@ fn kill_tasks_for_unloaded_chunks(
 ) {
     if let Some(pos) = index
         .pos_by_entity
-        .get(&trigger.entity())
+        .get(&trigger.target())
     {
         tasks.0.remove(&ChunkPosition(*pos));
     }
@@ -112,7 +112,7 @@ fn update_chunks(
     q_camera_position: Query<&GlobalTransform, (With<Player>, Changed<ChunkPosition>)>,
     q_chunk_position: Query<(Entity, &ChunkPosition), With<Chunk>>,
 ) {
-    let Ok(pos) = q_camera_position.get_single() else {
+    let Ok(pos) = q_camera_position.single() else {
         return;
     };
     let camera_position = pos.compute_transform().translation;
@@ -169,7 +169,7 @@ fn despawn_chunks(
         // Descending order (highest distance first)
         .sort::<&CameraDistance>()
         .take(CHUNKS_DESPAWNED_PER_FRAME)
-        .for_each(|(entity, _)| commands.entity(entity).despawn_recursive());
+        .for_each(|(entity, _)| commands.entity(entity).despawn());
 }
 
 fn receive_chunk_load_tasks(
@@ -181,7 +181,7 @@ fn receive_chunk_load_tasks(
         let Some(data) = block_on(future::poll_once(task)) else {
             return true;
         };
-        let Some(mut entity) = commands.get_entity(data.entity) else {
+        let Ok(mut entity) = commands.get_entity(data.entity) else {
             return false;
         };
         match data.added_data {

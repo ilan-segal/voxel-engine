@@ -66,9 +66,7 @@ fn spawn_ui_camera(mut commands: Commands) {
 
 fn despawn_ui_camera(mut commands: Commands, q_camera: Query<Entity, With<UiCamera>>) {
     for entity in q_camera.iter() {
-        commands
-            .entity(entity)
-            .despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 

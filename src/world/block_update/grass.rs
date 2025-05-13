@@ -35,7 +35,7 @@ fn smother_grass(
                 block: Block::Dirt,
                 world_pos: update.world_pos.into(),
             };
-            set_block_events.send(event);
+            set_block_events.write(event);
         }
     }
 }

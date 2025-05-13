@@ -35,7 +35,7 @@ impl PerfUiEntry for PerfUiCameraPosition {
         q_camera_pos: &mut <Self::SystemParam as bevy::ecs::system::SystemParam>::Item<'_, '_>,
     ) -> Option<Self::Value> {
         q_camera_pos
-            .get_single()
+            .single()
             .ok()
             .map(|t| t.translation)
         // .map(GlobalTransform::translation)

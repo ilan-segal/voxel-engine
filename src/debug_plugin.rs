@@ -23,7 +23,7 @@ impl Plugin for DebugPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             PerfUiPlugin,
-            FrameTimeDiagnosticsPlugin,
+            FrameTimeDiagnosticsPlugin::default(),
             EntityCountDiagnosticsPlugin,
             SystemInformationDiagnosticsPlugin,
             hitbox_frame::AabbWireframePlugin,

@@ -7,7 +7,7 @@ use crate::{
     },
     utils::VolumetricRange,
 };
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{platform::collections::HashMap, prelude::*};
 use std::{marker::PhantomData, sync::Arc};
 
 pub struct NeighborhoodPlugin<T>(PhantomData<T>);
@@ -285,7 +285,7 @@ fn add_to_index<T: Component + Send + Sync + 'static>(
     q: Query<(&ChunkPosition, &ComponentCopy<T>)>,
     mut index: ResMut<ComponentIndex<T>>,
 ) {
-    let entity = trigger.entity();
+    let entity = trigger.target();
     let Ok((pos, component)) = q.get(entity) else {
         return;
     };
@@ -299,7 +299,7 @@ fn remove_from_index<T: Component + Send + Sync + 'static>(
     q: Query<&ChunkPosition, With<ComponentCopy<T>>>,
     mut index: ResMut<ComponentIndex<T>>,
 ) {
-    let entity = trigger.entity();
+    let entity = trigger.target();
     let Ok(pos) = q.get(entity) else {
         return;
     };

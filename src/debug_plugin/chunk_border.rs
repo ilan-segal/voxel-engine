@@ -30,7 +30,7 @@ fn update_visibility(mut res_draw: ResMut<DrawChunkBorder>) {
 }
 
 fn draw_border(mut gizmos: Gizmos, q_chunk_pos: Query<&ChunkPosition, With<Player>>) {
-    if let Ok(ChunkPosition(chunk_pos)) = q_chunk_pos.get_single() {
+    if let Ok(ChunkPosition(chunk_pos)) = q_chunk_pos.single() {
         let translation = (chunk_pos.as_vec3() + Vec3::splat(0.5)) * CHUNK_SIZE as f32;
         let transform =
             Transform::from_translation(translation).with_scale(Vec3::splat(CHUNK_SIZE as f32));

@@ -7,6 +7,7 @@ use crate::{
 };
 use bevy::{
     core_pipeline::prepass::DepthPrepass,
+    platform::collections::HashMap,
     prelude::*,
     render::{
         camera::ScalingMode,
@@ -14,7 +15,6 @@ use bevy::{
         render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages},
         view::RenderLayers,
     },
-    utils::hashbrown::HashMap,
 };
 use strum::IntoEnumIterator;
 
@@ -148,16 +148,16 @@ fn setup_rendered_icons(mut commands: Commands, mut images: ResMut<Assets<Image>
 struct Checked;
 
 fn register_block_mesh(
-    q: Query<(Entity, &Mesh3d, &MeshMaterial3d<TerrainMaterial>, &Parent), Without<Checked>>,
+    q: Query<(Entity, &Mesh3d, &MeshMaterial3d<TerrainMaterial>, &ChildOf), Without<Checked>>,
     q_parent: Query<&ArchetypalBlock>,
     mut meshes: ResMut<BlockMeshes>,
     mut commands: Commands,
 ) {
-    for (entity, mesh_handle, material_handle, parent) in q.iter() {
+    for (entity, mesh_handle, material_handle, child_of) in q.iter() {
         commands
             .entity(entity)
             .try_insert(Checked);
-        let Ok(ArchetypalBlock(block)) = q_parent.get(parent.get()) else {
+        let Ok(ArchetypalBlock(block)) = q_parent.get(child_of.parent()) else {
             continue;
         };
         info!("Adding mesh to archetype for {:?}", block);
@@ -170,16 +170,16 @@ fn register_block_mesh(
 }
 
 fn register_fluid_mesh(
-    q: Query<(Entity, &Mesh3d, &MeshMaterial3d<FluidMaterial>, &Parent), Without<Checked>>,
+    q: Query<(Entity, &Mesh3d, &MeshMaterial3d<FluidMaterial>, &ChildOf), Without<Checked>>,
     q_parent: Query<&ArchetypalBlock>,
     mut meshes: ResMut<BlockMeshes>,
     mut commands: Commands,
 ) {
-    for (entity, mesh_handle, material_handle, parent) in q.iter() {
+    for (entity, mesh_handle, material_handle, child_of) in q.iter() {
         commands
             .entity(entity)
             .try_insert(Checked);
-        let Ok(ArchetypalBlock(block)) = q_parent.get(parent.get()) else {
+        let Ok(ArchetypalBlock(block)) = q_parent.get(child_of.parent()) else {
             continue;
         };
         info!("Adding mesh to archetype for {:?}", block);

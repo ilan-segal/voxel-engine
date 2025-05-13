@@ -117,7 +117,7 @@ fn do_random_block_updates(
                 chunk_id,
                 block,
             };
-            update_events.send(update);
+            update_events.write(update);
         }
     }
 }

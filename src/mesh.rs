@@ -1,4 +1,5 @@
 use bevy::{
+    ecs::entity::EntityHashMap,
     prelude::*,
     render::{
         mesh::{Indices, PrimitiveTopology},
@@ -6,7 +7,6 @@ use bevy::{
         view::RenderLayers,
     },
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
-    utils::HashMap,
 };
 use itertools::Itertools;
 
@@ -97,13 +97,13 @@ fn mark_mesh_as_stale(
 }
 
 #[derive(Resource, Default)]
-struct MeshGenTasks(HashMap<Entity, Task<MeshTaskData>>);
+struct MeshGenTasks(EntityHashMap<Task<MeshTaskData>>);
 
 fn end_mesh_tasks_for_unloaded_chunks(
     trigger: Trigger<OnRemove, Chunk>,
     mut tasks: ResMut<MeshGenTasks>,
 ) {
-    tasks.0.remove(&trigger.entity());
+    tasks.0.remove(&trigger.target());
 }
 
 fn begin_mesh_gen_tasks(
@@ -175,10 +175,10 @@ fn receive_mesh_gen_tasks(
             return true;
         };
         let e = data.entity;
-        let Some(mut entity) = commands.get_entity(e) else {
+        let Ok(mut entity) = commands.get_entity(e) else {
             return true;
         };
-        entity.despawn_descendants();
+        entity.despawn_related::<Children>();
         if data.mesh.is_empty() {
             return false;
         }
