@@ -206,14 +206,6 @@ fn receive_mesh_gen_tasks(
                     }
                     MaterialHandle::None => panic!("No material handle defined for block"),
                 }
-                // builder.spawn((
-                //     MaterialMeshBundle {
-                //         mesh: meshes.add(mesh),
-                //         material: materials.get(&block, &side).unwrap().clone(),
-                //         ..default()
-                //     },
-                //     render_layer.clone(),
-                // ));
             }
         });
         return false;

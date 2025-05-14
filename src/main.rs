@@ -13,7 +13,7 @@ use bevy::{
     prelude::*,
     window::CursorGrabMode,
 };
-use player::PlayerBundle;
+use player::{Player, PlayerCamera};
 use render_layer::WORLD_LAYER;
 use state::GameState;
 
@@ -93,7 +93,11 @@ fn setup_game(
     window.cursor_options.visible = false;
     window.cursor_options.grab_mode = CursorGrabMode::Locked;
 
-    commands.spawn(PlayerBundle::default());
+    commands.spawn((
+        Player,
+        PlayerCamera,
+        Transform::from_xyz(0.0, 2.0, 0.0).looking_to(Vec3::X, Vec3::Y),
+    ));
     commands.spawn((
         DirectionalLight {
             color: Color::WHITE,
