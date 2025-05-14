@@ -66,23 +66,27 @@ fn update_copy_to_match_component<T: Component + Clone>(
 }
 
 #[derive(Component, Clone)]
-pub struct Neighborhood<T>(pub [Option<Arc<T>>; 3 * 3 * 3]);
+pub struct Neighborhood<T> {
+    chunks: [Option<Arc<T>>; 3 * 3 * 3],
+}
 
 impl<T> Default for Neighborhood<T> {
     fn default() -> Self {
-        Self([const { None }; 27])
+        Self {
+            chunks: [const { None }; 27],
+        }
     }
 }
 
 impl<T> Neighborhood<T> {
     /// 0,0,0 is center
     pub fn get_chunk(&self, x: i32, y: i32, z: i32) -> &Option<Arc<T>> {
-        &self.0[Self::get_chunk_index(x, y, z)]
+        &self.chunks[Self::get_chunk_index(x, y, z)]
     }
 
     /// 0,0,0 is center
     pub fn get_chunk_mut(&mut self, x: i32, y: i32, z: i32) -> &mut Option<Arc<T>> {
-        self.0
+        self.chunks
             .get_mut(Self::get_chunk_index(x, y, z))
             .expect("index range")
     }
@@ -96,7 +100,7 @@ impl<T> Neighborhood<T> {
     }
 
     pub fn is_incomplete(&self) -> bool {
-        self.0
+        self.chunks
             .iter()
             .any(|maybe| maybe.is_none())
     }
@@ -104,7 +108,7 @@ impl<T> Neighborhood<T> {
 
 impl<T: Ord> Neighborhood<T> {
     pub fn min(&self) -> Option<Arc<T>> {
-        self.0
+        self.chunks
             .iter()
             .filter_map(|x| x.clone())
             .min()
