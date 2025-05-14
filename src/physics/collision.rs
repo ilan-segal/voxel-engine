@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-#[derive(Component)]
+#[derive(Component, Default)]
 pub struct Collidable;
 
 #[derive(Event)]

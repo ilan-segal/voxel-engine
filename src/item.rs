@@ -80,23 +80,22 @@ pub struct ItemBundle {
     pub quantity: Quantity,
 }
 
-pub const ITEM_LIFESPAN: Lifespan = Lifespan {
+#[derive(Component)]
+#[require(
+    ChunkPosition,
+    Collidable,
+    Gravity,
+    Velocity,
+    Visibility,
+    Friction { coefficient: 0.5 },
     // One hour
-    seconds: 3600.0,
-};
+    Lifespan { seconds: 3600.0 },
+    Aabb { ..item_aabb() }
+)]
+pub struct DroppedItem;
 
-#[derive(Bundle)]
-pub struct DroppedItemBundle {
-    pub item: ItemBundle,
-    pub transform: Transform,
-    pub chunk_position: ChunkPosition,
-    pub aabb: Aabb,
-    pub collidable: Collidable,
-    pub gravity: Gravity,
-    pub velocity: Velocity,
-    pub friction: Friction,
-    pub lifespan: Lifespan,
-    pub visibility: Visibility,
+fn item_aabb() -> Aabb {
+    Aabb::cube(1.0)
 }
 
 #[derive(Component)]

@@ -14,8 +14,8 @@ use bevy::{
 use super::{target_velocity::TargetVelocity, Sprinting};
 use crate::{
     block::Block,
-    item::{DroppedItemBundle, Item, ItemBundle, Quantity, DROPPED_ITEM_SCALE, ITEM_LIFESPAN},
-    physics::{aabb::Aabb, collision::Collidable, friction::Friction},
+    item::{DroppedItem, Item, ItemBundle, Quantity, DROPPED_ITEM_SCALE},
+    physics::velocity::Velocity,
     player::{
         block_target::{TargetedBlock, TargetedSpace},
         inventory::{HotbarSelection, Inventory},
@@ -285,26 +285,17 @@ fn drop_item(
         };
         item.quantity.decrease(1);
         let Item::Block(block) = item.item;
-        let player_transform = global_transform.compute_transform();
+        let translation = global_transform.translation();
+        let rotation = global_transform.rotation();
         let quantity = Quantity(1);
-        commands.spawn(DroppedItemBundle {
-            item: ItemBundle {
+        commands.spawn((
+            Transform::from_translation(translation).with_scale(Vec3::splat(DROPPED_ITEM_SCALE)),
+            DroppedItem,
+            ItemBundle {
                 item: Item::Block(block),
                 quantity,
             },
-            transform: Transform {
-                translation: player_transform.translation,
-                scale: Vec3::ONE * DROPPED_ITEM_SCALE,
-                ..default()
-            },
-            chunk_position: default(),
-            gravity: default(),
-            velocity: (player_transform.rotation * Vec3::NEG_Z * 5.0).into(),
-            aabb: Aabb::cube(1.0),
-            collidable: Collidable,
-            friction: Friction { coefficient: 0.1 },
-            lifespan: ITEM_LIFESPAN,
-            visibility: Visibility::Visible,
-        });
+            Velocity::from(rotation * Vec3::NEG_Z * 5.0),
+        ));
     }
 }
