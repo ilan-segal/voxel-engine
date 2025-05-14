@@ -50,7 +50,8 @@ const PLAYER_MAX_HEALTH: u32 = 20;
     Health(PLAYER_MAX_HEALTH),
     MaxHealth(PLAYER_MAX_HEALTH),
     Inventory::creative_default(),
-    HotbarSelection
+    HotbarSelection,
+    PickUpRange { meters: 2.0 }
 )]
 pub struct Player;
 
@@ -81,6 +82,7 @@ pub struct Sneaking(pub bool);
         ),
         ..default()
     },
+    RenderLayers::layer(WORLD_LAYER)
 )]
 pub struct PlayerCamera;
 
