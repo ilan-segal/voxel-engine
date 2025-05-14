@@ -558,6 +558,8 @@ fn optimize_side_choice(block: &Block, side: &BlockSide) -> BlockSide {
     match (block, side) {
         (Block::Wood, BlockSide::Up) | (Block::Wood, BlockSide::Down) => BlockSide::Up,
         (Block::Wood, _) => BlockSide::East,
+        (Block::Grass, BlockSide::Up) | (Block::Grass, BlockSide::Down) => *side,
+        (Block::Grass, _) => BlockSide::East,
         _ => BlockSide::default(),
     }
 }
