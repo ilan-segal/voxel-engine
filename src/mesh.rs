@@ -367,7 +367,7 @@ fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> 
                         width += 1;
                     }
                 }
-                let vertices = get_quad_corners(&direction, layer, row, height, col, width);
+                let vertices = get_quad_corners(&direction, layer, row, height, col, width, block);
                 let ao_factors = if direction == BlockSide::Down {
                     [
                         bottom_right_ao_factor,
@@ -482,6 +482,7 @@ fn get_quad_corners(
     height: usize,
     col: usize,
     width: usize,
+    block: &Block,
 ) -> [Vec3; 4] {
     let (x, y, z) = layer_to_xyz(direction, layer as i32, row as i32, col as i32);
     let (xf, yf, zf, h, w) = (
@@ -491,13 +492,22 @@ fn get_quad_corners(
         height as f32 + 1.0,
         width as f32 + 1.0,
     );
+    const FLUID_DROP: f32 = -0.125;
     match direction {
-        BlockSide::Up => [
-            Vec3::new(xf, yf, zf),
-            Vec3::new(xf, yf, zf + w),
-            Vec3::new(xf + h, yf, zf + w),
-            Vec3::new(xf + h, yf, zf),
-        ],
+        BlockSide::Up => match block {
+            Block::Water => [
+                Vec3::new(xf, yf + FLUID_DROP, zf),
+                Vec3::new(xf, yf + FLUID_DROP, zf + w),
+                Vec3::new(xf + h, yf + FLUID_DROP, zf + w),
+                Vec3::new(xf + h, yf + FLUID_DROP, zf),
+            ],
+            _ => [
+                Vec3::new(xf, yf, zf),
+                Vec3::new(xf, yf, zf + w),
+                Vec3::new(xf + h, yf, zf + w),
+                Vec3::new(xf + h, yf, zf),
+            ],
+        },
         BlockSide::Down => [
             Vec3::new(xf, yf - 1.0, zf + w),
             Vec3::new(xf, yf - 1.0, zf),
