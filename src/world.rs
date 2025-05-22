@@ -340,6 +340,7 @@ fn generate_terrain_sculpt_for_chunk(
     const LAND_HEIGHT_SCALE: f32 = 50.0;
     const SEA_LEVEL: i32 = 0;
     const DIRT_DEPTH: i32 = 4;
+    const SEA_SAND_DEPTH: f32 = 2.0;
     let chunk_pos = pos.0;
     Terrain::from_fn(|pos| {
         let [x, _, z] = pos;
@@ -360,6 +361,8 @@ fn generate_terrain_sculpt_for_chunk(
             return if y < continent_noise * CONTINENT_SCALE {
                 if is_cave {
                     Block::Air
+                } else if y < continent_noise * CONTINENT_SCALE - SEA_SAND_DEPTH {
+                    Block::Stone
                 } else {
                     Block::Sand
                 }
