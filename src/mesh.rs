@@ -11,7 +11,7 @@ use bevy::{
 use itertools::Itertools;
 
 use crate::{
-    block::{Block, BlockSide},
+    block::{Block, BlockSide, FLUID_DROP},
     chunk::{
         data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, Chunk,
         CHUNK_SIZE,
@@ -492,7 +492,6 @@ fn get_quad_corners(
         height as f32 + 1.0,
         width as f32 + 1.0,
     );
-    const FLUID_DROP: f32 = -0.125;
     match direction {
         BlockSide::Up => match block {
             Block::Water => [

@@ -7,12 +7,14 @@ use bevy::{
     prelude::*,
 };
 use iyes_perf_ui::prelude::*;
+use perf_ui_camera_block::PerfUiCameraBlock;
 use perf_ui_camera_facing::PerfUiCameraFacing;
 use perf_ui_camera_pos::PerfUiCameraPosition;
 use perf_ui_targeted_block::PerfUiTargetedBlock;
 
 mod chunk_border;
 mod hitbox_frame;
+mod perf_ui_camera_block;
 mod perf_ui_camera_facing;
 mod perf_ui_camera_pos;
 mod perf_ui_targeted_block;
@@ -31,6 +33,7 @@ impl Plugin for DebugPlugin {
         ))
         .add_perf_ui_simple_entry::<PerfUiCameraPosition>()
         .add_perf_ui_simple_entry::<PerfUiCameraFacing>()
+        .add_perf_ui_simple_entry::<PerfUiCameraBlock>()
         .add_perf_ui_simple_entry::<PerfUiTargetedBlock>()
         .init_resource::<DebugUiIsVisible>()
         .add_systems(Startup, (setup, toggle_debug_ui).chain())
@@ -46,6 +49,7 @@ fn setup(mut commands: Commands) {
         PerfUiEntryFPS::default(),
         PerfUiCameraPosition::default(),
         PerfUiCameraFacing::default(),
+        PerfUiCameraBlock::default(),
         PerfUiTargetedBlock::default(),
         DebugUi,
     ));

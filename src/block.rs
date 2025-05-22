@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 use strum_macros::EnumIter;
 
+pub const FLUID_DROP: f32 = -0.125;
+pub const SURFACE_HEIGHT: f32 = 1.0 + FLUID_DROP;
+
 #[derive(Default, Clone, Copy, PartialEq, Eq, Debug, Hash, PartialOrd, Ord, EnumIter)]
 pub enum Block {
     #[default]
