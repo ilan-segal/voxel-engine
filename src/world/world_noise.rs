@@ -38,8 +38,8 @@ impl WhiteNoise {
     }
 }
 
-impl NoiseFn<i32, 3> for WhiteNoise {
-    fn get(&self, [x, y, z]: [i32; 3]) -> f64 {
+impl NoiseFn<f64, 3> for WhiteNoise {
+    fn get(&self, [x, y, z]: [f64; 3]) -> f64 {
         let result = self
             .permutation_table
             .hash(&[x as isize, y as isize, z as isize]) as u8;
@@ -95,19 +95,19 @@ struct NoiseGenerator {
     offset: f64,
 }
 
-impl NoiseFn<i32, 2> for NoiseGenerator {
-    fn get(&self, [x, y]: [i32; 2]) -> f64 {
-        let sample_x = x as f64 / self.scale + self.offset;
-        let sample_y = y as f64 / self.scale + self.offset;
+impl NoiseFn<f64, 2> for NoiseGenerator {
+    fn get(&self, [x, y]: [f64; 2]) -> f64 {
+        let sample_x = x / self.scale + self.offset;
+        let sample_y = y / self.scale + self.offset;
         return self.perlin.get([sample_x, sample_y]) * self.amplitude;
     }
 }
 
-impl NoiseFn<i32, 3> for NoiseGenerator {
-    fn get(&self, [x, y, z]: [i32; 3]) -> f64 {
-        let sample_x = x as f64 / self.scale + self.offset;
-        let sample_y = y as f64 / self.scale + self.offset;
-        let sample_z = z as f64 / self.scale + self.offset;
+impl NoiseFn<f64, 3> for NoiseGenerator {
+    fn get(&self, [x, y, z]: [f64; 3]) -> f64 {
+        let sample_x = x / self.scale + self.offset;
+        let sample_y = y / self.scale + self.offset;
+        let sample_z = z / self.scale + self.offset;
         return self
             .perlin
             .get([sample_x, sample_y, sample_z])
@@ -155,8 +155,8 @@ impl StackedNoise {
     }
 }
 
-impl NoiseFn<i32, 2> for StackedNoise {
-    fn get(&self, point: [i32; 2]) -> f64 {
+impl NoiseFn<f64, 2> for StackedNoise {
+    fn get(&self, point: [f64; 2]) -> f64 {
         let (amp, sample) = self
             .noises
             .iter()
@@ -167,8 +167,8 @@ impl NoiseFn<i32, 2> for StackedNoise {
     }
 }
 
-impl NoiseFn<i32, 3> for StackedNoise {
-    fn get(&self, point: [i32; 3]) -> f64 {
+impl NoiseFn<f64, 3> for StackedNoise {
+    fn get(&self, point: [f64; 3]) -> f64 {
         let (amp, sample) = self
             .noises
             .iter()
@@ -176,5 +176,28 @@ impl NoiseFn<i32, 3> for StackedNoise {
             .reduce(|(agg_amp, agg_sample), (amp, sample)| ((agg_amp + amp), (agg_sample + sample)))
             .unwrap_or((1., 0.));
         (sample / amp) * 0.5 + 0.5
+    }
+}
+
+#[derive(Resource, Clone)]
+pub struct ClimateNoise {
+    pub temperature: Arc<ScalePoint<Simplex>>,
+    pub humidity: Arc<ScalePoint<Simplex>>,
+}
+
+impl ClimateNoise {
+    pub fn new(seed: u32, scale: f64) -> Self {
+        Self {
+            temperature: Arc::new(
+                ScalePoint::new(Simplex::new(seed ^ 0xDADA))
+                    .set_scale(scale.recip())
+                    .into(),
+            ),
+            humidity: Arc::new(
+                ScalePoint::new(Simplex::new(seed ^ 0xBABA))
+                    .set_scale(scale)
+                    .into(),
+            ),
+        }
     }
 }

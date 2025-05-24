@@ -2,7 +2,10 @@ use crate::{
     block::Block,
     camera_distance::CameraDistance,
     chunk::{
-        data::{Blocks, ContinentNoise, HeightNoise, Noise3d, Terrain},
+        data::{
+            Blocks, ContinentNoise, FromNoise, HeightNoise, HumidityNoise, Noise3d,
+            TemperatureNoise, Terrain,
+        },
         position::ChunkPosition,
         spatial::SpatiallyMapped,
         Chunk, CHUNK_LENGTH, CHUNK_SIZE, CHUNK_SIZE_I32,
@@ -26,7 +29,8 @@ use seed::{LoadSeed, WorldSeed};
 use stage::Stage;
 use std::collections::HashSet;
 use world_noise::{
-    CaveNetworkNoiseGenerator, ContinentNoiseGenerator, HeightNoiseGenerator, WhiteNoise,
+    CaveNetworkNoiseGenerator, ClimateNoise, ContinentNoiseGenerator, HeightNoiseGenerator,
+    WhiteNoise,
 };
 
 const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 7;
@@ -74,6 +78,7 @@ fn init_noise(mut commands: Commands, seed: Res<WorldSeed>) {
     commands.insert_resource(HeightNoiseGenerator::new(seed.0));
     commands.insert_resource(WhiteNoise::new(seed.0));
     commands.insert_resource(CaveNetworkNoiseGenerator::new(seed.0));
+    commands.insert_resource(ClimateNoise::new(seed.0, 1000.0))
 }
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -221,7 +226,7 @@ fn begin_noise_load_tasks(
     continent_noise_generator: Res<ContinentNoiseGenerator>,
     height_noise_generator: Res<HeightNoiseGenerator>,
     white_noise: Res<WhiteNoise>,
-    // cave_noise_generator: Res<CaveNetworkNoiseGenerator>,
+    climate_noise: Res<ClimateNoise>,
 ) {
     for (entity, pos, _) in q_chunk.iter().sort::<&CameraDistance>() {
         if tasks.0.contains_key(pos) {
@@ -231,6 +236,7 @@ fn begin_noise_load_tasks(
         let continent_noise_generator = continent_noise_generator.clone();
         let height_noise_generator = height_noise_generator.clone();
         let white_noise = white_noise.clone();
+        let climate_noise = climate_noise.clone();
         // let cave_noise_generator = cave_noise_generator.clone();
         let pos_ivec = pos.0;
         let task = task_pool.spawn(async move {
@@ -239,7 +245,7 @@ fn begin_noise_load_tasks(
                 continent_noise_generator,
                 height_noise_generator,
                 white_noise,
-                // cave_noise_generator,
+                climate_noise,
             );
             ChunkLoadTaskData {
                 entity,
@@ -255,6 +261,8 @@ struct NoiseBundle {
     continent: ContinentNoise,
     height: HeightNoise,
     white: Noise3d,
+    temperature: TemperatureNoise,
+    humidity: HumidityNoise,
     // cave: CaveNetworkNoise,
 }
 
@@ -263,17 +271,20 @@ fn generate_chunk_noise(
     continent_noise: ContinentNoiseGenerator,
     height_noise: HeightNoiseGenerator,
     white_noise: WhiteNoise,
-    // cave_noise_generator: CaveNetworkNoiseGenerator,
+    climate_noise: ClimateNoise, // cave_noise_generator: CaveNetworkNoiseGenerator,
 ) -> NoiseBundle {
-    let continent = ContinentNoise::from((continent_noise.0.as_ref(), chunk_pos));
-    let height = HeightNoise::from((height_noise.0.as_ref(), chunk_pos));
-    let white = Noise3d::from((white_noise, chunk_pos));
+    let continent = ContinentNoise::from_noise(continent_noise.0.as_ref(), chunk_pos);
+    let height = HeightNoise::from_noise(height_noise.0.as_ref(), chunk_pos);
+    let white = Noise3d::from_noise(white_noise, chunk_pos);
+    let temperature = TemperatureNoise::from_noise(climate_noise.temperature.as_ref(), chunk_pos);
+    let humidity = HumidityNoise::from_noise(climate_noise.humidity.as_ref(), chunk_pos);
     // let cave = CaveNetworkNoise::from((cave_noise_generator, chunk_pos));
     NoiseBundle {
         continent,
         height,
         white,
-        // cave,
+        temperature,
+        humidity,
     }
 }
 
