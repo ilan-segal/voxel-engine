@@ -1,8 +1,6 @@
 #![feature(let_chains)]
-#![feature(float_next_up_down)]
 #![feature(int_roundings)]
 #![feature(iter_map_windows)]
-#![feature(trivial_bounds)]
 #![feature(step_trait)]
 
 use bevy::{
