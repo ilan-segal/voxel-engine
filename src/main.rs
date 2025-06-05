@@ -21,6 +21,7 @@ mod camera_distance;
 mod chunk;
 mod debug_plugin;
 mod item;
+mod material;
 mod mesh;
 mod physics;
 mod player;
@@ -85,9 +86,7 @@ fn setup_game(
     mut windows: Query<&mut Window>,
     mut gizmos_config_store: ResMut<GizmoConfigStore>,
 ) {
-    let mut window = windows
-        .single_mut()
-        .expect("Window component");
+    let mut window = windows.single_mut().expect("Window component");
     window.cursor_options.visible = false;
     window.cursor_options.grab_mode = CursorGrabMode::Locked;
 
