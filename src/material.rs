@@ -21,16 +21,16 @@ use bevy::{
 
 /**
 BYTE DATA:
-* 0-4: x pos
-* 5-9: y pos
-* 10-14: z pos
-* 15-17: normal index (range \[0, 5])
-* 18-19: ambient occlusion factor (range \[0, 3])
-* 20-31: block index (range: \[0, 2^12])
+* 0-5: x pos
+* 6-11: y pos
+* 12-17: z pos
+* 18-20: normal index (range \[0, 5])
+* 21-22: ambient occlusion factor (range \[0, 3])
+* 23-31: block index (range: \[0, 2^12])
 */
 
-pub const TERRAIN_VERTEX_DATA: MeshVertexAttribute =
-    MeshVertexAttribute::new("TerrainVertexData", 37790000, VertexFormat::Float32x4);
+pub const ATTRIBUTE_TERRAIN_VERTEX_DATA: MeshVertexAttribute =
+    MeshVertexAttribute::new("TerrainVertexData", 37790000, VertexFormat::Uint32);
 
 #[derive(Asset, Reflect, Debug, Clone, Default)]
 pub struct TerrainMaterial {
@@ -55,7 +55,7 @@ impl Material for TerrainMaterial {
     ) -> Result<(), SpecializedMeshPipelineError> {
         let vertex_layout = layout
             .0
-            .get_layout(&[TERRAIN_VERTEX_DATA.at_shader_location(0)])?;
+            .get_layout(&[ATTRIBUTE_TERRAIN_VERTEX_DATA.at_shader_location(0)])?;
         descriptor.vertex.buffers = vec![vertex_layout];
         Ok(())
     }
@@ -76,7 +76,11 @@ impl AsBindGroup for TerrainMaterial {
     ) -> Result<PreparedBindGroup<Self::Data>, AsBindGroupError> {
         // retrieve the render resources from handles
         let mut images = vec![];
-        for handle in self.textures.iter().take(MAX_TEXTURE_COUNT) {
+        for handle in self
+            .textures
+            .iter()
+            .take(MAX_TEXTURE_COUNT)
+        {
             match image_assets.get(handle) {
                 Some(image) => images.push(image),
                 None => return Err(AsBindGroupError::RetryNextUpdate),
@@ -88,7 +92,10 @@ impl AsBindGroup for TerrainMaterial {
         let textures = vec![&fallback_image.texture_view; MAX_TEXTURE_COUNT];
 
         // convert bevy's resource types to WGPU's references
-        let mut textures: Vec<_> = textures.into_iter().map(|texture| &**texture).collect();
+        let mut textures: Vec<_> = textures
+            .into_iter()
+            .map(|texture| &**texture)
+            .collect();
 
         // fill in up to the first `MAX_TEXTURE_COUNT` textures and samplers to the arrays
         for (id, image) in images.into_iter().enumerate() {

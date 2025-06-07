@@ -137,20 +137,21 @@ fn add_mesh(
                                             RenderLayers::layer(WORLD_LAYER),
                                         ));
                                     }
-                                } else if let Some(handles) = block_meshes.fluid.get(block) {
-                                    for (mesh, material) in handles.iter() {
-                                        sub_builder.spawn((
-                                            mesh.clone(),
-                                            material.clone(),
-                                            Transform::from_translation(
-                                                Vec3::new(-1.0, 1.0, -1.0)
-                                                    * DROPPED_ITEM_SCALE
-                                                    * 2.0,
-                                            ),
-                                            RenderLayers::layer(WORLD_LAYER),
-                                        ));
-                                    }
-                                };
+                                }
+                                // else if let Some(handles) = block_meshes.fluid.get(block) {
+                                //     for (mesh, material) in handles.iter() {
+                                //         sub_builder.spawn((
+                                //             mesh.clone(),
+                                //             material.clone(),
+                                //             Transform::from_translation(
+                                //                 Vec3::new(-1.0, 1.0, -1.0)
+                                //                     * DROPPED_ITEM_SCALE
+                                //                     * 2.0,
+                                //             ),
+                                //             RenderLayers::layer(WORLD_LAYER),
+                                //         ));
+                                //     }
+                                // };
                             });
                     });
             }

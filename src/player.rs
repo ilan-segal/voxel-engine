@@ -80,7 +80,7 @@ pub struct Sneaking(pub bool);
         ..default()
     }),
     Msaa::Sample8,
-    DepthPrepass,
+    // DepthPrepass,
     DistanceFog { ..air_distance_fog() },
     RenderLayers::layer(WORLD_LAYER),
     CameraBlock,

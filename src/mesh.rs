@@ -16,6 +16,7 @@ use crate::{
         data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, Chunk,
         CHUNK_SIZE,
     },
+    material::ATTRIBUTE_TERRAIN_VERTEX_DATA,
     texture::{BlockMaterials, MaterialHandle},
     world::{
         neighborhood::{ComponentCopy, Neighborhood},
@@ -56,7 +57,7 @@ pub struct MeshSet;
 
 struct MeshTaskData {
     entity: Entity,
-    mesh: Vec<(Block, BlockSide, Mesh)>,
+    mesh: Option<Mesh>,
 }
 
 #[derive(Component)]
@@ -71,9 +72,14 @@ fn update_mesh_status(
 ) {
     for (e, stage) in q.iter() {
         if stage == &Stage::final_stage() {
-            commands.entity(e).remove::<Meshed>().insert(CheckedForMesh);
+            commands
+                .entity(e)
+                .remove::<Meshed>()
+                .insert(CheckedForMesh);
         } else {
-            commands.entity(e).insert((CheckedForMesh, Meshed));
+            commands
+                .entity(e)
+                .insert((CheckedForMesh, Meshed));
         }
     }
 }
@@ -84,7 +90,9 @@ fn mark_mesh_as_stale(
     mut tasks: ResMut<MeshGenTasks>,
 ) {
     for entity in q_changed_neighborhood.iter() {
-        commands.entity(entity).remove::<CheckedForMesh>();
+        commands
+            .entity(entity)
+            .remove::<CheckedForMesh>();
         tasks.0.remove(&entity);
     }
 }
@@ -172,34 +180,20 @@ fn receive_mesh_gen_tasks(
             return true;
         };
         entity.despawn_related::<Children>();
-        if data.mesh.is_empty() {
+        let Some(mesh) = data.mesh else {
             return false;
-        }
+        };
         let render_layer = q_render_layers
             .get(e)
             .ok()
             .cloned()
             .unwrap_or(RenderLayers::layer(WORLD_LAYER));
         entity.with_children(|builder| {
-            for (block, side, mesh) in data.mesh {
-                match materials.get(&block, &side) {
-                    MaterialHandle::Terrain(handle) => {
-                        builder.spawn((
-                            Mesh3d(meshes.add(mesh)),
-                            MeshMaterial3d(handle.clone_weak()),
-                            render_layer.clone(),
-                        ));
-                    }
-                    // MaterialHandle::Fluid(handle) => {
-                    //     builder.spawn((
-                    //         Mesh3d(meshes.add(mesh)),
-                    //         MeshMaterial3d(handle.clone_weak()),
-                    //         render_layer.clone(),
-                    //     ));
-                    // }
-                    MaterialHandle::None => panic!("No material handle defined for block"),
-                }
-            }
+            builder.spawn((
+                Mesh3d(meshes.add(mesh)),
+                MeshMaterial3d(materials.terrain.clone_weak()),
+                render_layer.clone(),
+            ));
         });
         return false;
     });
@@ -214,6 +208,13 @@ struct Quad {
     uvs: [[f32; 2]; 4],
 }
 
+/*
+
+00000 <- 0
+10000 <- 32
+
+*/
+
 impl Quad {
     fn rotate_against_anisotropy(&mut self) {
         if self.ao_factors[0] + self.ao_factors[2] > self.ao_factors[1] + self.ao_factors[3] {
@@ -227,10 +228,32 @@ impl Quad {
         self.uvs.rotate_left(mid);
     }
 
-    fn get_vertex_data(&self) -> [u32; 4] {}
+    fn get_vertex_data(&self) -> [u32; 4] {
+        std::array::from_fn(|idx| self.get_single_vertex_data(idx))
+    }
+
+    fn get_single_vertex_data(&self, i: usize) -> u32 {
+        let normal_index: u32 = match self.side {
+            BlockSide::North => 0,
+            BlockSide::South => 1,
+            BlockSide::Up => 2,
+            BlockSide::Down => 3,
+            BlockSide::East => 4,
+            BlockSide::West => 5,
+        };
+        let [local_x, local_y, local_z] = self.vertices[i].as_uvec3().to_array();
+        let ao_factor = self.ao_factors[i] as u32;
+        let block_id = 0;
+        return local_x
+            | (local_y << 6)
+            | (local_z << 12)
+            | (normal_index << 18)
+            | (ao_factor << 21)
+            | (block_id << 23);
+    }
 }
 
-fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Vec<(Block, BlockSide, Mesh)> {
+fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Option<Mesh> {
     let mut quads = vec![];
     quads.extend(greedy_mesh(&chunk, BlockSide::Up));
     quads.extend(greedy_mesh(&chunk, BlockSide::Down));
@@ -244,7 +267,10 @@ fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Vec<(Block, BlockSide, M
 // TODO: Replace slow implementation with binary mesher
 fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let middle = chunk.middle_chunk().clone().expect("Already checked");
+    let middle = chunk
+        .middle_chunk()
+        .clone()
+        .expect("Already checked");
     let mut blocks = middle.as_ref().clone();
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {
@@ -532,18 +558,19 @@ fn get_quad_corners(
     }
 }
 
-fn create_meshes(quads: Vec<Quad>) -> Vec<(Block, BlockSide, Mesh)> {
-    quads
-        .iter()
-        .map(|q| (q.block, optimize_side_choice(&q.block, &q.side), q))
-        .sorted_by_key(|(block, side, _)| (*block, *side))
-        .chunk_by(|(block, side, _)| (*block, *side))
-        .into_iter()
-        .filter_map(|((block, side), qs)| {
-            let mesh = create_mesh_from_quads(qs.map(|qs| qs.2).cloned().collect())?;
-            Some((block, side, mesh))
-        })
-        .collect()
+fn create_meshes(quads: Vec<Quad>) -> Option<Mesh> {
+    create_mesh_from_quads(quads)
+    // quads
+    //     .iter()
+    //     .map(|q| (q.block, optimize_side_choice(&q.block, &q.side), q))
+    //     .sorted_by_key(|(block, side, _)| (*block, *side))
+    //     .chunk_by(|(block, side, _)| (*block, *side))
+    //     .into_iter()
+    //     .filter_map(|((block, side), qs)| {
+    //         let mesh = create_mesh_from_quads(qs.map(|qs| qs.2).cloned().collect())?;
+    //         Some((block, side, mesh))
+    //     })
+    //     .collect()
 }
 
 fn optimize_side_choice(block: &Block, side: &BlockSide) -> BlockSide {
@@ -564,22 +591,22 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
     for i in 0..quads.len() {
         quads[i].rotate_against_anisotropy();
     }
-    let vertices = quads
-        .iter()
-        .flat_map(|q| q.vertices.iter())
-        .map(|v| v.to_array())
-        .collect::<Vec<_>>();
-    let normals = quads
-        .iter()
-        .map(|q| q.vertices)
-        .map(|vs| {
-            let a = vs[1] - vs[0];
-            let b = vs[2] - vs[0];
-            return a.cross(b).normalize();
-        })
-        .map(|norm| norm.to_array())
-        .flat_map(|norm| [norm; 4])
-        .collect::<Vec<_>>();
+    // let vertices = quads
+    //     .iter()
+    //     .flat_map(|q| q.vertices.iter())
+    //     .map(|v| v.to_array())
+    //     .collect::<Vec<_>>();
+    // let normals = quads
+    //     .iter()
+    //     .map(|q| q.vertices)
+    //     .map(|vs| {
+    //         let a = vs[1] - vs[0];
+    //         let b = vs[2] - vs[0];
+    //         return a.cross(b).normalize();
+    //     })
+    //     .map(|norm| norm.to_array())
+    //     .flat_map(|norm| [norm; 4])
+    //     .collect::<Vec<_>>();
     let indices = (0..quads.len())
         .flat_map(|quad_index| {
             let quad_index = quad_index as u32;
@@ -602,26 +629,33 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
             ]
         })
         .collect::<Vec<_>>();
-    // let colour = block.get_colour().unwrap_or_default();
-    let colours = quads
+    // // let colour = block.get_colour().unwrap_or_default();
+    // let colours = quads
+    //     .iter()
+    //     .flat_map(|q| {
+    //         q.ao_factors.iter().map(move |factor| {
+    //             let lum = 0.6_f32.powi((*factor).into());
+    //             return Color::WHITE.with_luminance(lum);
+    //         })
+    //     })
+    //     .map(|c| c.to_linear().to_f32_array())
+    //     .collect::<Vec<_>>();
+    // let uv = quads
+    //     .iter()
+    //     .flat_map(|q| q.uvs)
+    //     .collect::<Vec<_>>();
+    let vertex_data = quads
         .iter()
-        .flat_map(|q| {
-            q.ao_factors.iter().map(move |factor| {
-                let lum = 0.6_f32.powi((*factor).into());
-                return Color::WHITE.with_luminance(lum);
-            })
-        })
-        .map(|c| c.to_linear().to_f32_array())
+        .flat_map(|q| q.get_vertex_data())
         .collect::<Vec<_>>();
-    let uv = quads.iter().flat_map(|q| q.uvs).collect::<Vec<_>>();
     let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD,
     )
-    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colours)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uv)
+    .with_inserted_attribute(ATTRIBUTE_TERRAIN_VERTEX_DATA, vertex_data)
+    // .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    // .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colours)
+    // .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uv)
     .with_inserted_indices(Indices::U32(indices));
     return Some(mesh);
 }

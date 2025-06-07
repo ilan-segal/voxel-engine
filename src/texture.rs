@@ -69,13 +69,13 @@ pub struct BlockMaterials {
     // leaves: Handle<TerrainMaterial>,
     // bedrock: Handle<TerrainMaterial>,
     // water: Handle<TerrainMaterial>,
-    terrain: Handle<TerrainMaterial>,
+    pub terrain: Handle<TerrainMaterial>,
 }
 
 impl BlockMaterials {
-    pub fn get(&self, block: &Block, side: &BlockSide) -> MaterialHandle {
-        match (block, side) {
-            (Block::Air, _) => MaterialHandle::None,
+    pub fn get(&self, block: &Block) -> MaterialHandle {
+        match block {
+            Block::Air => MaterialHandle::None,
             _ => MaterialHandle::Terrain(&self.terrain),
             // (Block::Stone, _) => MaterialHandle::Terrain(&self.stone),
             // (Block::Dirt, _) => MaterialHandle::Terrain(&self.dirt),
