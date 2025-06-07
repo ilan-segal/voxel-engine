@@ -10,7 +10,7 @@ use bevy::{
 };
 
 use crate::{
-    block::{Block, BlockSide, FLUID_DROP},
+    block::{Block, BlockSide},
     chunk::{
         data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, Chunk,
         CHUNK_SIZE,
@@ -121,7 +121,7 @@ fn begin_mesh_gen_tasks(
         let task = task_pool.spawn(async move {
             MeshTaskData {
                 entity,
-                mesh: get_meshes_for_chunk(cloned_neighborhood),
+                mesh: chunk_mesh(cloned_neighborhood),
             }
         });
         tasks.0.insert(entity, task);
@@ -149,7 +149,7 @@ fn begin_mesh_gen_tasks_for_positionless_chunks(
         let task = task_pool.spawn(async move {
             MeshTaskData {
                 entity,
-                mesh: get_meshes_for_chunk(neighborhood),
+                mesh: chunk_mesh(neighborhood),
             }
         });
         tasks.0.insert(entity, task);
@@ -195,9 +195,9 @@ fn receive_mesh_gen_tasks(
 struct Quad {
     // block: Block,
     side: BlockSide,
-    vertices: [Vec3; 4],
+    vertices: [IVec3; 4],
     ao_factors: [u8; 4],
-    uvs: [[f32; 2]; 4],
+    // uvs: [[f32; 2]; 4],
 }
 
 /*
@@ -217,7 +217,7 @@ impl Quad {
     fn rotate_left(&mut self, mid: usize) {
         self.vertices.rotate_left(mid);
         self.ao_factors.rotate_left(mid);
-        self.uvs.rotate_left(mid);
+        // self.uvs.rotate_left(mid);
     }
 
     fn get_vertex_data(&self) -> [u32; 4] {
@@ -233,7 +233,8 @@ impl Quad {
             BlockSide::East => 4,
             BlockSide::West => 5,
         };
-        let [local_x, local_y, local_z] = self.vertices[i].as_uvec3().to_array();
+        let xs = self.vertices[i].to_array();
+        let [local_x, local_y, local_z] = xs.map(|x| u32::try_from(x).unwrap());
         let ao_factor = self.ao_factors[i] as u32;
         let block_id = 0;
         return local_x
@@ -245,7 +246,7 @@ impl Quad {
     }
 }
 
-fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Option<Mesh> {
+fn chunk_mesh(chunk: Neighborhood<Blocks>) -> Option<Mesh> {
     let mut quads = vec![];
     quads.extend(greedy_mesh(&chunk, BlockSide::Up));
     quads.extend(greedy_mesh(&chunk, BlockSide::Down));
@@ -253,7 +254,7 @@ fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Option<Mesh> {
     quads.extend(greedy_mesh(&chunk, BlockSide::South));
     quads.extend(greedy_mesh(&chunk, BlockSide::West));
     quads.extend(greedy_mesh(&chunk, BlockSide::East));
-    return create_meshes(quads);
+    return create_mesh_from_quads(quads);
 }
 
 // TODO: Replace slow implementation with binary mesher
@@ -374,7 +375,7 @@ fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> 
                         width += 1;
                     }
                 }
-                let vertices = get_quad_corners(&direction, layer, row, height, col, width, block);
+                let vertices = get_quad_corners(&direction, layer, row, height, col, width);
                 let ao_factors = if direction == BlockSide::Down {
                     [
                         bottom_right_ao_factor,
@@ -390,20 +391,11 @@ fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> 
                         top_left_ao_factor,
                     ]
                 };
-                let u = width as f32 + 1.0;
-                let v = height as f32 + 1.0;
-                let uvs = if direction == BlockSide::North || direction == BlockSide::West {
-                    [[v, u], [v, 0.0], [0., 0.], [0., u]]
-                } else {
-                    [[0., v], [u, v], [u, 0.0], [0., 0.]]
-                };
 
                 let quad = Quad {
                     side: direction,
                     vertices,
                     ao_factors,
-                    // block: *block,
-                    uvs,
                 };
                 quads.push(quad);
                 for cur_row in row..=height + row {
@@ -489,89 +481,49 @@ fn get_quad_corners(
     height: usize,
     col: usize,
     width: usize,
-    block: &Block,
-) -> [Vec3; 4] {
-    let (x, y, z) = layer_to_xyz(direction, layer as i32, row as i32, col as i32);
-    let (xf, yf, zf, h, w) = (
-        x as f32,
-        y as f32,
-        z as f32,
-        height as f32 + 1.0,
-        width as f32 + 1.0,
-    );
+) -> [IVec3; 4] {
+    let (xf, yf, zf) = layer_to_xyz(direction, layer as i32, row as i32, col as i32);
+    let w = width as i32 + 1;
+    let h = height as i32 + 1;
     match direction {
-        BlockSide::Up => match block {
-            Block::Water => [
-                Vec3::new(xf, yf + FLUID_DROP, zf),
-                Vec3::new(xf, yf + FLUID_DROP, zf + w),
-                Vec3::new(xf + h, yf + FLUID_DROP, zf + w),
-                Vec3::new(xf + h, yf + FLUID_DROP, zf),
-            ],
-            _ => [
-                Vec3::new(xf, yf, zf),
-                Vec3::new(xf, yf, zf + w),
-                Vec3::new(xf + h, yf, zf + w),
-                Vec3::new(xf + h, yf, zf),
-            ],
-        },
+        BlockSide::Up => [
+            IVec3::new(xf, yf, zf),
+            IVec3::new(xf, yf, zf + w),
+            IVec3::new(xf + h, yf, zf + w),
+            IVec3::new(xf + h, yf, zf),
+        ],
         BlockSide::Down => [
-            Vec3::new(xf, yf - 1.0, zf + w),
-            Vec3::new(xf, yf - 1.0, zf),
-            Vec3::new(xf + h, yf - 1.0, zf),
-            Vec3::new(xf + h, yf - 1.0, zf + w),
+            IVec3::new(xf, yf, zf + w),
+            IVec3::new(xf, yf, zf),
+            IVec3::new(xf + h, yf, zf),
+            IVec3::new(xf + h, yf, zf + w),
         ],
         BlockSide::North => [
-            Vec3::new(xf + 1.0, yf - 1.0, zf),
-            Vec3::new(xf + 1.0, yf - 1.0 + w, zf),
-            Vec3::new(xf + 1.0, yf - 1.0 + w, zf + h),
-            Vec3::new(xf + 1.0, yf - 1.0, zf + h),
+            IVec3::new(xf + 1, yf, zf),
+            IVec3::new(xf + 1, yf + w, zf),
+            IVec3::new(xf + 1, yf + w, zf + h),
+            IVec3::new(xf + 1, yf, zf + h),
         ],
         BlockSide::South => [
-            Vec3::new(xf, yf - 1.0, zf),
-            Vec3::new(xf, yf - 1.0, zf + w),
-            Vec3::new(xf, yf - 1.0 + h, zf + w),
-            Vec3::new(xf, yf - 1.0 + h, zf),
+            IVec3::new(xf, yf, zf),
+            IVec3::new(xf, yf, zf + w),
+            IVec3::new(xf, yf + h, zf + w),
+            IVec3::new(xf, yf + h, zf),
         ],
         BlockSide::West => [
-            Vec3::new(xf, yf - 1.0, zf),
-            Vec3::new(xf, yf - 1.0 + w, zf),
-            Vec3::new(xf + h, yf - 1.0 + w, zf),
-            Vec3::new(xf + h, yf - 1.0, zf),
+            IVec3::new(xf, yf, zf),
+            IVec3::new(xf, yf + w, zf),
+            IVec3::new(xf + h, yf + w, zf),
+            IVec3::new(xf + h, yf, zf),
         ],
         BlockSide::East => [
-            Vec3::new(xf, yf - 1.0, zf + 1.0),
-            Vec3::new(xf + w, yf - 1.0, zf + 1.0),
-            Vec3::new(xf + w, yf - 1.0 + h, zf + 1.0),
-            Vec3::new(xf, yf - 1.0 + h, zf + 1.0),
+            IVec3::new(xf, yf, zf + 1),
+            IVec3::new(xf + w, yf, zf + 1),
+            IVec3::new(xf + w, yf + h, zf + 1),
+            IVec3::new(xf, yf + h, zf + 1),
         ],
     }
 }
-
-fn create_meshes(quads: Vec<Quad>) -> Option<Mesh> {
-    create_mesh_from_quads(quads)
-    // quads
-    //     .iter()
-    //     .map(|q| (q.block, optimize_side_choice(&q.block, &q.side), q))
-    //     .sorted_by_key(|(block, side, _)| (*block, *side))
-    //     .chunk_by(|(block, side, _)| (*block, *side))
-    //     .into_iter()
-    //     .filter_map(|((block, side), qs)| {
-    //         let mesh = create_mesh_from_quads(qs.map(|qs| qs.2).cloned().collect())?;
-    //         Some((block, side, mesh))
-    //     })
-    //     .collect()
-}
-
-// fn optimize_side_choice(block: &Block, side: &BlockSide) -> BlockSide {
-//     // Normalize so there are fewer separate meshes
-//     match (block, side) {
-//         (Block::Wood, BlockSide::Up) | (Block::Wood, BlockSide::Down) => BlockSide::Up,
-//         (Block::Wood, _) => BlockSide::East,
-//         (Block::Grass, BlockSide::Up) | (Block::Grass, BlockSide::Down) => *side,
-//         (Block::Grass, _) => BlockSide::East,
-//         _ => BlockSide::default(),
-//     }
-// }
 
 fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
     if quads.is_empty() {
@@ -580,22 +532,6 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
     for i in 0..quads.len() {
         quads[i].rotate_against_anisotropy();
     }
-    // let vertices = quads
-    //     .iter()
-    //     .flat_map(|q| q.vertices.iter())
-    //     .map(|v| v.to_array())
-    //     .collect::<Vec<_>>();
-    // let normals = quads
-    //     .iter()
-    //     .map(|q| q.vertices)
-    //     .map(|vs| {
-    //         let a = vs[1] - vs[0];
-    //         let b = vs[2] - vs[0];
-    //         return a.cross(b).normalize();
-    //     })
-    //     .map(|norm| norm.to_array())
-    //     .flat_map(|norm| [norm; 4])
-    //     .collect::<Vec<_>>();
     let indices = (0..quads.len())
         .flat_map(|quad_index| {
             let quad_index = quad_index as u32;
@@ -618,21 +554,6 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
             ]
         })
         .collect::<Vec<_>>();
-    // // let colour = block.get_colour().unwrap_or_default();
-    // let colours = quads
-    //     .iter()
-    //     .flat_map(|q| {
-    //         q.ao_factors.iter().map(move |factor| {
-    //             let lum = 0.6_f32.powi((*factor).into());
-    //             return Color::WHITE.with_luminance(lum);
-    //         })
-    //     })
-    //     .map(|c| c.to_linear().to_f32_array())
-    //     .collect::<Vec<_>>();
-    // let uv = quads
-    //     .iter()
-    //     .flat_map(|q| q.uvs)
-    //     .collect::<Vec<_>>();
     let vertex_data = quads
         .iter()
         .flat_map(|q| q.get_vertex_data())
@@ -642,9 +563,6 @@ fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
         RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD,
     )
     .with_inserted_attribute(ATTRIBUTE_TERRAIN_VERTEX_DATA, vertex_data)
-    // .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
-    // .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colours)
-    // .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uv)
     .with_inserted_indices(Indices::U32(indices));
     return Some(mesh);
 }

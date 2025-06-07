@@ -13,6 +13,13 @@ struct VertexOutput {
     @location(3) color: vec4<f32>,
 };
 
+const NORTH: u32 = 0;
+const SOUTH: u32 = 1;
+const UP: u32 = 2;
+const DOWN: u32 = 3;
+const EAST: u32 = 4;
+const WEST: u32 = 5;
+
 @vertex
 fn vertex(
     in: VertexInput
@@ -25,10 +32,15 @@ fn vertex(
     let ao_factor = (data >> 21) & 3;
     let block_id = (data >> 23);
 
+    var y_modifier = 1.;
+    if normal_id == UP {
+        y_modifier = 0.;
+    }
+
     var out: VertexOutput;
     out.world_position = vec4(
         f32(local_x),
-        f32(local_y),
+        f32(local_y) - y_modifier,
         f32(local_z),
         1.,
     );
@@ -44,13 +56,27 @@ fn vertex(
 
 fn get_world_normal(normal_id: u32) -> vec3<f32> {
     switch normal_id {
-        case 0u: {return vec3(1., 0., 0.);}
-        case 1u: {return vec3(-1., 0., 0.);}
-        case 2u: {return vec3(0., 1., 0.);}
-        case 3u: {return vec3(0., -1., 0.);}
-        case 4u: {return vec3(0., 0., 1.);}
-        case 5u: {return vec3(0., 0., -1.);}
-        default: {return vec3(0., 0., 0.);}
+        case NORTH: {
+            return vec3(1., 0., 0.);
+        }
+        case SOUTH: {
+            return vec3(-1., 0., 0.);
+        }
+        case UP: {
+            return vec3(0., 1., 0.);
+        }
+        case DOWN: {
+            return vec3(0., -1., 0.);
+        }
+        case EAST: {
+            return vec3(0., 0., 1.);
+        }
+        case WEST: {
+            return vec3(0., 0., -1.);
+        }
+        default: {
+            return vec3(0., 0., 0.);
+        }
     }
 }
 
