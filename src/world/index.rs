@@ -1,5 +1,5 @@
 use crate::chunk::{data::Blocks, position::ChunkPosition, Chunk};
-use crate::mesh::MeshSet;
+use crate::render::mesh::MeshSet;
 use bevy::ecs::entity::EntityHashMap;
 use bevy::{platform::collections::HashMap, prelude::*};
 

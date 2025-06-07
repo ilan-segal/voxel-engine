@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::material::TerrainMaterial;
+use crate::render::material::TerrainMaterial;
 
 pub struct TexturePlugin;
 

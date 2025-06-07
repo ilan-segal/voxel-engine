@@ -33,8 +33,8 @@ use world_noise::{
     WhiteNoise,
 };
 
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 2;
-const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 2;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 1;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 1;
 
 pub mod block_update;
 pub mod index;
@@ -104,7 +104,10 @@ fn kill_tasks_for_unloaded_chunks(
     index: Res<ChunkIndex>,
     mut tasks: ResMut<ChunkLoadTasks>,
 ) {
-    if let Some(pos) = index.pos_by_entity.get(&trigger.target()) {
+    if let Some(pos) = index
+        .pos_by_entity
+        .get(&trigger.target())
+    {
         tasks.0.remove(&ChunkPosition(*pos));
     }
 }
@@ -137,7 +140,9 @@ fn update_chunks(
     for (entity, chunk_pos) in q_chunk_position.iter() {
         if !should_be_loaded_positions.remove(&chunk_pos.0) {
             // The chunk should be unloaded since it's not in our set
-            commands.entity(entity).insert(ToDespawn);
+            commands
+                .entity(entity)
+                .insert(ToDespawn);
         }
     }
     // Finally, load the new chunks
@@ -197,9 +202,11 @@ fn receive_chunk_load_tasks(
                     return false;
                 };
                 blocks.set_changed();
-                block_updates.iter().for_each(|(block, pos)| {
-                    *blocks.at_pos_mut(*pos) = *block;
-                });
+                block_updates
+                    .iter()
+                    .for_each(|(block, pos)| {
+                        *blocks.at_pos_mut(*pos) = *block;
+                    });
                 entity.try_insert(stage);
             }
         }
@@ -439,9 +446,15 @@ fn begin_structure_load_tasks(
         if tasks.0.contains_key(item.pos) || item.stage != &Stage::Sculpt {
             continue;
         }
-        let surroundings_arent_ready =
-            item.stage_neighborhood.min().unwrap().as_ref() < &Stage::Sculpt;
-        let surroundings_arent_complete = item.terrain_neighborhood.is_incomplete();
+        let surroundings_arent_ready = item
+            .stage_neighborhood
+            .min()
+            .unwrap()
+            .as_ref()
+            < &Stage::Sculpt;
+        let surroundings_arent_complete = item
+            .terrain_neighborhood
+            .is_incomplete();
         if surroundings_arent_ready || surroundings_arent_complete {
             continue;
         }

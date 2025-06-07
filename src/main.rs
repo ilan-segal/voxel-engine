@@ -21,14 +21,12 @@ mod camera_distance;
 mod chunk;
 mod debug_plugin;
 mod item;
-mod material;
-mod mesh;
 mod physics;
 mod player;
+mod render;
 mod render_layer;
 mod state;
 mod structure;
-mod texture;
 mod ui;
 mod utils;
 mod world;
@@ -54,13 +52,12 @@ fn main() {
             camera_distance::CameraDistancePlugin,
             chunk::ChunkPlugin,
             debug_plugin::DebugPlugin,
-            mesh::MeshPlugin,
             physics::PhysicsPlugin,
             player::PlayerPlugin,
-            texture::TexturePlugin,
             ui::UiPlugin,
             world::WorldPlugin,
             item::ItemPlugin,
+            render::RenderPlugin,
         ))
         .insert_state(GameState::Init)
         .insert_resource(Time::<Fixed>::from_hz(TICKS_PER_SECOND as f64))
@@ -85,7 +82,9 @@ fn setup_game(
     mut windows: Query<&mut Window>,
     mut gizmos_config_store: ResMut<GizmoConfigStore>,
 ) {
-    let mut window = windows.single_mut().expect("Window component");
+    let mut window = windows
+        .single_mut()
+        .expect("Window component");
     window.cursor_options.visible = false;
     window.cursor_options.grab_mode = CursorGrabMode::Locked;
 
