@@ -26,14 +26,14 @@ impl From<&Block> for Block {
 }
 
 impl Block {
-    pub fn get_colour(&self) -> Color {
-        match self {
-            Self::Grass => Color::linear_rgb(0.2, 0.6, 0.0),
-            Self::Leaves => Color::hsv(124.0, 0.9, 0.39),
-            Self::Water => Color::srgba(0.247, 0.463, 0.894, 0.5),
-            _ => Color::WHITE,
-        }
-    }
+    // pub fn get_colour(&self) -> Color {
+    //     match self {
+    //         Self::Grass => Color::linear_rgb(0.2, 0.6, 0.0),
+    //         Self::Leaves => Color::hsv(124.0, 0.9, 0.39),
+    //         Self::Water => Color::srgba(0.247, 0.463, 0.894, 0.5),
+    //         _ => Color::WHITE,
+    //     }
+    // }
 
     pub fn is_meshable(&self) -> bool {
         match self {

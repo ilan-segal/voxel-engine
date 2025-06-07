@@ -6,7 +6,6 @@ use crate::{
     world::stage::Stage,
 };
 use bevy::{
-    core_pipeline::prepass::DepthPrepass,
     platform::collections::HashMap,
     prelude::*,
     render::{
@@ -142,9 +141,7 @@ fn setup_rendered_icons(mut commands: Commands, mut images: ResMut<Assets<Image>
             icon_layer.clone(),
         ));
 
-        block_icon_materials
-            .map
-            .insert(block, image_handle);
+        block_icon_materials.map.insert(block, image_handle);
     }
 
     commands.insert_resource(block_icon_materials);
@@ -160,9 +157,7 @@ fn register_block_mesh(
     mut commands: Commands,
 ) {
     for (entity, mesh_handle, material_handle, child_of) in q.iter() {
-        commands
-            .entity(entity)
-            .try_insert(Checked);
+        commands.entity(entity).try_insert(Checked);
         let Ok(ArchetypalBlock(block)) = q_parent.get(child_of.parent()) else {
             continue;
         };

@@ -18,9 +18,7 @@ impl<T: Step> Iterator for VolumetricRange<T> {
     type Item = (T, T, T);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.product
-            .next()
-            .map(|((x, y), z)| (x, y, z))
+        self.product.next().map(|((x, y), z)| (x, y, z))
     }
 }
 

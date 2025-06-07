@@ -8,7 +8,6 @@ use bevy::{
     },
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
 };
-use itertools::Itertools;
 
 use crate::{
     block::{Block, BlockSide, FLUID_DROP},
@@ -17,7 +16,7 @@ use crate::{
         CHUNK_SIZE,
     },
     material::ATTRIBUTE_TERRAIN_VERTEX_DATA,
-    texture::{BlockMaterials, MaterialHandle},
+    texture::BlockMaterials,
     world::{
         neighborhood::{ComponentCopy, Neighborhood},
         stage::Stage,
@@ -72,14 +71,9 @@ fn update_mesh_status(
 ) {
     for (e, stage) in q.iter() {
         if stage == &Stage::final_stage() {
-            commands
-                .entity(e)
-                .remove::<Meshed>()
-                .insert(CheckedForMesh);
+            commands.entity(e).remove::<Meshed>().insert(CheckedForMesh);
         } else {
-            commands
-                .entity(e)
-                .insert((CheckedForMesh, Meshed));
+            commands.entity(e).insert((CheckedForMesh, Meshed));
         }
     }
 }
@@ -90,9 +84,7 @@ fn mark_mesh_as_stale(
     mut tasks: ResMut<MeshGenTasks>,
 ) {
     for entity in q_changed_neighborhood.iter() {
-        commands
-            .entity(entity)
-            .remove::<CheckedForMesh>();
+        commands.entity(entity).remove::<CheckedForMesh>();
         tasks.0.remove(&entity);
     }
 }
@@ -201,7 +193,7 @@ fn receive_mesh_gen_tasks(
 
 #[derive(Debug, Clone)]
 struct Quad {
-    block: Block,
+    // block: Block,
     side: BlockSide,
     vertices: [Vec3; 4],
     ao_factors: [u8; 4],
@@ -267,10 +259,7 @@ fn get_meshes_for_chunk(chunk: Neighborhood<Blocks>) -> Option<Mesh> {
 // TODO: Replace slow implementation with binary mesher
 fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let middle = chunk
-        .middle_chunk()
-        .clone()
-        .expect("Already checked");
+    let middle = chunk.middle_chunk().clone().expect("Already checked");
     let mut blocks = middle.as_ref().clone();
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {
@@ -413,7 +402,7 @@ fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> 
                     side: direction,
                     vertices,
                     ao_factors,
-                    block: *block,
+                    // block: *block,
                     uvs,
                 };
                 quads.push(quad);
@@ -573,16 +562,16 @@ fn create_meshes(quads: Vec<Quad>) -> Option<Mesh> {
     //     .collect()
 }
 
-fn optimize_side_choice(block: &Block, side: &BlockSide) -> BlockSide {
-    // Normalize so there are fewer separate meshes
-    match (block, side) {
-        (Block::Wood, BlockSide::Up) | (Block::Wood, BlockSide::Down) => BlockSide::Up,
-        (Block::Wood, _) => BlockSide::East,
-        (Block::Grass, BlockSide::Up) | (Block::Grass, BlockSide::Down) => *side,
-        (Block::Grass, _) => BlockSide::East,
-        _ => BlockSide::default(),
-    }
-}
+// fn optimize_side_choice(block: &Block, side: &BlockSide) -> BlockSide {
+//     // Normalize so there are fewer separate meshes
+//     match (block, side) {
+//         (Block::Wood, BlockSide::Up) | (Block::Wood, BlockSide::Down) => BlockSide::Up,
+//         (Block::Wood, _) => BlockSide::East,
+//         (Block::Grass, BlockSide::Up) | (Block::Grass, BlockSide::Down) => *side,
+//         (Block::Grass, _) => BlockSide::East,
+//         _ => BlockSide::default(),
+//     }
+// }
 
 fn create_mesh_from_quads(mut quads: Vec<Quad>) -> Option<Mesh> {
     if quads.is_empty() {

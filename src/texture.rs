@@ -1,9 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{
-    block::{Block, BlockSide},
-    material::TerrainMaterial,
-};
+use crate::material::TerrainMaterial;
 
 pub struct TexturePlugin;
 
@@ -72,33 +69,33 @@ pub struct BlockMaterials {
     pub terrain: Handle<TerrainMaterial>,
 }
 
-impl BlockMaterials {
-    pub fn get(&self, block: &Block) -> MaterialHandle {
-        match block {
-            Block::Air => MaterialHandle::None,
-            _ => MaterialHandle::Terrain(&self.terrain),
-            // (Block::Stone, _) => MaterialHandle::Terrain(&self.stone),
-            // (Block::Dirt, _) => MaterialHandle::Terrain(&self.dirt),
-            // (Block::Grass, BlockSide::Up) => MaterialHandle::Terrain(&self.grass),
-            // (Block::Grass, BlockSide::Down) => MaterialHandle::Terrain(&self.dirt),
-            // (Block::Grass, _) => MaterialHandle::Terrain(&self.grass_side),
-            // (Block::Sand, _) => MaterialHandle::Terrain(&self.sand),
-            // (Block::Wood, BlockSide::Down) | (Block::Wood, BlockSide::Up) => {
-            //     MaterialHandle::Terrain(&self.wood_top)
-            // }
-            // (Block::Wood, _) => MaterialHandle::Terrain(&self.wood),
-            // (Block::Leaves, _) => MaterialHandle::Terrain(&self.leaves),
-            // (Block::Water, _) => MaterialHandle::Terrain(&self.water),
-            // (Block::Bedrock, _) => MaterialHandle::Terrain(&self.bedrock),
-        }
-    }
-}
+// impl BlockMaterials {
+//     pub fn get(&self, block: &Block) -> MaterialHandle {
+//         match block {
+//             Block::Air => MaterialHandle::None,
+//             _ => MaterialHandle::Terrain(&self.terrain),
+//             // (Block::Stone, _) => MaterialHandle::Terrain(&self.stone),
+//             // (Block::Dirt, _) => MaterialHandle::Terrain(&self.dirt),
+//             // (Block::Grass, BlockSide::Up) => MaterialHandle::Terrain(&self.grass),
+//             // (Block::Grass, BlockSide::Down) => MaterialHandle::Terrain(&self.dirt),
+//             // (Block::Grass, _) => MaterialHandle::Terrain(&self.grass_side),
+//             // (Block::Sand, _) => MaterialHandle::Terrain(&self.sand),
+//             // (Block::Wood, BlockSide::Down) | (Block::Wood, BlockSide::Up) => {
+//             //     MaterialHandle::Terrain(&self.wood_top)
+//             // }
+//             // (Block::Wood, _) => MaterialHandle::Terrain(&self.wood),
+//             // (Block::Leaves, _) => MaterialHandle::Terrain(&self.leaves),
+//             // (Block::Water, _) => MaterialHandle::Terrain(&self.water),
+//             // (Block::Bedrock, _) => MaterialHandle::Terrain(&self.bedrock),
+//         }
+//     }
+// }
 
-pub enum MaterialHandle<'a> {
-    None,
-    Terrain(&'a Handle<TerrainMaterial>),
-    // Fluid(&'a Handle<FluidMaterial>),
-}
+// pub enum MaterialHandle<'a> {
+//     None,
+//     Terrain(&'a Handle<TerrainMaterial>),
+//     // Fluid(&'a Handle<FluidMaterial>),
+// }
 
 fn setup(
     mut commands: Commands,

@@ -8,7 +8,7 @@ use crate::{
         },
         position::ChunkPosition,
         spatial::SpatiallyMapped,
-        Chunk, CHUNK_LENGTH, CHUNK_SIZE, CHUNK_SIZE_I32,
+        Chunk, CHUNK_LENGTH, CHUNK_SIZE_I32,
     },
     // player::Player,
     render_layer::WORLD_LAYER,
@@ -33,8 +33,8 @@ use world_noise::{
     WhiteNoise,
 };
 
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 1;
-const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 1;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 2;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 2;
 
 pub mod block_update;
 pub mod index;
@@ -104,10 +104,7 @@ fn kill_tasks_for_unloaded_chunks(
     index: Res<ChunkIndex>,
     mut tasks: ResMut<ChunkLoadTasks>,
 ) {
-    if let Some(pos) = index
-        .pos_by_entity
-        .get(&trigger.target())
-    {
+    if let Some(pos) = index.pos_by_entity.get(&trigger.target()) {
         tasks.0.remove(&ChunkPosition(*pos));
     }
 }
@@ -140,9 +137,7 @@ fn update_chunks(
     for (entity, chunk_pos) in q_chunk_position.iter() {
         if !should_be_loaded_positions.remove(&chunk_pos.0) {
             // The chunk should be unloaded since it's not in our set
-            commands
-                .entity(entity)
-                .insert(ToDespawn);
+            commands.entity(entity).insert(ToDespawn);
         }
     }
     // Finally, load the new chunks
@@ -150,11 +145,7 @@ fn update_chunks(
         commands.spawn((
             Chunk,
             ChunkPosition(pos),
-            // Transform {
-            //     translation: (pos * CHUNK_SIZE as i32).as_vec3() + Vec3::Y,
-            //     scale: Vec3::ONE * super::BLOCK_SIZE,
-            //     ..Default::default()
-            // },
+            Transform::from_translation((pos * CHUNK_SIZE_I32).as_vec3() + Vec3::Y),
             Visibility::Visible,
             RenderLayers::layer(WORLD_LAYER),
         ));
@@ -206,11 +197,9 @@ fn receive_chunk_load_tasks(
                     return false;
                 };
                 blocks.set_changed();
-                block_updates
-                    .iter()
-                    .for_each(|(block, pos)| {
-                        *blocks.at_pos_mut(*pos) = *block;
-                    });
+                block_updates.iter().for_each(|(block, pos)| {
+                    *blocks.at_pos_mut(*pos) = *block;
+                });
                 entity.try_insert(stage);
             }
         }
@@ -220,16 +209,13 @@ fn receive_chunk_load_tasks(
 
 fn begin_noise_load_tasks(
     mut tasks: ResMut<ChunkLoadTasks>,
-    q_chunk: Query<
-        (Entity, &ChunkPosition, &CameraDistance),
-        (With<Chunk>, Without<ContinentNoise>),
-    >,
+    q_chunk: Query<(Entity, &ChunkPosition), (With<Chunk>, Without<ContinentNoise>)>,
     continent_noise_generator: Res<ContinentNoiseGenerator>,
     height_noise_generator: Res<HeightNoiseGenerator>,
     white_noise: Res<WhiteNoise>,
     climate_noise: Res<ClimateNoise>,
 ) {
-    for (entity, pos, _) in q_chunk.iter().sort::<&CameraDistance>() {
+    for (entity, pos) in q_chunk.iter() {
         if tasks.0.contains_key(pos) {
             continue;
         }
@@ -453,15 +439,9 @@ fn begin_structure_load_tasks(
         if tasks.0.contains_key(item.pos) || item.stage != &Stage::Sculpt {
             continue;
         }
-        let surroundings_arent_ready = item
-            .stage_neighborhood
-            .min()
-            .unwrap()
-            .as_ref()
-            < &Stage::Sculpt;
-        let surroundings_arent_complete = item
-            .terrain_neighborhood
-            .is_incomplete();
+        let surroundings_arent_ready =
+            item.stage_neighborhood.min().unwrap().as_ref() < &Stage::Sculpt;
+        let surroundings_arent_complete = item.terrain_neighborhood.is_incomplete();
         if surroundings_arent_ready || surroundings_arent_complete {
             continue;
         }

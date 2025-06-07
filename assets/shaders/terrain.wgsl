@@ -21,7 +21,7 @@ fn vertex(
     let local_x = (data >> 0) & 63;
     let local_y = (data >> 6) & 63;
     let local_z = (data >> 12) & 63;
-    let normal_id = (data >> 18) & 15;
+    let normal_id = (data >> 18) & 7;
     let ao_factor = (data >> 21) & 3;
     let block_id = (data >> 23);
 

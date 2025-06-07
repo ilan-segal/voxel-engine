@@ -33,7 +33,6 @@ mod ui;
 mod utils;
 mod world;
 
-const BLOCK_SIZE: f32 = 1.0;
 const SKY_COLOUR: Color = Color::linear_rgb(0.25, 0.60, 0.92);
 const TICKS_PER_SECOND: u8 = 20;
 

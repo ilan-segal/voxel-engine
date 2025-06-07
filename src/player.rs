@@ -8,7 +8,7 @@ use crate::{
     render_layer::WORLD_LAYER,
     world::neighborhood::ComponentIndex,
 };
-use bevy::{core_pipeline::prepass::DepthPrepass, prelude::*, render::view::RenderLayers};
+use bevy::{prelude::*, render::view::RenderLayers};
 use block_target::BlockTargetPlugin;
 use controls::target_velocity::TargetVelocity;
 use health::{Health, MaxHealth};
@@ -96,9 +96,7 @@ fn update_gravity(
             PlayerMode::Survival => commands
                 .entity(entity)
                 .insert((Gravity::default(), Collidable)),
-            PlayerMode::NoClip => commands
-                .entity(entity)
-                .remove::<(Gravity, Collidable)>(),
+            PlayerMode::NoClip => commands.entity(entity).remove::<(Gravity, Collidable)>(),
         };
     }
 }
@@ -112,18 +110,11 @@ fn update_camera_block(
 ) {
     for (global_transform, mut head_block) in q_player.iter_mut() {
         let pos = global_transform.translation();
-        let Some(block_at_pos) = blocks
-            .at_pos(pos.floor().as_ivec3())
-            .copied()
-        else {
+        let Some(block_at_pos) = blocks.at_pos(pos.floor().as_ivec3()).copied() else {
             continue;
         };
         let block_above = blocks
-            .at_pos(
-                (pos + Dir3::Y.as_vec3())
-                    .floor()
-                    .as_ivec3(),
-            )
+            .at_pos((pos + Dir3::Y.as_vec3()).floor().as_ivec3())
             .copied()
             .unwrap_or_default();
         match block_at_pos {
