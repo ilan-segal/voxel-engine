@@ -66,7 +66,12 @@ fn fragment(
     mesh: VertexOutput,
 ) -> @location(0) vec4<f32> {
     let uv = get_uv(mesh.world_position.xyz, mesh.normal_id);
-    return textureSample(textures[mesh.texture_index], texture_sampler, uv) * mesh.ao_brightness;
+    let color = textureSample(textures[mesh.texture_index], texture_sampler, uv) * mesh.ao_brightness;
+    if color.w == 0. {
+        discard;
+    } else {
+        return color;
+    }
 }
 
 // TODO: May need to rotate/flip things
