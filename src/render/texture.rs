@@ -99,14 +99,16 @@ pub struct BlockMaterials {
 
 fn setup(
     mut commands: Commands,
-    // asset_server: Res<AssetServer>,
+    asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<TerrainMaterial>>,
     // mut fluid_materials: ResMut<Assets<FluidMaterial>>,
 ) {
     // let mut get_material =
     //     |path, colour| get_material_with_colour(path, &asset_server, &mut materials, colour);
 
-    let terrain_material_handle = materials.add(TerrainMaterial { textures: vec![] });
+    let terrain_material_handle = materials.add(TerrainMaterial {
+        textures: vec![asset_server.load("textures/blocks/stone.png")],
+    });
     let block_materials = BlockMaterials {
         terrain: terrain_material_handle,
         // stone: get_material("textures/blocks/stone.png", Block::Stone.get_colour()),

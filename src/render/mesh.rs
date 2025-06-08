@@ -70,14 +70,9 @@ fn update_mesh_status(
 ) {
     for (e, stage) in q.iter() {
         if stage == &Stage::final_stage() {
-            commands
-                .entity(e)
-                .remove::<Meshed>()
-                .insert(CheckedForMesh);
+            commands.entity(e).remove::<Meshed>().insert(CheckedForMesh);
         } else {
-            commands
-                .entity(e)
-                .insert((CheckedForMesh, Meshed));
+            commands.entity(e).insert((CheckedForMesh, Meshed));
         }
     }
 }
@@ -88,9 +83,7 @@ fn mark_mesh_as_stale(
     mut tasks: ResMut<MeshGenTasks>,
 ) {
     for entity in q_changed_neighborhood.iter() {
-        commands
-            .entity(entity)
-            .remove::<CheckedForMesh>();
+        commands.entity(entity).remove::<CheckedForMesh>();
         tasks.0.remove(&entity);
     }
 }
@@ -231,6 +224,7 @@ impl Quad {
     }
 
     fn get_single_vertex_data(&self, i: usize) -> u32 {
+        // Make sure this matches the index in the terrain shader
         let normal_index: u32 = match self.side {
             BlockSide::North => 0,
             BlockSide::South => 1,
@@ -242,13 +236,13 @@ impl Quad {
         let xs = self.vertices[i].to_array();
         let [local_x, local_y, local_z] = xs.map(|x| u32::try_from(x).unwrap());
         let ao_factor = self.ao_factors[i] as u32;
-        let block_id = 0;
+        let texture_index = 0;
         return local_x
             | (local_y << 6)
             | (local_z << 12)
             | (normal_index << 18)
             | (ao_factor << 21)
-            | (block_id << 23);
+            | (texture_index << 23);
     }
 }
 
@@ -266,10 +260,7 @@ fn chunk_mesh(chunk: Neighborhood<Blocks>) -> Option<Mesh> {
 // TODO: Replace slow implementation with binary mesher
 fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let middle = chunk
-        .middle_chunk()
-        .clone()
-        .expect("Already checked");
+    let middle = chunk.middle_chunk().clone().expect("Already checked");
     let mut blocks = middle.as_ref().clone();
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {

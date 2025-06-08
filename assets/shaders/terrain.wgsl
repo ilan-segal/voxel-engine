@@ -8,10 +8,9 @@ struct VertexInput {
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) world_position: vec4<f32>,
-    @location(1) world_normal: vec3<f32>,
+    @location(1) normal_id: u32,
     @location(2) texture_index: u32,
-    @location(3) color: vec4<f32>,
-    @location(4) uv: vec2<f32>,
+    @location(3) ao_brightness: f32,
 };
 
 const NORTH: u32 = 0;
@@ -49,11 +48,52 @@ fn vertex(
         get_world_from_local(in.instance_index),
         out.world_position,
     );
-    out.world_normal = get_world_normal(normal_id);
+    out.normal_id = normal_id;
     out.texture_index = block_id;
-    out.color = vec4(get_ao_factor(ao_factor) * vec3(0.2, 0.5, 0.2), 1.0);
-    out.uv = get_uv(out.world_position.xyz, normal_id);
+    out.ao_brightness = get_ao_brightness(ao_factor);
     return out;
+}
+
+fn get_ao_brightness(ao_index: u32) -> f32 {
+    return pow(0.6, f32(ao_index));
+}
+
+@group(2) @binding(0) var textures: binding_array<texture_2d<f32>>;
+@group(2) @binding(1) var texture_sampler: sampler;
+
+@fragment
+fn fragment(
+    mesh: VertexOutput,
+) -> @location(0) vec4<f32> {
+    let uv = get_uv(mesh.world_position.xyz, mesh.normal_id);
+    return textureSample(textures[mesh.texture_index], texture_sampler, uv) * mesh.ao_brightness;
+}
+
+// TODO: May need to rotate/flip things
+fn get_uv(world_position: vec3<f32>, normal_id: u32) -> vec2<f32> {
+    switch normal_id {
+        case NORTH: {
+            return fract(vec2(world_position.z, world_position.y));
+        }
+        case SOUTH: {
+            return fract(vec2(-world_position.z, world_position.y));
+        }
+        case UP: {
+            return fract(world_position.xz);
+        }
+        case DOWN: {
+            return fract(world_position.xz);
+        }
+        case EAST: {
+            return fract(vec2(-world_position.x, world_position.y));
+        }
+        case WEST: {
+            return fract(world_position.xy);
+        }
+        default: {
+            return vec2(0., 0.);
+        }
+    }
 }
 
 fn get_world_normal(normal_id: u32) -> vec3<f32> {
@@ -80,47 +120,4 @@ fn get_world_normal(normal_id: u32) -> vec3<f32> {
             return vec3(0., 0., 0.);
         }
     }
-}
-
-fn get_ao_factor(ao_index: u32) -> f32 {
-    return pow(0.6, f32(ao_index));
-}
-
-// TODO: May need to rotate/flip things
-fn get_uv(world_position: vec3<f32>, normal_id: u32) -> vec2<f32> {
-    switch normal_id {
-        case NORTH: {
-            return fract(world_position.yz);
-        }
-        case SOUTH: {
-            return fract(world_position.yz);
-        }
-        case UP: {
-            return fract(world_position.xz);
-        }
-        case DOWN: {
-            return fract(world_position.xz);
-        }
-        case EAST: {
-            return fract(world_position.xy);
-        }
-        case WEST: {
-            return fract(world_position.xy);
-        }
-        default: {
-            return vec2(0., 0.);
-        }
-    }
-}
-
-@group(2) @binding(0) var textures: binding_array<texture_2d<f32>>;
-@group(2) @binding(1) var nearest_sampler: sampler;
-// We can also have array of samplers
-// var samplers: binding_array<sampler>;
-
-@fragment
-fn fragment(
-    mesh: VertexOutput,
-) -> @location(0) vec4<f32> {
-    return mesh.color;
 }
