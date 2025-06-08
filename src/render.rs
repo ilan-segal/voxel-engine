@@ -2,7 +2,7 @@ use bevy::app::Plugin;
 
 pub mod material;
 pub mod mesh;
-pub mod texture;
+mod texture;
 
 pub struct RenderPlugin;
 

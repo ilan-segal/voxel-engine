@@ -15,7 +15,10 @@ use crate::{
         data::Blocks, layer_to_xyz, position::ChunkPosition, spatial::SpatiallyMapped, Chunk,
         CHUNK_SIZE,
     },
-    render::{material::ATTRIBUTE_TERRAIN_VERTEX_DATA, texture::BlockMaterials},
+    render::{
+        material::ATTRIBUTE_TERRAIN_VERTEX_DATA,
+        texture::{get_texture_index, BlockMaterials},
+    },
     world::{
         neighborhood::{ComponentCopy, Neighborhood},
         stage::Stage,
@@ -192,7 +195,7 @@ fn receive_mesh_gen_tasks(
 
 #[derive(Debug, Clone)]
 struct Quad {
-    // block: Block,
+    block: Block,
     side: BlockSide,
     vertices: [IVec3; 4],
     ao_factors: [u8; 4],
@@ -236,7 +239,7 @@ impl Quad {
         let xs = self.vertices[i].to_array();
         let [local_x, local_y, local_z] = xs.map(|x| u32::try_from(x).unwrap());
         let ao_factor = self.ao_factors[i] as u32;
-        let texture_index = 0;
+        let texture_index = get_texture_index(&self.block, &self.side);
         return local_x
             | (local_y << 6)
             | (local_z << 12)
@@ -393,6 +396,7 @@ fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> 
                 };
 
                 let quad = Quad {
+                    block: *block,
                     side: direction,
                     vertices,
                     ao_factors,

@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 
-use crate::render::material::TerrainMaterial;
+use crate::{
+    block::{Block, BlockSide},
+    render::material::TerrainMaterial,
+};
 
 pub struct TexturePlugin;
 
@@ -107,7 +110,18 @@ fn setup(
     //     |path, colour| get_material_with_colour(path, &asset_server, &mut materials, colour);
 
     let terrain_material_handle = materials.add(TerrainMaterial {
-        textures: vec![asset_server.load("textures/blocks/stone.png")],
+        textures: vec![
+            asset_server.load("textures/blocks/stone.png"),
+            asset_server.load("textures/blocks/dirt.png"),
+            asset_server.load("textures/blocks/grass.png"),
+            asset_server.load("textures/blocks/grass_side.png"),
+            asset_server.load("textures/blocks/sand.png"),
+            asset_server.load("textures/blocks/oak_log.png"),
+            asset_server.load("textures/blocks/oak_log_top.png"),
+            asset_server.load("textures/blocks/oak_leaves.png"),
+            asset_server.load("textures/blocks/bedrock.png"),
+            asset_server.load("textures/blocks/water.png"),
+        ],
     });
     let block_materials = BlockMaterials {
         terrain: terrain_material_handle,
@@ -131,6 +145,28 @@ fn setup(
         // ),
     };
     commands.insert_resource(block_materials);
+}
+
+// Make sure this matches the texture array loaded during setup
+pub fn get_texture_index(block: &Block, side: &BlockSide) -> u32 {
+    match block {
+        Block::Air => panic!("No texture for air"),
+        Block::Stone => 0,
+        Block::Dirt => 1,
+        Block::Grass => match side {
+            BlockSide::Up => 2,
+            BlockSide::Down => 1,
+            _ => 3,
+        },
+        Block::Sand => 4,
+        Block::Wood => match side {
+            BlockSide::Up | BlockSide::Down => 6,
+            _ => 5,
+        },
+        Block::Leaves => 7,
+        Block::Bedrock => 8,
+        Block::Water => 9,
+    }
 }
 
 // fn get_material_with_colour(
