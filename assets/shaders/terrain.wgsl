@@ -1,4 +1,9 @@
-#import bevy_pbr::mesh_functions::{get_world_from_local, mesh_position_local_to_clip}
+#import bevy_pbr::{
+    mesh_functions::{get_world_from_local, mesh_position_local_to_clip},
+    mesh_view_bindings::view,
+    pbr_functions::{calculate_view, apply_pbr_lighting},
+    pbr_types::{PbrInput, pbr_input_new},
+}
 
 struct VertexInput {
     @builtin(instance_index) instance_index: u32,
@@ -7,6 +12,7 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
+    // @builtin(front_facing) front_facing: bool,
     @location(0) world_position: vec4<f32>,
     @location(1) normal_id: u32,
     @location(2) texture_index: u32,
@@ -77,6 +83,35 @@ fn get_ao_brightness(ao_index: u32) -> f32 {
 fn fragment(
     mesh: VertexOutput,
 ) -> @location(0) vec4<f32> {
+    let pbr_input = prepare_pbr_input(mesh);
+    // let pbr_colour = tone_mapping(apply_pbr_lighting(pbr_input), view.color_grading);
+    let pbr_colour = apply_pbr_lighting(pbr_input);
+    return pbr_colour;
+}
+
+fn prepare_pbr_input(frag: VertexOutput) -> PbrInput {
+    let world_normal = get_world_normal(frag.normal_id);
+    var base_color = get_base_color(frag);
+    // base_color += hash(vec4<f32>(floor(frag.world_position - world_normal * 0.5), 1.0)) * 0.0226;
+
+    var pbr_input: PbrInput = pbr_input_new();
+    pbr_input.material.perceptual_roughness = 0.0;
+    pbr_input.material.reflectance = vec3(0.0);
+    pbr_input.material.base_color = base_color;
+
+    pbr_input.frag_coord = frag.clip_position;
+    pbr_input.world_position = frag.world_position;
+    pbr_input.world_normal = world_normal;
+
+    pbr_input.is_orthographic = view.clip_from_view[3].w == 1.0;
+    pbr_input.N = normalize(world_normal);
+    pbr_input.V = calculate_view(frag.world_position, pbr_input.is_orthographic);
+
+    return pbr_input;
+}
+
+fn get_base_color(mesh: VertexOutput) -> vec4<f32> {
+    let texture_index = mesh.texture_index;
     let uv = get_uv(mesh.world_position.xyz, mesh.normal_id);
     let overlay_index = get_overlay_index(mesh.texture_index);
     var color = vec4(0., 0., 0., 0.);
@@ -162,6 +197,9 @@ fn get_color_for_texture(texture_index: u32) -> vec4<f32> {
         }
         case TEXTURE_IDX_OAK_LEAVES: {
             return vec4(0.03, 0.295, 0.045, 1.0);
+        }
+        case TEXTURE_IDX_WATER: {
+            return vec4(0.046, 0.184, 0.782, 0.1);
         }
         default: {
             return vec4(1., 1., 1., 1.);
