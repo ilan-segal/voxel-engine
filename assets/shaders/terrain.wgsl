@@ -11,6 +11,7 @@ struct VertexOutput {
     @location(1) world_normal: vec3<f32>,
     @location(2) texture_index: u32,
     @location(3) color: vec4<f32>,
+    @location(4) uv: vec2<f32>,
 };
 
 const NORTH: u32 = 0;
@@ -51,6 +52,7 @@ fn vertex(
     out.world_normal = get_world_normal(normal_id);
     out.texture_index = block_id;
     out.color = vec4(get_ao_factor(ao_factor) * vec3(0.2, 0.5, 0.2), 1.0);
+    out.uv = get_uv(out.world_position.xyz, normal_id);
     return out;
 }
 
@@ -82,6 +84,33 @@ fn get_world_normal(normal_id: u32) -> vec3<f32> {
 
 fn get_ao_factor(ao_index: u32) -> f32 {
     return pow(0.6, f32(ao_index));
+}
+
+// TODO: May need to rotate/flip things
+fn get_uv(world_position: vec3<f32>, normal_id: u32) -> vec2<f32> {
+    switch normal_id {
+        case NORTH: {
+            return fract(world_position.yz);
+        }
+        case SOUTH: {
+            return fract(world_position.yz);
+        }
+        case UP: {
+            return fract(world_position.xz);
+        }
+        case DOWN: {
+            return fract(world_position.xz);
+        }
+        case EAST: {
+            return fract(world_position.xy);
+        }
+        case WEST: {
+            return fract(world_position.xy);
+        }
+        default: {
+            return vec2(0., 0.);
+        }
+    }
 }
 
 @group(2) @binding(0) var textures: binding_array<texture_2d<f32>>;
