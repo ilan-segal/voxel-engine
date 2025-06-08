@@ -9,10 +9,11 @@ use bevy::{
         render_asset::RenderAssets,
         render_resource::{
             binding_types::{sampler, texture_2d},
-            AsBindGroup, AsBindGroupError, BindGroupEntries, BindGroupLayout,
-            BindGroupLayoutEntries, BindGroupLayoutEntry, BindingResources, PreparedBindGroup,
-            RenderPipelineDescriptor, SamplerBindingType, ShaderRef, ShaderStages,
-            SpecializedMeshPipelineError, TextureSampleType, UnpreparedBindGroup,
+            AddressMode, AsBindGroup, AsBindGroupError, BindGroupEntries, BindGroupLayout,
+            BindGroupLayoutEntries, BindGroupLayoutEntry, BindingResources, FilterMode,
+            PreparedBindGroup, RenderPipelineDescriptor, SamplerBindingType, SamplerDescriptor,
+            ShaderRef, ShaderStages, SpecializedMeshPipelineError, TextureSampleType,
+            UnpreparedBindGroup,
         },
         renderer::RenderDevice,
         texture::{FallbackImage, GpuImage},
@@ -46,6 +47,10 @@ impl Material for TerrainMaterial {
     }
     fn fragment_shader() -> ShaderRef {
         TERRAIN_MATERIAL_SHADER_PATH.into()
+    }
+
+    fn alpha_mode(&self) -> AlphaMode {
+        AlphaMode::AlphaToCoverage
     }
 
     fn specialize(
@@ -96,14 +101,20 @@ impl AsBindGroup for TerrainMaterial {
             Err(value) => return value,
         };
 
+        let sampler = render_device.create_sampler(&SamplerDescriptor {
+            label: Some("terrain_sampler"),
+            address_mode_u: AddressMode::Repeat,
+            address_mode_v: AddressMode::Repeat,
+            address_mode_w: AddressMode::Repeat,
+            mag_filter: FilterMode::Nearest,
+            min_filter: FilterMode::Nearest,
+            ..default()
+        });
+
         let bind_group = render_device.create_bind_group(
             "bindless_material_bind_group",
             layout,
-            &BindGroupEntries::sequential((
-                &fallback_image.sampler,
-                &textures[..],
-                &overlay_textures[..],
-            )),
+            &BindGroupEntries::sequential((&sampler, &textures[..], &overlay_textures[..])),
         );
 
         Ok(PreparedBindGroup {

@@ -134,10 +134,10 @@ fn get_base_color(mesh: VertexOutput) -> vec4<f32> {
         discard;
     }
     
-    return color * mesh.ao_brightness;
+    let ao_brightness_color = vec3(mesh.ao_brightness);
+    return color * vec4(ao_brightness_color, 1.0);
 }
 
-// TODO: May need to rotate/flip things
 fn get_uv(world_position: vec3<f32>, normal_id: u32) -> vec2<f32> {
     switch normal_id {
         case NORTH: {
@@ -199,7 +199,7 @@ fn get_color_for_texture(texture_index: u32) -> vec4<f32> {
             return vec4(0.03, 0.295, 0.045, 1.0);
         }
         case TEXTURE_IDX_WATER: {
-            return vec4(0.046, 0.184, 0.782, 0.1);
+            return vec4(0.046, 0.184, 0.782, 0.5);
         }
         default: {
             return vec4(1., 1., 1., 1.);
