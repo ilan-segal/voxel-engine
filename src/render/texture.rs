@@ -59,16 +59,6 @@ impl Plugin for TexturePlugin {
 
 #[derive(Resource)]
 pub struct BlockMaterials {
-    // stone: Handle<TerrainMaterial>,
-    // dirt: Handle<TerrainMaterial>,
-    // grass: Handle<TerrainMaterial>,
-    // grass_side: Handle<TerrainMaterial>,
-    // sand: Handle<TerrainMaterial>,
-    // wood: Handle<TerrainMaterial>,
-    // wood_top: Handle<TerrainMaterial>,
-    // leaves: Handle<TerrainMaterial>,
-    // bedrock: Handle<TerrainMaterial>,
-    // water: Handle<TerrainMaterial>,
     pub terrain: Handle<TerrainMaterial>,
 }
 
@@ -122,6 +112,7 @@ fn setup(
             asset_server.load("textures/blocks/bedrock.png"),
             asset_server.load("textures/blocks/water.png"),
         ],
+        overlay_textures: vec![asset_server.load("textures/blocks/grass_side_overlay.png")],
     });
     let block_materials = BlockMaterials {
         terrain: terrain_material_handle,

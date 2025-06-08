@@ -35,6 +35,7 @@ pub const ATTRIBUTE_TERRAIN_VERTEX_DATA: MeshVertexAttribute =
 #[derive(Asset, Reflect, Debug, Clone, Default)]
 pub struct TerrainMaterial {
     pub textures: Vec<Handle<Image>>,
+    pub overlay_textures: Vec<Handle<Image>>,
 }
 
 const TERRAIN_MATERIAL_SHADER_PATH: &str = "shaders/terrain.wgsl";
@@ -62,6 +63,7 @@ impl Material for TerrainMaterial {
 }
 
 const MAX_TEXTURE_COUNT: usize = 16;
+const MAX_OVERLAY_COUNT: usize = 16;
 
 impl AsBindGroup for TerrainMaterial {
     type Data = ();
@@ -74,38 +76,34 @@ impl AsBindGroup for TerrainMaterial {
         render_device: &RenderDevice,
         (image_assets, fallback_image): &mut SystemParamItem<'_, '_, Self::Param>,
     ) -> Result<PreparedBindGroup<Self::Data>, AsBindGroupError> {
-        // retrieve the render resources from handles
-        let mut images = vec![];
-        for handle in self
-            .textures
-            .iter()
-            .take(MAX_TEXTURE_COUNT)
-        {
-            match image_assets.get(handle) {
-                Some(image) => images.push(image),
-                None => return Err(AsBindGroupError::RetryNextUpdate),
-            }
-        }
-
         let fallback_image = &fallback_image.d2;
-
-        let textures = vec![&fallback_image.texture_view; MAX_TEXTURE_COUNT];
-
-        // convert bevy's resource types to WGPU's references
-        let mut textures: Vec<_> = textures
-            .into_iter()
-            .map(|texture| &**texture)
-            .collect();
-
-        // fill in up to the first `MAX_TEXTURE_COUNT` textures and samplers to the arrays
-        for (id, image) in images.into_iter().enumerate() {
-            textures[id] = &*image.texture_view;
-        }
+        let textures = match get_texture_views(
+            &self.textures,
+            MAX_TEXTURE_COUNT,
+            image_assets,
+            fallback_image,
+        ) {
+            Ok(value) => value,
+            Err(value) => return value,
+        };
+        let overlay_textures = match get_texture_views(
+            &self.overlay_textures,
+            MAX_OVERLAY_COUNT,
+            image_assets,
+            fallback_image,
+        ) {
+            Ok(value) => value,
+            Err(value) => return value,
+        };
 
         let bind_group = render_device.create_bind_group(
             "bindless_material_bind_group",
             layout,
-            &BindGroupEntries::sequential((&textures[..], &fallback_image.sampler)),
+            &BindGroupEntries::sequential((
+                &fallback_image.sampler,
+                &textures[..],
+                &overlay_textures[..],
+            )),
         );
 
         Ok(PreparedBindGroup {
@@ -137,31 +135,46 @@ impl AsBindGroup for TerrainMaterial {
             // The layout entries will only be visible in the fragment stage
             ShaderStages::FRAGMENT,
             (
-                // Screen texture
-                //
-                // @group(2) @binding(0) var textures: binding_array<texture_2d<f32>>;
+                (0, sampler(SamplerBindingType::Filtering)),
                 (
-                    0,
+                    1,
                     texture_2d(TextureSampleType::Float { filterable: true })
                         .count(NonZero::<u32>::new(MAX_TEXTURE_COUNT as u32).unwrap()),
                 ),
-                // Sampler
-                //
-                // @group(2) @binding(1) var nearest_sampler: sampler;
-                //
-                // Note: as with textures, multiple samplers can also be bound
-                // onto one binding slot:
-                //
-                // ```
-                // sampler(SamplerBindingType::Filtering)
-                //     .count(NonZero::<u32>::new(MAX_TEXTURE_COUNT as u32).unwrap()),
-                // ```
-                //
-                // One may need to pay attention to the limit of sampler binding
-                // amount on some platforms.
-                (1, sampler(SamplerBindingType::Filtering)),
+                (
+                    2,
+                    texture_2d(TextureSampleType::Float { filterable: true })
+                        .count(NonZero::<u32>::new(MAX_OVERLAY_COUNT as u32).unwrap()),
+                ),
             ),
         )
         .to_vec()
     }
+}
+
+fn get_texture_views<'a>(
+    textures: &'a Vec<Handle<Image>>,
+    max_count: usize,
+    image_assets: &'a Res<'_, RenderAssets<GpuImage>>,
+    fallback_image: &'a GpuImage,
+) -> Result<
+    Vec<&'a bevy::render::render_resource::WgpuTextureView>,
+    std::result::Result<PreparedBindGroup<()>, AsBindGroupError>,
+> {
+    let mut images = vec![];
+    for handle in textures.iter().take(max_count) {
+        match image_assets.get(handle) {
+            Some(image) => images.push(image),
+            None => return Err(Err(AsBindGroupError::RetryNextUpdate)),
+        }
+    }
+    let textures = vec![&fallback_image.texture_view; max_count];
+    let mut textures: Vec<_> = textures
+        .into_iter()
+        .map(|texture| &**texture)
+        .collect();
+    for (id, image) in images.into_iter().enumerate() {
+        textures[id] = &*image.texture_view;
+    }
+    Ok(textures)
 }
