@@ -10,7 +10,7 @@ use crate::{
         spatial::SpatiallyMapped,
         Chunk, CHUNK_LENGTH, CHUNK_SIZE_I32,
     },
-    // player::Player,
+    player::Player,
     render_layer::WORLD_LAYER,
     state::GameState,
     structure::StructureType,
@@ -116,14 +116,14 @@ fn kill_tasks_for_unloaded_chunks(
 
 fn update_chunks(
     mut commands: Commands,
-    // q_camera_position: Query<&GlobalTransform, (With<Player>, Changed<ChunkPosition>)>,
+    q_camera_position: Query<&GlobalTransform, (With<Player>, Changed<ChunkPosition>)>,
     q_chunk_position: Query<(Entity, &ChunkPosition), With<Chunk>>,
 ) {
-    // let Ok(pos) = q_camera_position.single() else {
-    //     return;
-    // };
-    // let camera_position = pos.compute_transform().translation;
-    let camera_position = Vec3::ZERO;
+    let Ok(pos) = q_camera_position.single() else {
+        return;
+    };
+    let camera_position = pos.compute_transform().translation;
+    // let camera_position = Vec3::ZERO;
     let chunk_pos = ChunkPosition::from_world_position(&camera_position);
     // Determine position of chunks that should be loaded
     let mut should_be_loaded_positions: HashSet<IVec3> = HashSet::new();
