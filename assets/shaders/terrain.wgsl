@@ -73,22 +73,22 @@ fn fragment(
 fn get_uv(world_position: vec3<f32>, normal_id: u32) -> vec2<f32> {
     switch normal_id {
         case NORTH: {
-            return fract(vec2(world_position.z, world_position.y));
+            return fract(vec2(world_position.z, -world_position.y));
         }
         case SOUTH: {
-            return fract(vec2(-world_position.z, world_position.y));
+            return fract(vec2(-world_position.z, -world_position.y));
         }
         case UP: {
-            return fract(world_position.xz);
+            return fract(vec2(-world_position.x, world_position.z));
         }
         case DOWN: {
-            return fract(world_position.xz);
+            return fract(vec2(world_position.x, world_position.z));
         }
         case EAST: {
-            return fract(vec2(-world_position.x, world_position.y));
+            return fract(vec2(-world_position.x, -world_position.y));
         }
         case WEST: {
-            return fract(world_position.xy);
+            return fract(vec2(world_position.x, -world_position.y));
         }
         default: {
             return vec2(0., 0.);
