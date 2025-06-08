@@ -113,8 +113,8 @@ fn begin_mesh_gen_tasks(
     >,
     mut commands: Commands,
 ) {
+    let task_pool = AsyncComputeTaskPool::get();
     for (entity, pos, neighborhood) in q_chunk.iter() {
-        let task_pool = AsyncComputeTaskPool::get();
         let Some(middle_chunk) = neighborhood.middle_chunk() else {
             warn!("Chunk at {:?} is absent from index", pos);
             continue;

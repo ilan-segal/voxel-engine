@@ -14,6 +14,7 @@ use crate::{
     render_layer::WORLD_LAYER,
     state::GameState,
     structure::StructureType,
+    world::neighborhood::CompleteNeighborhood,
 };
 use bevy::{
     ecs::query::QueryData,
@@ -33,8 +34,8 @@ use world_noise::{
     WhiteNoise,
 };
 
-const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 1;
-const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 1;
+const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 10;
+const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 5;
 
 pub mod block_update;
 pub mod index;
@@ -61,10 +62,11 @@ impl Plugin for WorldPlugin {
         .add_systems(
             Update,
             (
-                (update_chunks, despawn_chunks, begin_noise_load_tasks).chain(),
+                (update_chunks, despawn_chunks).chain(),
+                receive_chunk_load_tasks,
+                begin_noise_load_tasks,
                 begin_terrain_sculpt_tasks,
                 begin_structure_load_tasks,
-                receive_chunk_load_tasks,
             )
                 .in_set(WorldSet)
                 .run_if(in_state(GameState::InGame)),
@@ -433,29 +435,16 @@ struct StructureQueryData {
     entity: Entity,
     pos: &'static ChunkPosition,
     stage: &'static Stage,
-    stage_neighborhood: &'static Neighborhood<Stage>,
     terrain_neighborhood: &'static Neighborhood<Terrain>,
     noise_neighborhood: &'static Neighborhood<Noise3d>,
 }
 
 fn begin_structure_load_tasks(
     mut tasks: ResMut<ChunkLoadTasks>,
-    q_chunk: Query<StructureQueryData, With<Chunk>>,
+    q_chunk: Query<StructureQueryData, (With<Chunk>, With<CompleteNeighborhood<Terrain>>)>,
 ) {
     for item in q_chunk.iter() {
         if tasks.0.contains_key(item.pos) || item.stage != &Stage::Sculpt {
-            continue;
-        }
-        let surroundings_arent_ready = item
-            .stage_neighborhood
-            .min()
-            .unwrap()
-            .as_ref()
-            < &Stage::Sculpt;
-        let surroundings_arent_complete = item
-            .terrain_neighborhood
-            .is_incomplete();
-        if surroundings_arent_ready || surroundings_arent_complete {
             continue;
         }
         let task_pool = AsyncComputeTaskPool::get();

@@ -28,6 +28,10 @@ impl<T: Component + Clone> Plugin for NeighborhoodPlugin<T> {
                     (add_copy::<T>, update_copy_to_match_component::<T>),
                     update_index::<T>,
                     add_neighborhood::<T>,
+                    (
+                        mark_complete_neighborhoods::<T>,
+                        mark_incomplete_neighborhoods::<T>,
+                    ),
                 )
                     .chain()
                     .in_set(NeighborhoodSet),
@@ -95,7 +99,7 @@ impl<T> Neighborhood<T> {
         (9 * (x + 1) + 3 * (y + 1) + (z + 1)) as usize
     }
 
-    pub fn is_incomplete(&self) -> bool {
+    fn is_incomplete(&self) -> bool {
         self.0
             .iter()
             .any(|maybe| maybe.is_none())
@@ -306,4 +310,40 @@ fn remove_from_index<T: Component + Send + Sync + 'static>(
     index
         .component_by_position
         .remove(&pos.0.to_array());
+}
+
+#[derive(Component)]
+pub struct CompleteNeighborhood<T: Component>(PhantomData<T>);
+
+fn mark_complete_neighborhoods<T: Component>(
+    mut commands: Commands,
+    q_neighborhood: Query<
+        (Entity, &Neighborhood<T>),
+        (Changed<Neighborhood<T>>, Without<CompleteNeighborhood<T>>),
+    >,
+) {
+    for (entity, neighborhood) in q_neighborhood.iter() {
+        if neighborhood.is_incomplete() {
+            continue;
+        }
+        commands
+            .entity(entity)
+            .try_insert(CompleteNeighborhood(PhantomData::<T>));
+    }
+}
+
+fn mark_incomplete_neighborhoods<T: Component>(
+    mut commands: Commands,
+    q_neighborhood: Query<
+        (Entity, &Neighborhood<T>),
+        (Changed<Neighborhood<T>>, With<CompleteNeighborhood<T>>),
+    >,
+) {
+    for (entity, neighborhood) in q_neighborhood.iter() {
+        if neighborhood.is_incomplete() {
+            commands
+                .entity(entity)
+                .remove::<CompleteNeighborhood<T>>();
+        }
+    }
 }
