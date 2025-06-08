@@ -67,7 +67,7 @@ fn rotate_camera_with_mouse(
         let (yaw, mut pitch, _) = transform
             .rotation
             .to_euler(EulerRot::YXZ);
-        pitch = (pitch - delta.y * CAMERA_MOUSE_SENSITIVITY_Y).clamp(-PI * 0.5, PI * 0.5);
+        pitch = (pitch - delta.y * CAMERA_MOUSE_SENSITIVITY_Y).clamp(-PI * 0.499, PI * 0.499);
         transform.rotation = Quat::from_euler(
             // YXZ order corresponds to the common
             // "yaw"/"pitch"/"roll" convention
