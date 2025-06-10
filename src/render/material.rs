@@ -33,6 +33,7 @@ BYTE DATA:
 pub const ATTRIBUTE_TERRAIN_VERTEX_DATA: MeshVertexAttribute =
     MeshVertexAttribute::new("TerrainVertexData", 37790000, VertexFormat::Uint32);
 
+// TODO: Implement depth prepass and shadow casting for this material
 #[derive(Asset, Reflect, Debug, Clone, Default)]
 pub struct TerrainMaterial {
     pub textures: Vec<Handle<Image>>,
@@ -45,6 +46,7 @@ impl Material for TerrainMaterial {
     fn vertex_shader() -> ShaderRef {
         TERRAIN_MATERIAL_SHADER_PATH.into()
     }
+
     fn fragment_shader() -> ShaderRef {
         TERRAIN_MATERIAL_SHADER_PATH.into()
     }
