@@ -12,7 +12,7 @@ use crate::{
     },
     player::Player,
     render_layer::WORLD_LAYER,
-    state::GameState,
+    state::AppState,
     structure::StructureType,
     world::neighborhood::CompleteNeighborhood,
 };
@@ -38,6 +38,7 @@ const CHUNK_LOAD_DISTANCE_HORIZONTAL: i32 = 5;
 const CHUNK_LOAD_DISTANCE_VERTICAL: i32 = 3;
 
 pub mod block_update;
+mod cleanup;
 pub mod index;
 pub mod neighborhood;
 pub mod seed;
@@ -56,6 +57,7 @@ impl Plugin for WorldPlugin {
             neighborhood::NeighborhoodPlugin::<Blocks>::new(),
             neighborhood::NeighborhoodPlugin::<Stage>::new(),
             neighborhood::NeighborhoodPlugin::<Noise3d>::new(),
+            cleanup::CleanupPlugin,
         ))
         .init_resource::<ChunkLoadTasks>()
         .add_systems(Startup, init_noise.after(LoadSeed))
@@ -69,7 +71,7 @@ impl Plugin for WorldPlugin {
                 begin_structure_load_tasks,
             )
                 .in_set(WorldSet)
-                .run_if(in_state(GameState::InGame)),
+                .run_if(in_state(AppState::InGame)),
         )
         .add_observer(kill_tasks_for_unloaded_chunks);
     }

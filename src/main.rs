@@ -4,6 +4,7 @@
 #![feature(step_trait)]
 
 use bevy::{
+    input::common_conditions::input_just_pressed,
     pbr::{
         light_consts::lux::CLEAR_SUNRISE,
         wireframe::{WireframeConfig, WireframePlugin},
@@ -13,7 +14,9 @@ use bevy::{
 };
 use player::{Player, PlayerCamera};
 use render_layer::WORLD_LAYER;
-use state::GameState;
+use state::AppState;
+
+use crate::state::InGameState;
 
 mod age;
 mod block;
@@ -59,22 +62,26 @@ fn main() {
             item::ItemPlugin,
             render::RenderPlugin,
         ))
-        .insert_state(GameState::Init)
+        .insert_state(AppState::Init)
+        .add_sub_state::<InGameState>()
         .insert_resource(Time::<Fixed>::from_hz(TICKS_PER_SECOND as f64))
-        .add_systems(OnEnter(GameState::InGame), setup_game)
+        .add_systems(OnEnter(AppState::InGame), setup_game)
         .add_systems(
             Update,
             (
                 toggle_wireframe,
-                go_to_main_menu.run_if(in_state(GameState::Init)),
+                go_to_main_menu.run_if(in_state(AppState::Init)),
+                pause_game.run_if(
+                    in_state(InGameState::Playing).and(input_just_pressed(KeyCode::Escape)),
+                ),
+                unpause_game
+                    .run_if(in_state(InGameState::Paused).and(input_just_pressed(KeyCode::Escape))),
             ),
         )
+        .add_systems(OnEnter(InGameState::Playing), lock_cursor)
+        .add_systems(OnExit(InGameState::Playing), unlock_cursor)
         .insert_resource(ClearColor(SKY_COLOUR))
         .run();
-}
-
-fn go_to_main_menu(mut next_state: ResMut<NextState<GameState>>) {
-    next_state.set(GameState::MainMenu);
 }
 
 fn setup_game(
@@ -120,4 +127,34 @@ fn toggle_wireframe(
     if keyboard.just_pressed(KeyCode::Backquote) {
         wireframe_config.global = !wireframe_config.global;
     }
+}
+
+fn go_to_main_menu(mut next_state: ResMut<NextState<AppState>>) {
+    next_state.set(AppState::MainMenu);
+}
+
+fn pause_game(mut next_state: ResMut<NextState<InGameState>>) {
+    next_state.set(InGameState::Paused);
+}
+
+fn unpause_game(mut next_state: ResMut<NextState<InGameState>>) {
+    next_state.set(InGameState::Playing);
+}
+
+fn lock_cursor(mut windows: Query<&mut Window>) {
+    let mut window = windows
+        .single_mut()
+        .expect("Window component");
+    window.cursor_options.visible = false;
+    window.cursor_options.grab_mode = CursorGrabMode::Locked;
+    let half_size = window.size() * 0.5;
+    window.set_cursor_position(Some(half_size));
+}
+
+fn unlock_cursor(mut windows: Query<&mut Window>) {
+    let mut window = windows
+        .single_mut()
+        .expect("Window component");
+    window.cursor_options.visible = true;
+    window.cursor_options.grab_mode = CursorGrabMode::None;
 }

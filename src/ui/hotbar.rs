@@ -2,7 +2,8 @@ use super::{block_icons::BlockIconMaterials, health::HealthDisplayRoot, Ui, UiFo
 use crate::{
     item::Item,
     player::inventory::{HotbarSelection, Inventory, INVENTORY_WIDTH},
-    state::GameState,
+    state::AppState,
+    ui::HudUi,
 };
 use bevy::prelude::*;
 
@@ -13,14 +14,15 @@ impl Plugin for HotbarUiPlugin {
         app.add_systems(Startup, setup)
             .add_systems(
                 Update,
-                (update_selected_slot, update_item_display).run_if(in_state(GameState::InGame)),
+                (update_selected_slot, update_item_display).run_if(in_state(AppState::InGame)),
             )
-            .add_systems(OnEnter(GameState::InGame), spawn_hotbar)
+            .add_systems(OnEnter(AppState::InGame), spawn_hotbar)
             .add_observer(add_slots);
     }
 }
 
 #[derive(Component)]
+#[require(HudUi)]
 pub struct HotbarDisplayRoot;
 
 #[derive(Resource)]
@@ -43,12 +45,12 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 const SLOT_SPRITE_SIZE: f32 = 50.0;
 
 #[derive(Component)]
+#[require(HudUi)]
 struct UiHotbar;
 
 fn spawn_hotbar(mut commands: Commands) {
     commands
         .spawn((
-            Ui,
             UiHotbar,
             Node {
                 height: Val::Percent(100.0),
@@ -59,9 +61,8 @@ fn spawn_hotbar(mut commands: Commands) {
             },
         ))
         .with_children(|builder| {
-            builder.spawn((Ui, HealthDisplayRoot, Node::default()));
+            builder.spawn((HealthDisplayRoot, Node::default()));
             builder.spawn((
-                Ui,
                 HotbarDisplayRoot,
                 Node {
                     width: Val::Percent(100.0),
@@ -73,6 +74,7 @@ fn spawn_hotbar(mut commands: Commands) {
 }
 
 #[derive(Component)]
+#[require(HudUi)]
 struct HotbarSlot;
 
 fn add_slots(
@@ -90,7 +92,6 @@ fn add_slots(
         let margin = UiRect::all(Val::Px(1.0));
         for i in 0..INVENTORY_WIDTH {
             builder.spawn((
-                Ui,
                 HotbarSlot,
                 HotbarIndex(i),
                 ImageNode::new(sprites.slot.clone()),

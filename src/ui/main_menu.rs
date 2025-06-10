@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::state::GameState;
+use crate::state::AppState;
 
 use super::{UiFont, UiRoot};
 
@@ -9,8 +9,8 @@ pub struct MainMenuPlugin;
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_assets)
-            .add_systems(OnEnter(GameState::MainMenu), setup_main_menu)
-            .add_systems(OnExit(GameState::MainMenu), tear_down_main_menu)
+            .add_systems(OnEnter(AppState::MainMenu), setup_main_menu)
+            .add_systems(OnExit(AppState::MainMenu), tear_down_main_menu)
             .add_systems(Update, (play_button, quit_button));
     }
 }
@@ -142,11 +142,11 @@ struct PlayButton;
 
 fn play_button(
     q_button: Query<&Interaction, (With<PlayButton>, Changed<Interaction>)>,
-    mut next_state: ResMut<NextState<GameState>>,
+    mut next_state: ResMut<NextState<AppState>>,
 ) {
     for interaction in q_button.iter() {
         if let Interaction::Pressed = interaction {
-            next_state.set(GameState::InGame);
+            next_state.set(AppState::InGame);
         }
     }
 }

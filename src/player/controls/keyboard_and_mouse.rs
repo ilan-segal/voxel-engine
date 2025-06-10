@@ -22,7 +22,7 @@ use crate::{
         mode::{player_in_mode, PlayerMode},
         Jumping, Player, Sneaking,
     },
-    state::GameState,
+    state::{AppState, InGameState},
     world::block_update::SetBlockEvent,
 };
 
@@ -46,7 +46,7 @@ impl Plugin for KeyboardMousePlugin {
                 change_hotbar_selection_from_keys,
                 change_hotbar_selection_from_scrollbar,
             )
-                .run_if(in_state(GameState::InGame)),
+                .run_if(in_state(AppState::InGame).and(in_state(InGameState::Playing))),
         )
         .add_observer(toggle_player_mode);
     }

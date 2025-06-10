@@ -1,14 +1,14 @@
 use bevy::prelude::*;
 
-use crate::state::GameState;
+use crate::{state::AppState, ui::HudUi};
 
-use super::{Ui, UiRoot};
+use super::UiRoot;
 
 pub struct CrosshairPlugin;
 
 impl Plugin for CrosshairPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::InGame), spawn_crosshair);
+        app.add_systems(OnEnter(AppState::InGame), spawn_crosshair);
     }
 }
 
@@ -25,7 +25,7 @@ fn spawn_crosshair(
         .expect("Should be exactly one UiRoot component");
     let crosshair_node = commands
         .spawn((
-            Ui,
+            HudUi,
             Node {
                 width: Val::Px(CROSSHAIR_WIDTH),
                 height: Val::Px(CROSSHAIR_WIDTH),

@@ -5,10 +5,9 @@ use crate::{
         health::{Health, MaxHealth},
         Player,
     },
-    state::GameState,
+    state::AppState,
+    ui::HudUi,
 };
-
-use super::Ui;
 
 pub struct HealthUiPlugin;
 
@@ -17,7 +16,7 @@ impl Plugin for HealthUiPlugin {
         app.add_systems(Startup, setup)
             .add_systems(
                 Update,
-                update_health_display.run_if(in_state(GameState::InGame)),
+                update_health_display.run_if(in_state(AppState::InGame)),
             );
     }
 }
@@ -30,6 +29,7 @@ struct SpriteHandles {
 }
 
 #[derive(Component)]
+#[require(HudUi)]
 pub struct HealthDisplayRoot;
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -69,7 +69,6 @@ fn update_health_display(
                 let height = Val::Px(HEART_SPRITE_SIZE);
                 builder
                     .spawn((
-                        Ui,
                         Node {
                             width,
                             height,
@@ -87,7 +86,6 @@ fn update_health_display(
                         };
                         if let Some(sprite) = heart_sprite {
                             builder_2.spawn((
-                                Ui,
                                 Node {
                                     width,
                                     height,

@@ -3,7 +3,7 @@ use crate::{
     physics::{
         falling_state::FallingState, gravity::Gravity, velocity::Velocity, PhysicsSystemSet,
     },
-    state::GameState,
+    state::{AppState, InGameState},
 };
 use bevy::{ecs::query::QueryData, prelude::*};
 use target_velocity::TargetVelocity;
@@ -23,8 +23,9 @@ impl Plugin for ControlsPlugin {
                     update_velocity_for_no_clip_mode,
                 )
                     .before(PhysicsSystemSet::Act)
-                    .run_if(in_state(GameState::InGame)),
-            );
+                    .run_if(in_state(AppState::InGame)),
+            )
+            .add_systems(OnEnter(InGameState::Paused), clear_target_velocity);
     }
 }
 
@@ -124,4 +125,10 @@ fn update_velocity_for_no_clip_mode(
 fn square_root_v(v: Vec3) -> Vec3 {
     let [x, y, z] = v.abs().to_array();
     Vec3::new(x.sqrt(), y.sqrt(), z.sqrt()) * v.signum()
+}
+
+fn clear_target_velocity(mut q_target_velocity: Query<&mut TargetVelocity>) {
+    for mut target_velocity in q_target_velocity.iter_mut() {
+        target_velocity.0 = Vec3::ZERO;
+    }
 }
