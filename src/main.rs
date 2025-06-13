@@ -62,6 +62,7 @@ fn main() {
             world::WorldPlugin,
             item::ItemPlugin,
             render::RenderPlugin,
+            portal::PortalPlugin,
         ))
         .insert_state(AppState::Init)
         .add_sub_state::<InGameState>()
@@ -90,9 +91,7 @@ fn setup_game(
     mut windows: Query<&mut Window>,
     mut gizmos_config_store: ResMut<GizmoConfigStore>,
 ) {
-    let mut window = windows
-        .single_mut()
-        .expect("Window component");
+    let mut window = windows.single_mut().expect("Window component");
     window.cursor_options.visible = false;
     window.cursor_options.grab_mode = CursorGrabMode::Locked;
 
@@ -143,9 +142,7 @@ fn unpause_game(mut next_state: ResMut<NextState<InGameState>>) {
 }
 
 fn lock_cursor(mut windows: Query<&mut Window>) {
-    let mut window = windows
-        .single_mut()
-        .expect("Window component");
+    let mut window = windows.single_mut().expect("Window component");
     window.cursor_options.visible = false;
     window.cursor_options.grab_mode = CursorGrabMode::Locked;
     let half_size = window.size() * 0.5;
@@ -153,9 +150,7 @@ fn lock_cursor(mut windows: Query<&mut Window>) {
 }
 
 fn unlock_cursor(mut windows: Query<&mut Window>) {
-    let mut window = windows
-        .single_mut()
-        .expect("Window component");
+    let mut window = windows.single_mut().expect("Window component");
     window.cursor_options.visible = true;
     window.cursor_options.grab_mode = CursorGrabMode::None;
 }

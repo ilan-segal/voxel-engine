@@ -24,9 +24,9 @@ fn align_portal_cameras(
     q_portals: Query<(&PortalEntrance, &GlobalTransform), Without<Camera3d>>,
     mut q_portal_cameras: Query<&mut Transform, (With<Camera3d>, Without<Player>)>,
 ) {
-    let Ok(eye_transform) = q_player_camera_transform
+    let Ok(eye_affine) = q_player_camera_transform
         .single()
-        .map(GlobalTransform::compute_transform)
+        .map(GlobalTransform::affine)
     else {
         return;
     };
@@ -38,20 +38,18 @@ fn align_portal_cameras(
         else {
             continue;
         };
-        let Ok(exit_transform) = q_portals
+        let Ok(portal_exit_affine) = q_portals
             .get(*portal_exit_id)
             .map(|(_, t)| t)
-            .map(GlobalTransform::compute_transform)
+            .map(GlobalTransform::affine)
         else {
             continue;
         };
-        let Ok(mut exit_camera_transform) = q_portal_cameras.get(*portal_exit_camera_id) else {
+        let Ok(mut exit_camera_transform) = q_portal_cameras.get_mut(*portal_exit_camera_id) else {
             continue;
         };
-
-        let eye_transform_relative_to_entrance = portal_entrance_global_transform
-            .affine()
-            .inverse()
-            .transform_point3(eye_transform.translation);
+        let portal_entrance_affine = portal_entrance_global_transform.affine();
+        let exit_camera_affine = portal_exit_affine * portal_entrance_affine.inverse() * eye_affine;
+        *exit_camera_transform = Transform::from_matrix(exit_camera_affine.into());
     }
 }
