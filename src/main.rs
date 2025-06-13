@@ -26,6 +26,7 @@ mod debug_plugin;
 mod item;
 mod physics;
 mod player;
+mod portal;
 mod render;
 mod render_layer;
 mod state;
