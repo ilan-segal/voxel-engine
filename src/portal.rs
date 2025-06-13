@@ -20,16 +20,11 @@ pub struct PortalEntrance {
 }
 
 fn align_portal_cameras(
-    q_player_camera_transform: Query<&GlobalTransform, (With<Camera3d>, With<Player>)>,
+    q_player_camera_transform: Single<&GlobalTransform, (With<Camera3d>, With<Player>)>,
     q_portals: Query<(&PortalEntrance, &GlobalTransform), Without<Camera3d>>,
     mut q_portal_cameras: Query<&mut Transform, (With<Camera3d>, Without<Player>)>,
 ) {
-    let Ok(eye_affine) = q_player_camera_transform
-        .single()
-        .map(GlobalTransform::affine)
-    else {
-        return;
-    };
+    let eye_affine = q_player_camera_transform.affine();
     for (entrance, portal_entrance_global_transform) in q_portals.iter() {
         let PortalEntrance {
             exit: Some(portal_exit_id),
