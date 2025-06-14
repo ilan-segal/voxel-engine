@@ -5,7 +5,7 @@ use crate::{
         aabb::Aabb, collision::Collidable, falling_state::FallingState, gravity::Gravity,
         velocity::Velocity,
     },
-    render_layer::WORLD_LAYER,
+    render_layer::{PORTAL_LAYER, WORLD_LAYER},
     world::neighborhood::ComponentIndex,
 };
 use bevy::{prelude::*, render::view::RenderLayers};
@@ -83,7 +83,7 @@ pub struct Sneaking(pub bool);
     // TODO: Enable DepthPrepass once implemented for terrain material
     // DepthPrepass,
     DistanceFog { ..air_distance_fog() },
-    RenderLayers::layer(WORLD_LAYER),
+    RenderLayers::from_layers(&[WORLD_LAYER, PORTAL_LAYER]),
     CameraBlock,
 )]
 pub struct PlayerCamera;
