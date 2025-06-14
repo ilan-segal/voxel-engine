@@ -10,6 +10,7 @@ use bevy::{
 };
 
 use crate::{
+    physics::PhysicsSystemSet,
     player::Player,
     render_layer::{PORTAL_LAYER, WORLD_LAYER},
     SKY_COLOUR,
@@ -20,11 +21,19 @@ pub struct PortalPlugin;
 impl Plugin for PortalPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(MaterialPlugin::<PortalEntranceMaterial>::default())
+            .add_systems(Startup, spawn_portals)
+            .add_systems(PreUpdate, add_prev_position_component)
+            .add_systems(
+                Update,
+                (
+                    update_prev_position.before(PhysicsSystemSet::Act),
+                    move_through_portals.after(PhysicsSystemSet::React),
+                ),
+            )
             .add_systems(
                 PostUpdate,
                 align_portal_cameras.before(TransformSystem::TransformPropagate),
             )
-            .add_systems(Startup, spawn_portals)
             .add_observer(setup_portal_camera);
     }
 }
@@ -32,6 +41,7 @@ impl Plugin for PortalPlugin {
 #[derive(Component)]
 pub struct PortalEntrance {
     exit: Option<Entity>,
+    size: Vec2,
 }
 
 #[derive(Component)]
@@ -42,7 +52,8 @@ pub struct PortalCamera {
 }
 
 fn spawn_portals(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
-    let portal_mesh_dimensions = Vec3::new(4.0, 4.0, 0.0);
+    let size = Vec2::new(4.0, 4.0);
+    let portal_mesh_dimensions = size.extend(0.0);
     let rectangle = meshes.add(Cuboid::from_size(portal_mesh_dimensions));
     let portal_a_id = commands
         .spawn((
@@ -62,11 +73,13 @@ fn spawn_portals(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
         .entity(portal_a_id)
         .insert(PortalEntrance {
             exit: Some(portal_b_id),
+            size,
         });
     commands
         .entity(portal_b_id)
         .insert(PortalEntrance {
             exit: Some(portal_a_id),
+            size,
         });
 }
 
@@ -118,6 +131,7 @@ fn setup_portal_camera(
         },
         Projection::from(PerspectiveProjection {
             fov: 70_f32.to_radians(),
+            near: 0.0001,
             ..default()
         }),
         Mesh3d(meshes.add(Cuboid::from_length(0.25))),
@@ -180,4 +194,86 @@ impl Material for PortalEntranceMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/portal_entrance.wgsl".into()
     }
+}
+
+#[derive(Component, Default)]
+struct PreviousPosition(Vec3);
+
+fn add_prev_position_component(
+    mut commands: Commands,
+    q_no_prev_position: Query<Entity, (With<Transform>, Without<PreviousPosition>)>,
+) {
+    for entity in q_no_prev_position.iter() {
+        commands
+            .entity(entity)
+            .insert(PreviousPosition::default());
+    }
+}
+
+fn update_prev_position(mut q_prev_position: Query<(&Transform, &mut PreviousPosition)>) {
+    for (transform, mut prev_position) in q_prev_position.iter_mut() {
+        prev_position.0 = transform.translation;
+    }
+}
+
+// Don't teleport child entities, since they'll just move with their parent
+fn move_through_portals(
+    mut q_teleportable: Query<
+        (&PreviousPosition, &mut Transform),
+        (Without<ChildOf>, Without<PortalEntrance>),
+    >,
+    q_portal: Query<(&Transform, &PortalEntrance)>,
+) {
+    for (prev_position, mut transform) in q_teleportable.iter_mut() {
+        for (portal_entrance_transform, portal_entrance) in q_portal.iter() {
+            if !portal_is_crossed(
+                portal_entrance,
+                portal_entrance_transform,
+                &transform.translation,
+                &prev_position.0,
+            ) {
+                continue;
+            }
+            let Some((exit_transform, _)) = portal_entrance
+                .exit
+                .and_then(|e| q_portal.get(e).ok())
+            else {
+                warn!("Could not find exit for teleportation!");
+                continue;
+            };
+            let player_affine = transform.compute_affine();
+            let entrance_affine = portal_entrance_transform.compute_affine();
+            let exit_affine = exit_transform.compute_affine();
+            let teleported_affine = exit_affine * entrance_affine.inverse() * player_affine;
+            *transform = Transform::from_matrix(teleported_affine.into());
+        }
+    }
+}
+
+fn portal_is_crossed(
+    portal_entrance: &PortalEntrance,
+    portal_entrance_transform: &Transform,
+    entity_position: &Vec3,
+    entity_prev_position: &Vec3,
+) -> bool {
+    let x0 = entity_prev_position;
+    let x1 = entity_position;
+    let d = x1 - x0;
+    let p0 = portal_entrance_transform.translation;
+    let p1 =
+        portal_entrance_transform.transform_point(Vec3::new(portal_entrance.size.x * 0.5, 0., 0.));
+    let p2 =
+        portal_entrance_transform.transform_point(Vec3::new(0., portal_entrance.size.y * 0.5, 0.));
+    let pw = p1 - p0;
+    let ph = p2 - p0;
+    let n = pw.cross(ph);
+    let t = (p0 - x0).dot(n) / d.dot(n);
+    let c = x0 + t * d;
+    let u = pw.normalize().dot(c - p0);
+    let v = ph.normalize().dot(c - p0);
+    return is_in_range(t, 0., 1.) && is_in_range(u, -1., 1.) && is_in_range(v, -1., 1.);
+}
+
+fn is_in_range<T: PartialOrd>(value: T, min: T, max: T) -> bool {
+    value >= min && value <= max
 }

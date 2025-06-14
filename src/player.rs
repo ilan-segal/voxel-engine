@@ -77,6 +77,7 @@ pub struct Sneaking(pub bool);
     Camera3d,
     Projection::from(PerspectiveProjection {
         fov: 70_f32.to_radians(),
+        near: 0.0001,
         ..default()
     }),
     Msaa::Sample8,
