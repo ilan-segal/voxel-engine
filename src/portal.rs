@@ -1,5 +1,6 @@
 use bevy::{
     asset::RenderAssetUsages,
+    pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
     render::{
         render_resource::{
@@ -53,7 +54,7 @@ pub struct PortalCamera {
 
 fn spawn_portals(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
     let size = Vec2::new(4.0, 4.0);
-    let portal_mesh_dimensions = size.extend(0.0);
+    let portal_mesh_dimensions = size.extend(0.05);
     let rectangle = meshes.add(Cuboid::from_size(portal_mesh_dimensions));
     let portal_a_id = commands
         .spawn((
@@ -87,8 +88,6 @@ fn setup_portal_camera(
     trigger: Trigger<OnAdd, PortalEntrance>,
     mut commands: Commands,
     q_portal: Query<&PortalEntrance>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut standard_materials: ResMut<Assets<StandardMaterial>>,
     mut portal_materials: ResMut<Assets<PortalEntranceMaterial>>,
     mut images: ResMut<Assets<Image>>,
     window: Single<&Window>,
@@ -134,18 +133,18 @@ fn setup_portal_camera(
             near: 0.0001,
             ..default()
         }),
-        Mesh3d(meshes.add(Cuboid::from_length(0.25))),
-        MeshMaterial3d(
-            standard_materials.add(StandardMaterial::from_color(Color::linear_rgb(
-                1.0, 0.0, 0.0,
-            ))),
-        ),
         RenderLayers::layer(WORLD_LAYER),
     ));
 
     // Add texture to entrance portal
-    let portal_entrance_material_handle =
-        portal_materials.add(PortalEntranceMaterial { image_handle });
+    let portal_entrance_material_handle = portal_materials.add(ExtendedMaterial {
+        base: StandardMaterial {
+            double_sided: true,
+            cull_mode: None,
+            ..default()
+        },
+        extension: PortalMaterialExtension { image_handle },
+    });
     commands.entity(entrance).insert((
         MeshMaterial3d(portal_entrance_material_handle),
         RenderLayers::layer(PORTAL_LAYER),
@@ -183,16 +182,22 @@ fn align_portal_cameras(
     }
 }
 
+type PortalEntranceMaterial = ExtendedMaterial<StandardMaterial, PortalMaterialExtension>;
+
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
-struct PortalEntranceMaterial {
-    #[texture(0)]
-    #[sampler(1)]
+struct PortalMaterialExtension {
+    #[texture(100)]
+    #[sampler(101)]
     image_handle: Handle<Image>,
 }
 
-impl Material for PortalEntranceMaterial {
+impl MaterialExtension for PortalMaterialExtension {
     fn fragment_shader() -> ShaderRef {
         "shaders/portal_entrance.wgsl".into()
+    }
+
+    fn deferred_fragment_shader() -> ShaderRef {
+        Self::fragment_shader()
     }
 }
 
@@ -219,7 +224,7 @@ fn update_prev_position(mut q_prev_position: Query<(&Transform, &mut PreviousPos
 // Don't teleport child entities, since they'll just move with their parent
 fn move_through_portals(
     mut q_teleportable: Query<
-        (&PreviousPosition, &mut Transform),
+        (&GlobalTransform, &mut Transform),
         (Without<ChildOf>, Without<PortalEntrance>),
     >,
     q_portal: Query<(&Transform, &PortalEntrance)>,
@@ -230,7 +235,7 @@ fn move_through_portals(
                 portal_entrance,
                 portal_entrance_transform,
                 &transform.translation,
-                &prev_position.0,
+                &prev_position.translation(),
             ) {
                 continue;
             }
@@ -241,11 +246,13 @@ fn move_through_portals(
                 warn!("Could not find exit for teleportation!");
                 continue;
             };
+            info!("zoop!");
             let player_affine = transform.compute_affine();
             let entrance_affine = portal_entrance_transform.compute_affine();
             let exit_affine = exit_transform.compute_affine();
             let teleported_affine = exit_affine * entrance_affine.inverse() * player_affine;
             *transform = Transform::from_matrix(teleported_affine.into());
+            break;
         }
     }
 }
@@ -260,10 +267,8 @@ fn portal_is_crossed(
     let x1 = entity_position;
     let d = x1 - x0;
     let p0 = portal_entrance_transform.translation;
-    let p1 =
-        portal_entrance_transform.transform_point(Vec3::new(portal_entrance.size.x * 0.5, 0., 0.));
-    let p2 =
-        portal_entrance_transform.transform_point(Vec3::new(0., portal_entrance.size.y * 0.5, 0.));
+    let p1 = portal_entrance_transform.transform_point(Vec3::new(portal_entrance.size.x, 0., 0.));
+    let p2 = portal_entrance_transform.transform_point(Vec3::new(0., portal_entrance.size.y, 0.));
     let pw = p1 - p0;
     let ph = p2 - p0;
     let n = pw.cross(ph);
@@ -275,5 +280,5 @@ fn portal_is_crossed(
 }
 
 fn is_in_range<T: PartialOrd>(value: T, min: T, max: T) -> bool {
-    value >= min && value <= max
+    min <= value && value <= max
 }
