@@ -267,15 +267,17 @@ fn portal_is_crossed(
     let x1 = entity_position;
     let d = x1 - x0;
     let p0 = portal_entrance_transform.translation;
-    let p1 = portal_entrance_transform.transform_point(Vec3::new(portal_entrance.size.x, 0., 0.));
-    let p2 = portal_entrance_transform.transform_point(Vec3::new(0., portal_entrance.size.y, 0.));
+    let p1 =
+        portal_entrance_transform.transform_point(Vec3::new(portal_entrance.size.x * 0.5, 0., 0.));
+    let p2 =
+        portal_entrance_transform.transform_point(Vec3::new(0., portal_entrance.size.y * 0.5, 0.));
     let pw = p1 - p0;
     let ph = p2 - p0;
     let n = pw.cross(ph);
     let t = (p0 - x0).dot(n) / d.dot(n);
     let c = x0 + t * d;
-    let u = pw.normalize().dot(c - p0);
-    let v = ph.normalize().dot(c - p0);
+    let u = pw.normalize().dot(c - p0) / pw.length();
+    let v = ph.normalize().dot(c - p0) / ph.length();
     return is_in_range(t, 0., 1.) && is_in_range(u, -1., 1.) && is_in_range(v, -1., 1.);
 }
 
