@@ -54,7 +54,7 @@ pub struct PortalCamera {
 
 fn spawn_portals(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
     let size = Vec2::new(4.0, 4.0);
-    let portal_mesh_dimensions = size.extend(0.05);
+    let portal_mesh_dimensions = size.extend(0.0);
     let rectangle = meshes.add(Cuboid::from_size(portal_mesh_dimensions));
     let portal_a_id = commands
         .spawn((
@@ -246,7 +246,6 @@ fn move_through_portals(
                 warn!("Could not find exit for teleportation!");
                 continue;
             };
-            info!("zoop!");
             let player_affine = transform.compute_affine();
             let entrance_affine = portal_entrance_transform.compute_affine();
             let exit_affine = exit_transform.compute_affine();
