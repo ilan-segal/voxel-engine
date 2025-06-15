@@ -126,6 +126,7 @@ fn setup_portal_camera(
         Camera {
             target: image_handle.clone().into(),
             clear_color: SKY_COLOUR.into(),
+            order: -1,
             ..default()
         },
         Projection::from(PerspectiveProjection {
