@@ -73,9 +73,14 @@ fn update_mesh_status(
 ) {
     for (e, stage) in q.iter() {
         if stage == &Stage::final_stage() {
-            commands.entity(e).remove::<Meshed>().insert(CheckedForMesh);
+            commands
+                .entity(e)
+                .remove::<Meshed>()
+                .insert(CheckedForMesh);
         } else {
-            commands.entity(e).insert((CheckedForMesh, Meshed));
+            commands
+                .entity(e)
+                .insert((CheckedForMesh, Meshed));
         }
     }
 }
@@ -86,7 +91,9 @@ fn mark_mesh_as_stale(
     mut tasks: ResMut<MeshGenTasks>,
 ) {
     for entity in q_changed_neighborhood.iter() {
-        commands.entity(entity).remove::<CheckedForMesh>();
+        commands
+            .entity(entity)
+            .remove::<CheckedForMesh>();
         tasks.0.remove(&entity);
     }
 }
@@ -263,7 +270,10 @@ fn chunk_mesh(chunk: Neighborhood<Blocks>) -> Option<Mesh> {
 // TODO: Replace slow implementation with binary mesher
 fn greedy_mesh(chunk: &Neighborhood<Blocks>, direction: BlockSide) -> Vec<Quad> {
     let mut quads: Vec<Quad> = vec![];
-    let middle = chunk.middle_chunk().clone().expect("Already checked");
+    let middle = chunk
+        .middle_chunk()
+        .clone()
+        .expect("Already checked");
     let mut blocks = middle.as_ref().clone();
     for layer in 0..CHUNK_SIZE {
         for row in 0..CHUNK_SIZE {

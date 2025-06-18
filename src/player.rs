@@ -8,7 +8,7 @@ use crate::{
     render_layer::{PORTAL_LAYER, WORLD_LAYER},
     world::neighborhood::ComponentIndex,
 };
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{core_pipeline::prepass::DepthPrepass, prelude::*, render::view::RenderLayers};
 use block_target::BlockTargetPlugin;
 use controls::target_velocity::TargetVelocity;
 use health::{Health, MaxHealth};
@@ -82,7 +82,7 @@ pub struct Sneaking(pub bool);
     }),
     Msaa::Sample8,
     // TODO: Enable DepthPrepass once implemented for terrain material
-    // DepthPrepass,
+    DepthPrepass,
     DistanceFog { ..air_distance_fog() },
     RenderLayers::from_layers(&[WORLD_LAYER, PORTAL_LAYER]),
     CameraBlock,

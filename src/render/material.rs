@@ -10,10 +10,10 @@ use bevy::{
         render_resource::{
             binding_types::{sampler, texture_2d},
             AddressMode, AsBindGroup, AsBindGroupError, BindGroupEntries, BindGroupLayout,
-            BindGroupLayoutEntries, BindGroupLayoutEntry, BindingResources, FilterMode,
-            PreparedBindGroup, RenderPipelineDescriptor, SamplerBindingType, SamplerDescriptor,
-            ShaderRef, ShaderStages, SpecializedMeshPipelineError, TextureSampleType,
-            UnpreparedBindGroup,
+            BindGroupLayoutEntries, BindGroupLayoutEntry, BindingResources, CompareFunction,
+            DepthStencilState, FilterMode, PreparedBindGroup, RenderPipelineDescriptor,
+            SamplerBindingType, SamplerDescriptor, ShaderRef, ShaderStages,
+            SpecializedMeshPipelineError, TextureFormat, TextureSampleType, UnpreparedBindGroup,
         },
         renderer::RenderDevice,
         texture::{FallbackImage, GpuImage},
@@ -41,6 +41,7 @@ pub struct TerrainMaterial {
 }
 
 const TERRAIN_MATERIAL_SHADER_PATH: &str = "shaders/terrain.wgsl";
+const TERRAIN_MATERIAL_PREPASS_SHADER_PATH: &str = "shaders/depth_prepass.wgsl";
 
 impl Material for TerrainMaterial {
     fn vertex_shader() -> ShaderRef {
@@ -51,8 +52,16 @@ impl Material for TerrainMaterial {
         TERRAIN_MATERIAL_SHADER_PATH.into()
     }
 
+    fn prepass_vertex_shader() -> ShaderRef {
+        TERRAIN_MATERIAL_PREPASS_SHADER_PATH.into()
+    }
+
+    fn prepass_fragment_shader() -> ShaderRef {
+        TERRAIN_MATERIAL_PREPASS_SHADER_PATH.into()
+    }
+
     fn alpha_mode(&self) -> AlphaMode {
-        AlphaMode::AlphaToCoverage
+        AlphaMode::Blend
     }
 
     fn specialize(
@@ -65,6 +74,13 @@ impl Material for TerrainMaterial {
             .0
             .get_layout(&[ATTRIBUTE_TERRAIN_VERTEX_DATA.at_shader_location(0)])?;
         descriptor.vertex.buffers = vec![vertex_layout];
+        descriptor.depth_stencil = Some(DepthStencilState {
+            format: TextureFormat::Depth32Float,
+            depth_write_enabled: true,
+            depth_compare: CompareFunction::GreaterEqual,
+            stencil: default(),
+            bias: default(),
+        });
         Ok(())
     }
 }
