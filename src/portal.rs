@@ -3,6 +3,7 @@ use bevy::{
     pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
     render::{
+        camera::CameraProjection,
         render_resource::{
             AsBindGroup, Extent3d, ShaderRef, TextureDimension, TextureFormat, TextureUsages,
         },
@@ -33,7 +34,12 @@ impl Plugin for PortalPlugin {
             )
             .add_systems(
                 PostUpdate,
-                align_portal_cameras.before(TransformSystem::TransformPropagate),
+                (
+                    align_portal_cameras.before(TransformSystem::TransformPropagate),
+                    // update_portal_camera_near_clip_plane
+                    //     .before(bevy::render::view::update_frusta)
+                    //     .in_set(bevy::render::view::VisibilitySystems::UpdateFrusta),
+                ),
             )
             .add_observer(setup_portal_camera);
     }
@@ -119,6 +125,16 @@ fn setup_portal_camera(
         TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT;
     let image_handle = images.add(image);
 
+    let perspective = PerspectiveProjection {
+        fov: 70_f32.to_radians(),
+        near: 0.0001,
+        ..default()
+    };
+    let near_plane = Dir3::NEG_Z.extend(0.1);
+    let custom_perspective = ObliquePerspectiveProjection {
+        perspective,
+        near_plane,
+    };
     // Portal Camera
     commands.spawn((
         PortalCamera { entrance, exit },
@@ -129,11 +145,7 @@ fn setup_portal_camera(
             order: -1,
             ..default()
         },
-        Projection::from(PerspectiveProjection {
-            fov: 70_f32.to_radians(),
-            near: 0.0001,
-            ..default()
-        }),
+        Projection::custom(custom_perspective),
         RenderLayers::layer(WORLD_LAYER),
     ));
 
@@ -151,6 +163,63 @@ fn setup_portal_camera(
         RenderLayers::layer(PORTAL_LAYER),
     ));
 }
+
+#[derive(Component, Debug, Clone)]
+struct ObliquePerspectiveProjection {
+    perspective: PerspectiveProjection,
+    near_plane: Vec4,
+}
+
+impl CameraProjection for ObliquePerspectiveProjection {
+    /// https://forum.beyond3d.com/threads/oblique-near-plane-clipping-reversed-depth-buffer.52827/
+    fn get_clip_from_view(&self) -> Mat4 {
+        let mut m_values = self
+            .perspective
+            .get_clip_from_view()
+            .to_cols_array_2d();
+        let plane_eq = self
+            .near_plane
+            .xyz()
+            .extend(self.near_plane.z * -1.);
+        let q = Vec4::new(
+            (plane_eq.x.signum() - m_values[2][0]) / m_values[0][0],
+            (plane_eq.y.signum() - m_values[2][1]) / m_values[1][1],
+            1.0,
+            (1.0 - m_values[2][2]) / m_values[3][2],
+        );
+        let c = plane_eq * plane_eq.dot(q).recip();
+        m_values[0][2] = c.x;
+        m_values[1][2] = c.y;
+        m_values[2][2] = c.z;
+        m_values[3][2] = c.w;
+        return Mat4::from_cols_array_2d(&m_values);
+    }
+
+    fn get_clip_from_view_for_sub(&self, sub_view: &bevy::render::camera::SubCameraView) -> Mat4 {
+        self.perspective
+            .get_clip_from_view_for_sub(sub_view)
+    }
+
+    fn update(&mut self, width: f32, height: f32) {
+        self.perspective.update(width, height);
+    }
+
+    fn far(&self) -> f32 {
+        self.perspective.far()
+    }
+
+    fn get_frustum_corners(&self, z_near: f32, z_far: f32) -> [Vec3A; 8] {
+        self.perspective
+            .get_frustum_corners(z_near, z_far)
+    }
+}
+
+// fn update_portal_camera_near_clip_plane(
+//     mut q_portal_camera: Query<(&PortalCamera, &Transform, &mut Projection)>,
+//     // q_portal: Query<&Transform, (With<PortalEntrance>, Without<PortalCamera>)>,
+// ) {
+//     for ()
+// }
 
 fn align_portal_cameras(
     q_player_camera_transform: Single<
