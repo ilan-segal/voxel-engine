@@ -38,7 +38,9 @@ impl Plugin for PortalPlugin {
             .add_systems(
                 PostUpdate,
                 (
-                    align_portal_cameras.before(TransformSystem::TransformPropagate),
+                    (align_portal_cameras, update_portal_camera_near_clip_plane)
+                        .chain()
+                        .before(TransformSystem::TransformPropagate),
                     // update_portal_camera_near_clip_plane
                     //     .before(bevy::render::view::update_frusta)
                     //     .in_set(bevy::render::view::VisibilitySystems::UpdateFrusta),
@@ -133,7 +135,7 @@ fn setup_portal_camera(
         near: 0.0001,
         ..default()
     };
-    let near_plane = HalfSpace::new(Vec3::new(1.0, 0.0, -1.0).extend(5.1));
+    let near_plane = HalfSpace::new(Vec3::new(1.0, 0.0, -1.0).extend(4.1));
     let custom_perspective = ObliquePerspectiveProjection {
         perspective,
         near_plane,
@@ -257,12 +259,46 @@ impl CameraProjection for ObliquePerspectiveProjection {
     }
 }
 
-// fn update_portal_camera_near_clip_plane(
-//     mut q_portal_camera: Query<(&PortalCamera, &Transform, &mut Projection)>,
-//     // q_portal: Query<&Transform, (With<PortalEntrance>, Without<PortalCamera>)>,
-// ) {
-//     for ()
-// }
+fn update_portal_camera_near_clip_plane(
+    mut q_portal_camera: Query<(&PortalCamera, &Transform, &mut Projection)>,
+    q_portal: Query<&Transform, (With<PortalEntrance>, Without<PortalCamera>)>,
+) {
+    for (portal_camera, portal_camera_transform, mut portal_camera_projection) in
+        q_portal_camera.iter_mut()
+    {
+        let Ok(portal_entrance_transform) = q_portal.get(portal_camera.exit) else {
+            continue;
+        };
+        let portal_camera_affine = portal_camera_transform.compute_matrix();
+        let portal_entrance_affine = portal_entrance_transform.compute_matrix();
+        let local_entrance_affine = portal_camera_affine.inverse() * portal_entrance_affine;
+        let local_entrance_transform = Transform::from_matrix(local_entrance_affine);
+        let camera_forward = Vec3::NEG_Z;
+        let plane_normal = if local_entrance_transform
+            .forward()
+            .dot(camera_forward)
+            < 0.0
+        {
+            -local_entrance_transform.forward()
+        } else {
+            local_entrance_transform.forward()
+        };
+        let d = local_entrance_transform
+            .translation
+            .dot(plane_normal.into());
+        let perspective = PerspectiveProjection {
+            fov: 70_f32.to_radians(),
+            near: 0.0001,
+            ..default()
+        };
+        let near_plane = HalfSpace::new(plane_normal.extend(d));
+        let custom_projection = ObliquePerspectiveProjection {
+            perspective,
+            near_plane,
+        };
+        *portal_camera_projection = Projection::custom(custom_projection);
+    }
+}
 
 fn align_portal_cameras(
     q_player_camera_transform: Single<
