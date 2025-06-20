@@ -205,10 +205,8 @@ impl CameraProjection for ObliquePerspectiveProjection {
         // info!("c={}", c.to_string());
         // return m_prime;
         let m = self.perspective.get_clip_from_view();
-        let c = self
-            .near_plane
-            .normal()
-            .extend(-self.near_plane.d());
+        let [c_x, c_y, c_z, c_w] = self.near_plane.normal_d().to_array();
+        let c = Vec4::new(c_x, c_y, c_z, -c_w);
         // let c = self.near_plane.normal_d();
         const REVERSE_Z: Mat4 = Mat4::from_cols_array_2d(&[
             [1., 0., 0., 0.],
@@ -216,11 +214,7 @@ impl CameraProjection for ObliquePerspectiveProjection {
             [0., 0., -1., 0.],
             [0., 0., 1., 1.],
         ]);
-        let m_prime = Mat4::from_cols(m.row(0), m.row(1), -c + m.row(3), m.row(3)).transpose();
-        info!("m={}", m.to_string());
-        info!("m_prime={}", m_prime.to_string());
-        info!("c={}", c.to_string());
-
+        let m_prime = REVERSE_Z * Mat4::from_cols(m.row(0), m.row(1), c, m.row(3)).transpose();
         return m_prime;
         // let mut m_values = self
         //     .perspective
