@@ -178,6 +178,30 @@ struct ObliquePerspectiveProjection {
 impl CameraProjection for ObliquePerspectiveProjection {
     /// https://forum.beyond3d.com/threads/oblique-near-plane-clipping-reversed-depth-buffer.52827/
     fn get_clip_from_view(&self) -> Mat4 {
+        let c = {
+            let [c_x, c_y, c_z, c_w] = self.near_plane.normal_d().to_array();
+            Vec4::new(c_x, c_y, c_z, -c_w)
+        };
+        let translate = Mat4::from_cols_array_2d(&[
+            [1., 0., 0., 0.],
+            [0., 1., 0., 0.],
+            [0., 0., 0., -c.w / c.z],
+            [0., 0., -1., 0.],
+        ])
+        .transpose();
+        let shear = Mat4::from_cols_array_2d(&[
+            [1., 0., 0., 0.],
+            [0., 1., 0., 0.],
+            [-c.x / c.z, -c.y / c.z, 1., 0.],
+            [0., 0., 0., 1.],
+        ])
+        .transpose();
+        let m = self.perspective.get_clip_from_view();
+        let m_prime = Mat4::from_cols(m.row(0), m.row(1), m.row(2), Vec4::W).transpose();
+        let result = m_prime * shear * translate;
+        info!("{}", result.to_string());
+        return result;
+
         // let PerspectiveProjection {
         //     fov: fov_y_radians,
         //     aspect_ratio,
@@ -206,18 +230,18 @@ impl CameraProjection for ObliquePerspectiveProjection {
         // info!("m_prime={}", m_prime.to_string());
         // info!("c={}", c.to_string());
         // return m_prime;
-        let m = self.perspective.get_clip_from_view();
-        let [c_x, c_y, c_z, c_w] = self.near_plane.normal_d().to_array();
-        let c = Vec4::new(c_x, c_y, c_z, -c_w);
+        // let m = self.perspective.get_clip_from_view();
+        // let [c_x, c_y, c_z, c_w] = self.near_plane.normal_d().to_array();
+        // let c = Vec4::new(c_x, c_y, c_z, -c_w);
         // let c = self.near_plane.normal_d();
-        const REVERSE_Z: Mat4 = Mat4::from_cols_array_2d(&[
-            [1., 0., 0., 0.],
-            [0., 1., 0., 0.],
-            [0., 0., -1., 0.],
-            [0., 0., 1., 1.],
-        ]);
-        let m_prime = REVERSE_Z * Mat4::from_cols(m.row(0), m.row(1), c, m.row(3)).transpose();
-        return m_prime;
+        // const REVERSE_Z: Mat4 = Mat4::from_cols_array_2d(&[
+        //     [1., 0., 0., 0.],
+        //     [0., 1., 0., 0.],
+        //     [0., 0., -1., 0.],
+        //     [0., 0., 1., 1.],
+        // ]);
+        // let m_prime = REVERSE_Z * Mat4::from_cols(m.row(0), m.row(1), c, m.row(3)).transpose();
+        // return m_prime;
         // let mut m_values = self
         //     .perspective
         //     .get_clip_from_view()
@@ -260,7 +284,10 @@ impl CameraProjection for ObliquePerspectiveProjection {
 }
 
 fn update_portal_camera_near_clip_plane(
-    mut q_portal_camera: Query<(&PortalCamera, &Transform, &mut Projection)>,
+    mut q_portal_camera: Query<
+        (&PortalCamera, &Transform, &mut Projection),
+        Or<(Changed<GlobalTransform>, Changed<PortalCamera>)>,
+    >,
     q_portal: Query<&Transform, (With<PortalEntrance>, Without<PortalCamera>)>,
 ) {
     for (portal_camera, portal_camera_transform, mut portal_camera_projection) in
@@ -291,11 +318,17 @@ fn update_portal_camera_near_clip_plane(
             near: 0.0001,
             ..default()
         };
-        let near_plane = HalfSpace::new(plane_normal.extend(d));
+        let near_plane = HalfSpace::new(plane_normal.extend(d * 0.95));
         let custom_projection = ObliquePerspectiveProjection {
             perspective,
             near_plane,
         };
+        // info!(
+        //     "{:?}",
+        //     custom_projection
+        //         .get_clip_from_view()
+        //         .to_string()
+        // );
         *portal_camera_projection = Projection::custom(custom_projection);
     }
 }
