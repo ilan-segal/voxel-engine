@@ -1,12 +1,10 @@
-use std::ops::Neg;
-
 use bevy::{
     asset::RenderAssetUsages,
+    math::FloatPow,
     pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
     render::{
         camera::CameraProjection,
-        primitives::HalfSpace,
         render_resource::{
             AsBindGroup, Extent3d, ShaderRef, TextureDimension, TextureFormat, TextureUsages,
         },
@@ -37,14 +35,9 @@ impl Plugin for PortalPlugin {
             )
             .add_systems(
                 PostUpdate,
-                (
-                    (align_portal_cameras, update_portal_camera_near_clip_plane)
-                        .chain()
-                        .before(TransformSystem::TransformPropagate),
-                    // update_portal_camera_near_clip_plane
-                    //     .before(bevy::render::view::update_frusta)
-                    //     .in_set(bevy::render::view::VisibilitySystems::UpdateFrusta),
-                ),
+                (align_portal_cameras, update_portal_camera_near_clip_plane)
+                    .chain()
+                    .before(TransformSystem::TransformPropagate),
             )
             .add_observer(setup_portal_camera);
     }
@@ -135,7 +128,7 @@ fn setup_portal_camera(
         near: 0.0001,
         ..default()
     };
-    let near_plane = HalfSpace::new(Vec3::new(1.0, 0.0, -1.0).extend(4.1));
+    let near_plane = Vec3::NEG_Z.extend(-0.0001);
     let custom_perspective = ObliquePerspectiveProjection {
         perspective,
         near_plane,
@@ -172,122 +165,89 @@ fn setup_portal_camera(
 #[derive(Component, Debug, Clone)]
 struct ObliquePerspectiveProjection {
     perspective: PerspectiveProjection,
-    near_plane: HalfSpace,
+    near_plane: Vec4,
 }
 
 impl CameraProjection for ObliquePerspectiveProjection {
-    /// https://forum.beyond3d.com/threads/oblique-near-plane-clipping-reversed-depth-buffer.52827/
+    /// https://aras-p.info/texts/obliqueortho.html
     fn get_clip_from_view(&self) -> Mat4 {
-        let c = {
-            let [c_x, c_y, c_z, c_w] = self.near_plane.normal_d().to_array();
-            Vec4::new(c_x, c_y, c_z, -c_w)
-        };
-        let translate = Mat4::from_cols_array_2d(&[
+        const REVERSE_Z: Mat4 = Mat4::from_cols_array_2d(&[
             [1., 0., 0., 0.],
             [0., 1., 0., 0.],
-            [0., 0., 0., -c.w / c.z],
             [0., 0., -1., 0.],
-        ])
+            [0., 0., 1., 1.],
+        ]);
+        // let fov_y_radians = self.perspective.fov;
+        // let aspect_ratio = self.perspective.aspect_ratio;
+        // let z_near = 0.0001;
+        // let z_far = 1e3;
+        // let m = REVERSE_Z * Mat4::perspective_rh(fov_y_radians, aspect_ratio, z_near, z_far);
+        // return REVERSE_Z * m;
+        let m = REVERSE_Z * self.perspective.get_clip_from_view();
+        let m_inverse = m.inverse();
+        let c_prime = m_inverse.transpose() * self.near_plane;
+        let q_prime = Vec4::new(c_prime.x.signum(), c_prime.y.signum(), 1.0, 1.0);
+        let q = m_inverse * q_prime;
+        let m_prime = Mat4::from_cols(
+            m.row(0),
+            m.row(1),
+            (2.0 * m.row(3).dot(q) / self.near_plane.dot(q)) * self.near_plane - m.row(3),
+            m.row(3),
+        )
         .transpose();
-        let shear = Mat4::from_cols_array_2d(&[
-            [1., 0., 0., 0.],
-            [0., 1., 0., 0.],
-            [-c.x / c.z, -c.y / c.z, 1., 0.],
-            [0., 0., 0., 1.],
-        ])
-        .transpose();
-        let m = self.perspective.get_clip_from_view();
-        let m_prime = Mat4::from_cols(m.row(0), m.row(1), m.row(2), Vec4::W).transpose();
-        let result = m_prime * shear * translate;
-        info!("{}", result.to_string());
-        return result;
-
-        // let PerspectiveProjection {
-        //     fov: fov_y_radians,
-        //     aspect_ratio,
-        //     near: z_near,
-        //     ..
-        // } = self.perspective;
-        // let f = (0.5 * fov_y_radians).tan().recip();
-        // let m = Mat4::from_cols(
-        //     Vec4::new(f / aspect_ratio, 0.0, 0.0, 0.0),
-        //     Vec4::new(0.0, f, 0.0, 0.0),
-        //     Vec4::new(0.0, 0.0, -1.0, -1.0),
-        //     Vec4::new(0.0, 0.0, -2.0 * z_near, 0.0),
+        let m_prime = REVERSE_Z * m_prime;
+        // eprintln!(
+        //     "orig near: {}, custom near: {}",
+        //     m.row(3) + m.row(2),
+        //     m_prime.row(3) + m_prime.row(2)
         // );
-        // let m = self.perspective.get_clip_from_view();
-        // info!("m={}", m.to_string());
-        // let m_inverse = m.inverse();
-        // let c = self
-        //     .near_plane
-        //     .normal()
-        //     .extend(self.near_plane.d().neg());
-        // let c_prime = m_inverse.transpose() * c;
-        // let q_prime = Vec4::new(c_prime.x.signum(), c_prime.y.signum(), 1.0, 1.0);
-        // let q = m_inverse * q_prime;
-        // let m3_prime = (-2.0 * q_prime.z * c.dot(q).recip() * c + Vec4::Z) * -1.0;
-        // let m_prime = Mat4::from_cols(m.row(0), m.row(1), m3_prime, m.row(3)).transpose();
-        // info!("m_prime={}", m_prime.to_string());
-        // info!("c={}", c.to_string());
-        // return m_prime;
-        // let m = self.perspective.get_clip_from_view();
-        // let [c_x, c_y, c_z, c_w] = self.near_plane.normal_d().to_array();
-        // let c = Vec4::new(c_x, c_y, c_z, -c_w);
-        // let c = self.near_plane.normal_d();
-        // const REVERSE_Z: Mat4 = Mat4::from_cols_array_2d(&[
-        //     [1., 0., 0., 0.],
-        //     [0., 1., 0., 0.],
-        //     [0., 0., -1., 0.],
-        //     [0., 0., 1., 1.],
-        // ]);
-        // let m_prime = REVERSE_Z * Mat4::from_cols(m.row(0), m.row(1), c, m.row(3)).transpose();
-        // return m_prime;
-        // let mut m_values = self
-        //     .perspective
-        //     .get_clip_from_view()
-        //     .to_cols_array_2d();
-        // let plane_eq = self
-        //     .near_plane
-        //     .normal()
-        //     .extend(self.near_plane.d().neg());
-        // let q = Vec4::new(
-        //     (plane_eq.x.signum() - m_values[2][0]) / m_values[0][0],
-        //     (plane_eq.y.signum() - m_values[2][1]) / m_values[1][1],
-        //     1.0,
-        //     (1.0 - m_values[2][2]) / m_values[3][2],
+        // eprintln!(
+        //     "orig far: {}, custom far: {}",
+        //     m.row(3) - m.row(2),
+        //     m_prime.row(3) - m_prime.row(2)
         // );
-        // let c = plane_eq * plane_eq.dot(q).recip();
-        // m_values[0][2] = -c.x;
-        // m_values[1][2] = -c.y;
-        // m_values[2][2] = -c.z;
-        // m_values[3][2] = c.w;
-        // return Mat4::from_cols_array_2d(&m_values);
+        // eprintln!(
+        //     "orig left: {}, custom left: {}",
+        //     m.row(3) + m.row(0),
+        //     m_prime.row(3) + m_prime.row(0)
+        // );
+        // eprintln!(
+        //     "orig right: {}, custom right: {}",
+        //     m.row(3) - m.row(0),
+        //     m_prime.row(3) - m_prime.row(0)
+        // );
+        // eprintln!(
+        //     "orig bottom: {}, custom bottom: {}",
+        //     m.row(3) + m.row(1),
+        //     m_prime.row(3) + m_prime.row(1)
+        // );
+        // eprintln!(
+        //     "orig top: {}, custom top: {}",
+        //     m.row(3) - m.row(1),
+        //     m_prime.row(3) - m_prime.row(1)
+        // );
+        m_prime
     }
-
-    fn get_clip_from_view_for_sub(&self, sub_view: &bevy::render::camera::SubCameraView) -> Mat4 {
-        self.perspective
-            .get_clip_from_view_for_sub(sub_view)
+    fn get_clip_from_view_for_sub(&self, _sub_view: &bevy::render::camera::SubCameraView) -> Mat4 {
+        //self.perspective.get_clip_from_view_for_sub(sub_view)
+        todo!()
     }
 
     fn update(&mut self, width: f32, height: f32) {
-        self.perspective.update(width, height);
+        self.perspective.update(width, height)
     }
 
     fn far(&self) -> f32 {
         self.perspective.far()
     }
 
-    fn get_frustum_corners(&self, z_near: f32, z_far: f32) -> [Vec3A; 8] {
-        self.perspective
-            .get_frustum_corners(z_near, z_far)
+    fn get_frustum_corners(&self, _z_near: f32, _z_far: f32) -> [Vec3A; 8] {
+        todo!()
     }
 }
 
 fn update_portal_camera_near_clip_plane(
-    mut q_portal_camera: Query<
-        (&PortalCamera, &Transform, &mut Projection),
-        Or<(Changed<GlobalTransform>, Changed<PortalCamera>)>,
-    >,
+    mut q_portal_camera: Query<(&PortalCamera, &Transform, &mut Projection)>,
     q_portal: Query<&Transform, (With<PortalEntrance>, Without<PortalCamera>)>,
 ) {
     for (portal_camera, portal_camera_transform, mut portal_camera_projection) in
@@ -300,25 +260,17 @@ fn update_portal_camera_near_clip_plane(
         let portal_entrance_affine = portal_entrance_transform.compute_matrix();
         let local_entrance_affine = portal_camera_affine.inverse() * portal_entrance_affine;
         let local_entrance_transform = Transform::from_matrix(local_entrance_affine);
-        let camera_forward = Vec3::NEG_Z;
-        let plane_normal = if local_entrance_transform
-            .forward()
-            .dot(camera_forward)
-            < 0.0
-        {
-            -local_entrance_transform.forward()
-        } else {
-            local_entrance_transform.forward()
-        };
+        let plane_normal = -local_entrance_transform.forward();
         let d = local_entrance_transform
             .translation
-            .dot(plane_normal.into());
+            .dot(plane_normal.into())
+            / plane_normal.length();
         let perspective = PerspectiveProjection {
             fov: 70_f32.to_radians(),
-            near: 0.0001,
+            near: d,
             ..default()
         };
-        let near_plane = HalfSpace::new(plane_normal.extend(d * 0.95));
+        let near_plane = plane_normal.extend(-d);
         let custom_projection = ObliquePerspectiveProjection {
             perspective,
             near_plane,
