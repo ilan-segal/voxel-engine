@@ -162,7 +162,7 @@ fn setup_portal_camera(
     ));
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Debug, Clone)]
 struct ObliquePerspectiveProjection {
     perspective: PerspectiveProjection,
     near_plane: Vec4,
