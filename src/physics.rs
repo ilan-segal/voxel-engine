@@ -8,11 +8,7 @@ use friction::Friction;
 use gravity::Gravity;
 use velocity::Velocity;
 
-use crate::{
-    chunk::{data::Blocks, position::ChunkPosition},
-    utils::VolumetricRange,
-    world::neighborhood::ComponentIndex,
-};
+use crate::{chunk::data::Blocks, utils::VolumetricRange, world::neighborhood::ComponentIndex};
 
 pub mod aabb;
 pub mod collision;
@@ -116,7 +112,6 @@ struct MovingObjectQuery {
     transform: &'static mut Transform,
     v: &'static mut Velocity,
     aabb: &'static Aabb,
-    chunk_position: &'static ChunkPosition,
 }
 
 fn apply_velocity_with_terrain_collision(

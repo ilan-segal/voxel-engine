@@ -243,7 +243,7 @@ impl<T: Into<IVec3>> From<T> for SpawnFallingSandEvent {
 }
 
 #[derive(Component)]
-#[require(Gravity, Aabb::cube(0.9999), Collidable, ChunkPosition)]
+#[require(Gravity, Aabb::cube(0.9999), Collidable)]
 struct FallingSand;
 
 fn spawn_falling_sand(

@@ -207,12 +207,12 @@ struct PreviousPosition(Vec3);
 
 fn add_prev_position_component(
     mut commands: Commands,
-    q_no_prev_position: Query<Entity, (With<Transform>, Without<PreviousPosition>)>,
+    q_no_prev_position: Query<(Entity, &Transform), Without<PreviousPosition>>,
 ) {
-    for entity in q_no_prev_position.iter() {
+    for (entity, transform) in q_no_prev_position.iter() {
         commands
             .entity(entity)
-            .insert(PreviousPosition::default());
+            .insert(PreviousPosition(transform.translation));
     }
 }
 
@@ -225,7 +225,7 @@ fn update_prev_position(mut q_prev_position: Query<(&Transform, &mut PreviousPos
 // Don't teleport child entities, since they'll just move with their parent
 fn move_through_portals(
     mut q_teleportable: Query<
-        (&GlobalTransform, &mut Transform),
+        (&PreviousPosition, &mut Transform),
         (Without<ChildOf>, Without<PortalEntrance>),
     >,
     q_portal: Query<(&Transform, &PortalEntrance)>,
@@ -236,7 +236,7 @@ fn move_through_portals(
                 portal_entrance,
                 portal_entrance_transform,
                 &transform.translation,
-                &prev_position.translation(),
+                &prev_position.0,
             ) {
                 continue;
             }
@@ -265,6 +265,9 @@ fn portal_is_crossed(
 ) -> bool {
     let x0 = entity_prev_position;
     let x1 = entity_position;
+    if x0 == x1 {
+        return false;
+    }
     let d = x1 - x0;
     let p0 = portal_entrance_transform.translation;
     let p1 =
