@@ -51,7 +51,7 @@ fn prepare_pbr_input(frag: VertexOutput) -> PbrInput {
 
 fn get_base_color(mesh: VertexOutput) -> vec4<f32> {
     let texture_index = mesh.texture_index;
-    let uv = get_uv(mesh.world_position.xyz, mesh.normal_id);
+    let uv = get_uv(mesh.world_position.xyz - mesh.world_position_offset, mesh.normal_id);
     let overlay_index = get_overlay_index(mesh.texture_index);
     var color = vec4(0., 0., 0., 0.);
 

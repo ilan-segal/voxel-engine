@@ -9,6 +9,7 @@ struct VertexOutput {
     @location(1) normal_id: u32,
     @location(2) texture_index: u32,
     @location(3) ao_brightness: f32,
+    @location(4) world_position_offset: vec3<f32>,
 };
 
 const NORTH: u32 = 0;
