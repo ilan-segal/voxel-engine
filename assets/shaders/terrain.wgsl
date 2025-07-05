@@ -41,15 +41,15 @@ fn vertex(
     // Leaves blowing in the wind
     var offset = vec3<f32>(0.0, 0.0, 0.0);
     if block_id == TEXTURE_IDX_OAK_LEAVES {
-        let t = globals.time * 0.2;
-        let offset_strength = 0.05;
+        let t = globals.time * 0.25;
+        let offset_strength = 0.02;
+        let actual_world_position = get_world_from_local(in.instance_index) * world_position;
         // Positional offset
-        let a = (2.0 * 3.14159) / (32.);
-        let b = 5.0;
+        let b = 0.5;
         offset = vec3(
-            wind_sway_offset(t + a * b * world_position.x),
-            wind_sway_offset(t + a * b * world_position.y),
-            wind_sway_offset(t + a * b * world_position.z),
+            wind_sway_offset(t + b * actual_world_position.x),
+            wind_sway_offset(t + b * actual_world_position.y),
+            wind_sway_offset(t + b * actual_world_position.z),
         ) * offset_strength;
     }
 
